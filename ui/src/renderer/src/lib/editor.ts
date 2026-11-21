@@ -11,6 +11,7 @@
  *  openEditorProject(); App.tsx switches to the page on 'open-editor-page'. */
 import { useEffect, useState } from 'react'
 import { editorApi, EditorRouteError, type EditorOpenRequest, type EditorProject, type EditorTakeIn } from './api'
+import { exportDestination, nextOpeningProgress, OPENING_MOST } from './editorOpening'
 import { getExportFolder } from './exportFolder'
 import { t } from './i18n'
 
@@ -182,10 +183,13 @@ async function wantsFresh(project: EditorProject): Promise<boolean> {
 }
 
 /** Wait for a project to be made, then open it on the page. */
-async function openReady(first: EditorProject, token: number, mayRemake = true): Promise<void> {
+async function openReady(first: EditorProject, token: number, mayRemake = true, restart = false): Promise<void> {
   let project = first
   const wasFailed = project.state === 'failed'
-  set({ opening: { name: project.name, progress: openingProgress(project), id: project.id }, openError: '' })
+  set({ opening: { name: project.name, progress: openingProgress(project, restart), id: project.id }, openError: '' })
+  // The editor is started while the project is made, so it is ready when the
+  // project is (FL2 F1): hidden, with no project, until show() opens this one.
+  if (project.state === 'building') void window.studio?.editor?.prepare?.()
   while (project.state === 'building') {
     await buildNews(1000)
     if (token !== openToken) return
@@ -218,7 +222,8 @@ async function openReady(first: EditorProject, token: number, mayRemake = true):
     return
   }
   if (opened.state === 'building') {
-    await openReady(opened, token, false)
+    // Made again (it had failed): its bar starts again too (FL2 F3).
+    await openReady(opened, token, false, true)
     return
   }
   if (opened.state !== 'ready') {
@@ -254,17 +259,42 @@ export async function showOptions(
   project: EditorProject | null
 ): Promise<{ exportFolder: string; destination: string }> {
   const exportFolder = await getExportFolder()
-  let destination: string
-  if (project?.kind === 'clip' && !project.clip_gone) {
-    destination = project.clip_changed
-      ? t('Saved next to this clip, which was changed since')
-      : t('Replaces this clip in the Library')
-  } else {
-    destination = exportFolder
-      ? t('Export folder: {folder}').replace('{folder}', exportFolder)
-      : t('Goes to your Downloads folder')
-  }
+  const destination = exportDestination(project, exportFolder, {
+    replaces: t('Replaces this clip in the Library'),
+    besideChanged: t('Saved next to this clip, which was changed since'),
+    folder: t('Export folder: {folder}'),
+    downloads: t('Goes to your Downloads folder')
+  })
   return { exportFolder, destination }
+}
+
+/** The editor started early for a project being made (prepare) is closed
+ *  again when that open ended without showing a project: it failed, or
+ *  another open took its place. Never the editor of a shown project (the
+ *  main process only closes one that has no project). */
+function releasePrepared(token: number): void {
+  if (token === openToken && store.opening === null) {
+    void window.studio?.editor?.unprepare?.()
+  }
+}
+
+/** The shown project read again when the page is shown again, so the
+ *  editor's Export sheet says where the file goes now: a clip deleted while
+ *  its project was open goes to the export folder (FL2 F4). Only the line
+ *  changes; the editor keeps the project as it is. */
+export async function refreshShownProject(): Promise<void> {
+  const bridge = window.studio?.editor
+  const id = store.shownId
+  if (!bridge || !id || !store.runtime.running || store.runtime.projectId !== id) return
+  let project: EditorProject
+  try {
+    project = await editorApi.project(id)
+  } catch {
+    return
+  }
+  if (store.shownId !== id) return
+  set({ project })
+  await bridge.show(id, await showOptions(project))
 }
 
 /** Open a clip, a Library video or a file in the editor: made first when
@@ -284,6 +314,7 @@ export async function openInEditor(req: EditorOpenRequest): Promise<void> {
   } catch (e) {
     if (token === openToken) set({ opening: null, openError: openErrorText(e) })
   }
+  releasePrepared(token)
 }
 
 /** Open a project from the page's list (or from Quick edit's question). */
@@ -302,6 +333,7 @@ export async function openEditorProject(id: string): Promise<void> {
   } catch (e) {
     if (token === openToken) set({ opening: null, openError: openErrorText(e) })
   }
+  releasePrepared(token)
 }
 
 /** Start the editor again on the shown project (Try again, Open again, or
@@ -311,7 +343,11 @@ export async function ensureEditorShown(): Promise<void> {
   const id = store.shownId
   if (!bridge || !id) return
   set({ runtime: { ...store.runtime, error: '', ended: '' } })
-  await bridge.show(id, await showOptions(store.project))
+  // Read again: the clip may have been deleted since (FL2 F4).
+  const project = await editorApi.project(id).catch(() => store.project)
+  if (store.shownId !== id) return
+  if (project && project !== store.project) set({ project })
+  await bridge.show(id, await showOptions(project))
 }
 
 /** Try again after a start that failed or a software-only start. */
@@ -401,16 +437,18 @@ function buildNews(ms: number): Promise<void> {
   })
 }
 
-/** The most the bar says before the editor shows the project: a project is
- *  "ready" (1.0) a moment before the editor has drawn it. */
-export const OPENING_MOST = 0.99
+export { OPENING_MOST }
 
 /** How far the project being opened is, for its bar: never less than it
  *  already said for that project (the event stream and the page's own
- *  asking can arrive out of order), and never 100% while it is opening. */
-export function openingProgress(project: { id?: string; progress?: number }): number {
+ *  asking can arrive out of order), never 100% while it is opening, and
+ *  from the start again when its build restarts (lib/editorOpening.ts). */
+export function openingProgress(
+  project: { id?: string; state?: string; progress?: number },
+  restart = false
+): number {
   const before = store.opening && (!store.opening.id || store.opening.id === project.id) ? store.opening.progress : 0
-  return Math.min(OPENING_MOST, Math.max(before || 0, project.progress || 0))
+  return nextOpeningProgress(before, project, restart)
 }
 
 let appPointerAt = 0

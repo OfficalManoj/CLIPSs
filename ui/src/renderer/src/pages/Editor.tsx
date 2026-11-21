@@ -24,6 +24,7 @@ import {
   noteSentences,
   openEditorProject,
   openInEditor,
+  refreshShownProject,
   restartEditor,
   useEditorStore
 } from '../lib/editor'
@@ -359,6 +360,12 @@ function ProjectView({
   useEffect(() => {
     if (store.shownId && !rt.running && !rt.error && rt.ended !== 'unexpected') void ensureEditorShown()
   }, [store.shownId, rt.running, rt.error, rt.ended])
+
+  // Coming back to the page: the shown project is read again, so the Export
+  // sheet's line follows a clip deleted meanwhile (FL2 F4).
+  useEffect(() => {
+    void refreshShownProject()
+  }, [])
 
   // A click in the editor takes the keys: no button of the page stays
   // focused (Space would press it). Ctrl+F6 in the editor gives them back,

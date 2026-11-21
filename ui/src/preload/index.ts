@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld('studio', {
     getState: (): Promise<Record<string, unknown> | null> => ipcRenderer.invoke('editor:getState'),
     setWords: (words: { message: string; keep: string; quit: string }): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('editor:words', words),
+    prepare: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('editor:prepare'),
+    unprepare: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('editor:unprepare'),
     reveal: (projectId: string, index: number): Promise<boolean> =>
       ipcRenderer.invoke('editor:reveal', projectId, index),
     ask: (question: {

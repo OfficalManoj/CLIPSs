@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "Clips Kitty editor suite",
-  "updated": "2026-11-18",
+  "updated": "2026-11-20",
   "about": "Machine-readable tracker for the editor suite. STATUS.md is the readable view of this file; when they disagree, this file wins. Acceptance criteria are copied from the plan's Proof column; step 0 also carries the checks from the plan's section on keeping plain auto-clipping identical. depends_on is read from the plan's text (which earlier step's output a step uses): the plan gives the run order, not a dependency list.",
   "now": "1",
   "stop_after_phase": 2,
@@ -2331,9 +2331,9 @@
           "id": "K-D1",
           "date": "2026-11-18",
           "found_by": "qc",
-          "summary": "The walk through the real desktop app (QC step 5) was not done: drive C: was full (filled by work outside this step). Not a code defect; QC reruns step 5 once C: has room, with the newest editor build",
+          "summary": "The walk through the real desktop app (QC step 5) was not done: drive C: was full (filled by work outside this step). Not a code defect; QC reruns step 5 once C: has room, with the newest editor build; done: QC rounds 2 to 4 walked the real desktop app with the newest editor builds (FL2 F5, 2026-11-20)",
           "routed_to": "qc",
-          "status": "open"
+          "status": "fixed"
         },
         {
           "id": "K-D2",
@@ -2427,9 +2427,9 @@
           "id": "K-D15",
           "date": "2026-11-19",
           "found_by": "black-box",
-          "summary": "Typing into a caption's Content box in the embedded editor lost characters. Diagnosed (k2/typing): real key presses arrive whole; only injected VK_PACKET characters are lost when embedded (winit's WM_CHAR pairing), and a press on the box's border band takes the keyboard from the field so single-letter shortcuts edit the timeline. Both are the fork's; nothing in Clips Kitty takes keys (no accelerator, global shortcut or before-input-event), so nothing was changed here",
+          "summary": "Typing into a caption's Content box in the embedded editor lost characters. Diagnosed (k2/typing): real key presses arrive whole; only injected VK_PACKET characters are lost when embedded (winit's WM_CHAR pairing), and a press on the box's border band takes the keyboard from the field so single-letter shortcuts edit the timeline. Both are the fork's; nothing in Clips Kitty takes keys (no accelerator, global shortcut or before-input-event), so nothing was changed here; fixed in the fork at ee029aff (field focus: a press on the box's border band keeps the keyboard in the field), checked in the desktop app before the owner's click-through; injected VK_PACKET typing stays upstream's winit issue (PATCHES.md section 9) (FL2 F5)",
           "routed_to": "eng-fork",
-          "status": "routed"
+          "status": "fixed"
         },
         {
           "id": "K-D16",
@@ -2526,6 +2526,150 @@
           "summary": "S4: the Export sheet said '~31 MB' before a 30 s 1920x1080 export that came to 2.9 MB (S3: '~17 MB' for 1.77 MB); the finished sheet's 'Exported · 3 MB' was right. Not changed, by choice: the estimate is Concat's own (export.rs size_bytes = target_kbps x length + sound, unchanged in the fork), 8 Mbps for 1080p30; x264's average-bitrate mode spends far less on the synthetic near-still test videos (synth_timer_2h is 0.15 Mbps as made), and on real footage it held (S8 '~16 MB' for 16.7 MB). A content-aware estimate needs the sources' bitrate added to the fork's probe and model, a fork build and a heuristic, for a figure marked '~' that only errs high; no work lost, no wrong file",
           "routed_to": "eng-fork",
           "status": "wont_fix"
+        }
+      ]
+    },
+    {
+      "id": "FL2",
+      "title": "Fixes, Ctrl keys, the first Concat update",
+      "size": "M",
+      "scope": "Concat v0.2.12 merged into the fork and a weekly upstream check (fork side); Ctrl shortcuts inside Clips Kitty as data in the editor's own settings (ED31); a faster first open (full-frame 9:16 clips without the full render, the editor started while the project is made); fixes held from the K2 click-through (record read race, the bar after a failed build, the Export sheet's line after the clip is deleted); playback A/B of the base encoding",
+      "closes": [],
+      "depends_on": [
+        "K2"
+      ],
+      "status": "in_progress",
+      "user_visible": true,
+      "acceptance": [
+        "Bare letters and Backspace do nothing to the timeline inside Clips Kitty; each former one-letter shortcut works on its Ctrl chord; typing into a caption still lands every character; Settings > Shortcuts shows the Ctrl chords and a change made there survives a restart",
+        "A full-frame 9:16 clip shows in the editor in at most 10 s the first time",
+        "registry.load never calls a good project's record unreadable because it met the file being replaced; the two route tests that were flaky under load pass 50 runs in a row",
+        "Reopening a project whose build failed starts its bar again; the Export sheet says where the file goes once the clip is deleted",
+        "Playback at least 58 of 60 fps, or a written decision with the numbers",
+        "The v0.2.12 merge passes the K2 scenarios",
+        "Plain auto-clipping and Quick edit behave and render exactly as before: argv snapshots, golden renders, import guard"
+      ],
+      "files": [
+        "ui/src/main/editorKeys.ts",
+        "ui/src/main/editor.ts",
+        "ui/src/preload/index.ts",
+        "ui/src/renderer/src/env.d.ts",
+        "ui/src/renderer/src/lib/editorOpening.ts",
+        "ui/src/renderer/src/lib/editor.ts",
+        "ui/src/renderer/src/pages/Editor.tsx",
+        "kitty_editor/fastbase.py",
+        "kitty_editor/registry.py",
+        "tests/test_ui_editor_fl2.py",
+        "tests/test_kitty_editor_fl2.py",
+        "tests/test_ui_editor_page.py"
+      ],
+      "notes": [
+        "Plan: the 2026-11-20 editor plan, step FL2 (Clips Kitty Editor becomes the one editor)",
+        "Contract: docs/editor-suite/api/k2-editor.md, section FL2",
+        "The fork's half (U1 the v0.2.12 merge, U2 the upstream check, F6 the focused field on close) and P1 (the base encoding A/B) are recorded by their own agents"
+      ],
+      "results": [
+        {
+          "date": "2026-11-20",
+          "agent": "Engineering (Clips Kitty)",
+          "check": "C1 in the real desktop app (build 44855595570), a fresh editor folder and one where the person had already moved shortcuts",
+          "outcome": "pass",
+          "evidence": "Fresh folder: the settings file held only the 10 keybinds after the first start. With a clip selected and the playhead inside it, q w f m h n s b and Backspace changed nothing (saved project byte-identical, not dirty). Ctrl+M muted, Ctrl+F froze (24 to 26 clips), Ctrl+Shift+Q and Ctrl+Shift+W cut left and right, Delete deleted, Shift+Delete deleted and closed the gap (each undone with Ctrl+Z); Ctrl+Shift+B, Ctrl+H and Ctrl+N switched the split tool, the pan tool and snapping (pictures), Ctrl+Shift+S switched the preview axis (the editor's settings file). ' qwfmhnsb KitX' then Backspace typed into a caption's Content box with real key presses saved as 'qwfmhnsb Kit'. Settings > Shortcuts showed the Ctrl chords; the toolbar tooltips said 'Split tool (Ctrl+Shift+B)' and 'Pan tool (Ctrl+H)' and the Edit menu 'Snap to edges Ctrl+N'. Freeze moved there to Ctrl+Shift+F was still Ctrl+Shift+F after the app was stopped and started again. Moved folder (the owner-style settings file with freeze on Ctrl+Shift+F and mute on no key before Clips Kitty ran): both kept, the other 8 written, the other 30 settings untouched; Ctrl+F and Ctrl+M did nothing, Ctrl+Shift+F froze, Backspace and Shift+Backspace did nothing. Pictures outside the repository"
+        },
+        {
+          "date": "2026-11-20",
+          "agent": "Engineering (Clips Kitty)",
+          "check": "F1 first open in the desktop app, project deleted between runs",
+          "outcome": "pass",
+          "evidence": "speech_vertical_20s's clip (full-frame 9:16, 20 s, 30 fps): 4.57 / 4.22 / 4.11 s (18.5 s before); the editor process started 0.4 to 0.8 s after the click, while the base was made. real_150s's 24.8 s clip (60 fps, face-safe layout): 12.48 / 12.15 / 12.47 s (13.6 s before). The bar never went back and said at most 99% before the editor showed the project. Identity base against the clip's own render path's base: SSIM 0.9994 to 0.9996 at 5 points, 600 = 600 frames, -14.4 = -14.4 LUFS; with Vertical Live 0.9996, with Vertical Live and the vintage look 0.9983, tracked with the vintage look 0.9988, frames and loudness equal in each"
+        },
+        {
+          "date": "2026-11-20",
+          "agent": "Engineering (Clips Kitty)",
+          "check": "F2 the two route tests flaky under load, 50 runs in a row",
+          "outcome": "pass",
+          "evidence": "test_a_clip_is_opened_as_a_project_and_the_same_one_every_time_after and test_projects_are_listed_last_opened_first_read_and_deleted (the two that failed with \"This project's record can't be read.\" in k2/fix2): 50 of 50 runs passed, each a fresh pytest process, with tests/test_kitty_editor_guards.py running in a loop beside them for load"
+        },
+        {
+          "date": "2026-11-20",
+          "agent": "Engineering (Clips Kitty)",
+          "check": "F3 and F4 in the desktop app",
+          "outcome": "pass",
+          "evidence": "F3: a clip project recorded as failed at 80% (its video removed) opened from Recent projects: the bar read 2%, 5%, then about 24% while it was made again, never 80%, and the editor showed it when it was ready (it was never shown empty). F4: the open project's clip deleted on the Clip Editor page; back on the Editor page the editor's Export sheet said 'Export folder: <the export folder>' with the name '<name> - <date>' (it said 'Replaces this clip in the Library' before)"
+        }
+      ],
+      "defects": [
+        {
+          "id": "K-D28",
+          "date": "2026-11-20",
+          "found_by": "owner",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "The editor's one-letter shortcuts (Q, W, F, B, M, H, N, S) and Backspace edited the timeline whenever the keyboard was not in a text field (K2 click-through, decision 2). Fixed as ED31, with no editor code: before it starts the editor, the main process lays Clips Kitty's table into the editor's own settings file (keybinds): freeze Ctrl+F, delete left Ctrl+Shift+Q, delete right Ctrl+Shift+W, split tool Ctrl+Shift+B, mute Ctrl+M, pan Ctrl+H, snap Ctrl+N, preview axis Ctrl+Shift+S, delete Delete only, ripple delete Shift+Delete only. Merged into the file, written beside it and moved over it, once per table version, never over a chord the person set in Settings > Shortcuts (ui/src/main/editorKeys.ts; what was written is kept in Clips Kitty's own data). Tests: tests/test_ui_editor_fl2.py"
+        },
+        {
+          "id": "K-D29",
+          "date": "2026-11-20",
+          "found_by": "owner",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "A clip whose source is already 9:16 (full frame) was refused by the fast base and took the full render: 18.5 s to the editor for speech_vertical_20s. Fixed: fastbase.make makes its base as an identity crop (the layout told from 5 frames; a face-safe one still goes the full way), and a Vertical Live clip's base is its whole frame as the pipeline's single encode makes it. 4.1 to 4.6 s now. Tests: tests/test_kitty_editor_fl2.py"
+        },
+        {
+          "id": "K-D30",
+          "date": "2026-11-20",
+          "found_by": "owner",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "The editor process was started only once the project was made, adding about 2 s to every first open. Fixed: while a project is made the page asks the main process to start the editor hidden with no project (editor:prepare); show() then opens the project in it (host.open_project) and only then shows it; an open that ends without a project closes it again (editor:unprepare), and it is closed after 10 minutes without one"
+        },
+        {
+          "id": "K-D31",
+          "date": "2026-11-20",
+          "found_by": "eng-ck",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "Found in the desktop check: a clip whose crop never moves (a centred crop; synth_timer_30s's clip) has an empty crop script, which FFmpeg's sendcmd refuses, so its base went to the full render. Fixed: no script then, the crop stays where it is. Test: test_a_crop_that_never_moves_is_made_the_fast_way"
+        },
+        {
+          "id": "K-D32",
+          "date": "2026-11-20",
+          "found_by": "black-box",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "registry.load had no retry on Windows: a read that met the manifest being replaced (os.replace) said \"This project's record can't be read.\" for a good project, about once in a thousand opens, and two route tests were flaky under load. Fixed: the manifest is read under the lock its writers hold, and a sharing violation is tried again for up to 0.5 s; a file that is not JSON is not waited for. 50 of 50 runs of the two tests under load"
+        },
+        {
+          "id": "K-D33",
+          "date": "2026-11-20",
+          "found_by": "black-box",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "Reopening a project whose build had failed showed the bar stuck at the failed build's height until the new build passed it. Fixed: a failed project's progress counts as none, and a build that starts again starts its bar again (lib/editorOpening.ts nextOpeningProgress, run under Node in tests/test_ui_editor_fl2.py)"
+        },
+        {
+          "id": "K-D34",
+          "date": "2026-11-20",
+          "found_by": "black-box",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "After the clip of an open project was deleted, the editor's Export sheet still said \"Replaces this clip in the Library\" although the export went to the export folder. The line is Clips Kitty's (--export-note / host.open_project destination), given only at start and on a switch. Fixed: the page reads the shown project again when it is shown again and the main process tells the editor a changed line with host.open_project on the folder it already has open (which opens nothing again)"
+        },
+        {
+          "id": "K-D35",
+          "date": "2026-11-21",
+          "found_by": "black-box",
+          "routed_to": "eng-ck",
+          "status": "wont_fix",
+          "summary": "S7: 'Edit a file from your PC' with own_clip_45s.mp4 said \"Clips Kitty can't open that file.\"; the request's path had lost its backslashes. Not an app defect, no change: the main process returns the dialog's filePaths[0] and the page sends it with JSON.stringify. In the desktop app, with a real backslash path through the dialog hook, the request carried all 5 backslashes, the engine answered 200 and the file opened (16:9, 45 s). The reported path lost exactly what a JavaScript string literal loses when a path with single backslashes is typed into it (\\c \\e \\m \\o dropped, \\b turned into a backspace character): the test script's quoting"
+        },
+        {
+          "id": "K-D36",
+          "date": "2026-11-21",
+          "found_by": "black-box",
+          "routed_to": "eng-fork",
+          "status": "fixed",
+          "summary": "X1: Reset next to Mute in the editor's Settings > Shortcuts put it back on a bare M, and M alone then muted the selected clip. Fixed: Clips Kitty also writes its table as hostKeybinds in the editor's settings (kept equal to the table at every start; the editor never writes it), and the fork reads an action's defaults through it (keymap.rs defaults_of, prefs.rs host_keybinds; fork 0bac504c, build 44879315991), so Reset and Reset all go back to the Ctrl chords. Checked in the desktop app with build 44879315991: Mute moved to Ctrl+Shift+M, its Reset showed Ctrl+M (no arrow); with the clip selected M alone changed nothing (undo still greyed), Ctrl+M muted it (undone with Ctrl+Z). Tests: keymap::tests::the_hosts_defaults_are_what_reset_puts_back, tests/test_ui_editor_fl2.py test_the_hosts_defaults_are_kept_as_the_table"
         }
       ]
     }

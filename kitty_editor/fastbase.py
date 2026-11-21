@@ -21,10 +21,17 @@ face high in the frame). The captions, a watermark or a logo in the clip's
 file take no part in the match: each frame is compared in eight bands across
 its height, and only the five that agree best count.
 
+A clip whose source is already 9:16 (FL2) has no crop to read: its layout
+is told from five frames (the whole frame filling the screen, or the
+face-safe layout, which is left to the full render) and its base is the
+whole frame. A Vertical Live clip of a 9:16 source is the whole frame as the
+pipeline's single encode makes it, read from nothing.
+
 Any other clip (letterbox, split-screen, podcast, gaming, sport, Vertical
-Live, Longform, a clip with an edit of its own) is left to render_base's
-full render: make() returns None. So is a clip any sampled frame of which
-matches badly, so a framing that can't be read back is never guessed.
+Live of another shape, Longform, a clip with an edit of its own) is left to
+render_base's full render: make() returns None. So is a clip any sampled
+frame of which matches badly, so a framing that can't be read back is never
+guessed.
 
 Nothing here is used by a clipping run or by Quick edit.
 """
@@ -423,13 +430,15 @@ def colour_steps(source: Path) -> str:
     return f"format=bgr24,{UNTAGGED}"
 
 
-def filter_graph(layout: Layout, fps: str, first_x: int, script_name: str, vf_extra: str = "",
+def filter_graph(layout: Layout, fps: str, first_x: int, script_name: str | None, vf_extra: str = "",
                  colours: str = UNTAGGED) -> str:
     """The source's window cropped where the script says and laid out as
     video/cropper._render_tracked lays out this layout, with its colours
     (colour_steps) and the clip's colour filters (vf_extra, on the picture
-    only, as there)."""
-    crop = (f"sendcmd=f={script_name},crop@base=w={layout.crop_w}:h={layout.crop_h}:x={first_x}:y=0:exact=1,"
+    only, as there). No script: the crop stays at first_x (a crop as wide as
+    the source, FL2 F1)."""
+    send = f"sendcmd=f={script_name}," if script_name else ""
+    crop = (f"{send}crop@base=w={layout.crop_w}:h={layout.crop_h}:x={first_x}:y=0:exact=1,"
             f"{colours}")
     colour = f",{vf_extra}" if vf_extra else ""
     if layout.name == "full":
@@ -482,6 +491,107 @@ def render(source: Path, out: Path, start: float, seconds: float, *, graph: str,
     return out
 
 
+def live_layout(opts: dict, config: dict) -> bool:
+    """Whether the clip was rendered as Vertical Live (core.pipeline's
+    single-encode branch: the whole frame, no tracking, no crop): the
+    clip's or the job's toggle, and not a landscape profile."""
+    from core import modes
+
+    if opts.get("profile"):
+        return False
+    return modes.is_vertical_live(opts) or modes.is_vertical_live(config)
+
+
+def full_frame(src_w: int, src_h: int) -> bool:
+    """Whether the source is already 9:16: the tracker's 9:16 crop is the
+    whole frame, so it can't move (FL2 F1). As layouts() works the crop out."""
+    crop_w = int(src_h * 9 / 16)
+    crop_w -= crop_w % 2
+    return src_w * 16 >= src_h * 9 and crop_w >= src_w
+
+
+def live_graph(fps: str, src_w: int, src_h: int, vf_extra: str = "") -> str:
+    """A Vertical Live clip's picture as core.pipeline makes it: the whole
+    frame brought to 1080x1920 (modes.fit_filter: nothing for a 1080x1920
+    source) and the clip's colour filters, at the clip's constant rate, the
+    source's own colours (cut_clip pipes nothing through Python)."""
+    from core.modes import fit_filter
+
+    parts = [_source_filters(fps), fit_filter(src_w, src_h), vf_extra]
+    return f"[0:v]{','.join(p for p in parts if p)}[v]"
+
+
+IDENTITY_POINTS = (0.1, 0.3, 0.5, 0.7, 0.9)   # where a full-frame clip's layout is read
+
+
+def _one_grey(path: Path, at: float, width: int, height: int):
+    """One frame of `path` at `at` seconds, grey, scaled to width x height."""
+    from core.binaries import ffmpeg
+
+    cmd = [ffmpeg(), "-v", "error", "-ss", f"{max(0.0, at):.3f}", "-i", str(path), "-an", "-sn",
+           "-frames:v", "1", "-vf", f"scale={width}:{height}:flags=area,format=gray", "-f", "rawvideo", "-"]
+    for frame in _grey(cmd, width, height):
+        return frame
+    return None
+
+
+IDENTITY_MAD = 10.0     # grey levels: a full-frame clip's frame differs from its source's by less
+IDENTITY_MARGIN = 2.0   # and the face-safe layout must match this much better to be taken for it
+
+
+def identity_scores(src, clip) -> dict[str, float]:
+    """How far a clip frame (grey, CLIP_SCAN) is from the source frame of a
+    full-frame 9:16 source (grey, the same size) in the two layouts
+    _render_tracked can make of it: the whole frame filling the screen
+    ("full"), or the face-safe layout, the whole frame at full width under
+    the apps' top bar ("face", its bottom cut off). The mean absolute
+    difference in grey levels of the KEEP of BANDS bands across the height
+    that agree best: the captions, a watermark or a logo are in the others.
+    A difference, not a correlation, because a plain picture (a wall, a
+    title card) has nothing to correlate and is still the same picture."""
+    import numpy as np
+
+    _cw, ch = CLIP_SCAN
+    top = round(FACE_TOP * ch / OUT_H)
+    pairs = {"full": (src, clip), "face": (src[:ch - top], clip[top:])}
+    out: dict[str, float] = {}
+    for name, (a, b) in pairs.items():
+        diff = np.abs(a.astype(np.float32) - b.astype(np.float32))
+        edges = np.linspace(0, diff.shape[0], BANDS + 1).astype(int)
+        bands = sorted(float(diff[lo:hi].mean()) for lo, hi in zip(edges, edges[1:]) if hi > lo)
+        out[name] = float(np.mean(bands[:KEEP]))
+    return out
+
+
+def full_frame_layout(source: Path, clip_file: Path, start: float, seconds: float, *, src_w: int,
+                      src_h: int) -> tuple[Layout, list]:
+    """The layout of a clip whose source is already 9:16, read from five of
+    its frames: the whole frame filling the screen (an identity crop), or
+    NotPlain. A face-safe clip (the whole frame under the apps' top bar) and
+    a letterboxed one are not made here: they go to the full render."""
+    cw, ch = CLIP_SCAN
+    seen: list = []
+    votes = {"full": 0, "face": 0}
+    for share in IDENTITY_POINTS:
+        at = seconds * share
+        src = _one_grey(source, start + at, cw, ch)
+        clip = _one_grey(clip_file, at, cw, ch)
+        if src is None or clip is None:
+            continue
+        scores = identity_scores(src, clip)
+        seen.append({"at": round(at, 2), **{k: round(v, 2) for k, v in scores.items()}})
+        if scores["face"] + IDENTITY_MARGIN < scores["full"] and scores["face"] <= IDENTITY_MAD:
+            votes["face"] += 1
+        elif scores["full"] <= IDENTITY_MAD:
+            votes["full"] += 1
+    if votes["face"] > votes["full"]:
+        raise NotPlain("the clip is in the face-safe layout")
+    if votes["full"] < 3:
+        raise NotPlain(f"only {votes['full']} of {len(IDENTITY_POINTS)} frames are the whole picture")
+    crop_w = src_w - src_w % 2
+    return Layout("full", crop_w, src_h, 0, OUT_H), seen
+
+
 def make(row, opts: dict, config: dict, source: Path, clip_file: Path | None, work_dir: Path,
          progress=None) -> Path | None:
     """The clip's base video from its own framing, or None when the clip is
@@ -490,7 +600,10 @@ def make(row, opts: dict, config: dict, source: Path, clip_file: Path | None, wo
     from kitty_editor.build import probe
     from video.filters import combined_chain
 
-    if clip_file is None or not Path(clip_file).is_file() or not plain_layout(opts, config):
+    if clip_file is None or not Path(clip_file).is_file():
+        return None
+    live = live_layout(opts, config)
+    if not live and not plain_layout(opts, config):
         return None
     src, clip = probe(source), probe(clip_file)
     if not src["video"] or not clip["video"] or (clip["width"], clip["height"]) != (OUT_W, OUT_H):
@@ -510,6 +623,32 @@ def make(row, opts: dict, config: dict, source: Path, clip_file: Path | None, wo
 
     def part(lo: float, hi: float):
         return (lambda v: progress(lo + (hi - lo) * v)) if progress is not None else None
+
+    if live or full_frame(src["width"], src["height"]):
+        # Already 9:16 (FL2 F1): nothing to read back but which layout.
+        if not full_frame(src["width"], src["height"]):
+            return None
+        work_dir.mkdir(parents=True, exist_ok=True)
+        normalize = bool(opts.get("normalize_audio", True))
+        if live:
+            graph = live_graph(fps, src["width"], src["height"], vf_extra)
+            (work_dir / "framing.json").write_text(json.dumps({"layout": "live"}), encoding="utf-8")
+        else:
+            try:
+                layout, seen = full_frame_layout(source, clip_file, start, seconds, src_w=src["width"],
+                                                 src_h=src["height"])
+            except NotPlain as e:
+                print(f"      Editor base: the clip's framing can't be read back ({e}); making it in full")
+                (work_dir / "framing.json").write_text(json.dumps({"failed": str(e)}), encoding="utf-8")
+                return None
+            (work_dir / "framing.json").write_text(json.dumps({"layout": layout.name, "identity": True,
+                                                               "seen": seen}), encoding="utf-8")
+            graph = filter_graph(layout, fps, 0, None, vf_extra, colour_steps(source))
+        if progress is not None:
+            progress(0.1)
+        frames = max(1, round(seconds * _rate(fps)))
+        return render(source, work_dir / "base.mp4", start, seconds, graph=graph, workdir=work_dir,
+                      normalize=normalize, progress=part(0.1, 1.0), frames=frames)
 
     seen: list = []
     try:
@@ -531,7 +670,11 @@ def make(row, opts: dict, config: dict, source: Path, clip_file: Path | None, wo
     script.write_text(script_text, encoding="utf-8")
     (work_dir / "framing.json").write_text(
         json.dumps({"layout": layout.name, "frames": frames, "keys": keys, "seen": seen}), encoding="utf-8")
+    # A crop that never moves (a centred one) has no commands, and FFmpeg's
+    # sendcmd refuses an empty script: the crop then simply stays at first_x
+    # (FL2: such clips went to the full render).
+    moves = script.name if script_text.strip() else None
     return render(source, work_dir / "base.mp4", start, seconds,
-                  graph=filter_graph(layout, fps, first_x, script.name, vf_extra, colour_steps(source)),
+                  graph=filter_graph(layout, fps, first_x, moves, vf_extra, colour_steps(source)),
                   workdir=work_dir,
                   normalize=bool(opts.get("normalize_audio", True)), progress=part(0.25, 1.0), frames=frames)

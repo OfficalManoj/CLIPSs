@@ -90,6 +90,10 @@ interface Window {
       close: () => Promise<{ ok: boolean }>
       getState: () => Promise<Record<string, unknown> | null>
       setWords?: (words: { message: string; keep: string; quit: string }) => Promise<{ ok: boolean }>
+      /** Start the editor hidden, with no project, while one is made (FL2 F1). */
+      prepare?: () => Promise<{ ok: boolean }>
+      /** Close an editor started by prepare that never got its project. */
+      unprepare?: () => Promise<{ ok: boolean }>
       reveal: (projectId: string, index: number) => Promise<boolean>
       ask: (question: {
         message: string

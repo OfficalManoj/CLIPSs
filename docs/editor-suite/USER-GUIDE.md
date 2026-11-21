@@ -274,7 +274,7 @@ If you don't see **Editor** in the menu on the left, your copy of Clips Kitty do
 
 1. Go to **Clip Editor** and pick a video.
 2. Point at a clip and click **Edit** (next to **Publish**). You can also click **Edit** next to **Edit this clip**.
-3. The **Editor** page opens. The first time, Clips Kitty gets the clip ready, which takes a minute or two; you see how far it is. After that it opens straight away.
+3. The **Editor** page opens. The first time, Clips Kitty gets the clip ready, which takes a few seconds for most clips and up to a minute or two for some (gaming, sport or letterboxed clips); you see how far it is. After that it opens straight away.
 
 In the editor:
 
@@ -292,7 +292,7 @@ Click **Export** in the editor (top right), then **Export**.
 - **A clip:** the export becomes that clip's video in your Library. The bar says **Saved as this clip's video.**
 - **A whole video or a file:** it's saved to your export folder (the one in Settings). If you haven't chosen one, it goes to your Downloads folder, the same place the app's other Export buttons use. The name box starts as "project name - date"; change it if you like, and that is the file's name. The bar says where, with **Show in folder**.
 
-The Export window says under the name where your video will go: **Replaces this clip in the Library**, or the export folder.
+The Export window says under the name where your video will go: **Replaces this clip in the Library**, or the export folder. If you deleted the clip from your Library meanwhile, it goes to the export folder, and the Export window says so.
 
 No end card is added to what you export from the editor.
 
@@ -316,6 +316,7 @@ Once you've exported a clip from the editor, today's clip editor (**Edit this cl
 
 - The editor is drawn over the page. When Clips Kitty shows something of its own there (for example the Feedback window), the editor steps aside until you close it.
 - Click in the editor to type in it; click anywhere else in Clips Kitty to type there. With the keyboard: **Tab** to the editor and press **Enter** to use it, **Ctrl+F6** to come back.
+- **Shortcuts need Ctrl inside Clips Kitty**, so a stray letter never changes your timeline: **Ctrl+F** freeze, **Ctrl+Shift+Q** and **Ctrl+Shift+W** delete left and right of the playhead, **Ctrl+Shift+B** the split tool, **Ctrl+M** mute, **Ctrl+H** the pan tool, **Ctrl+N** snap to edges, **Ctrl+Shift+S** the preview axis. **Delete** deletes a clip and **Shift+Delete** deletes it and closes the gap; Backspace doesn't delete clips. **Space**, the arrow keys, **Home** and **End** and the usual Ctrl shortcuts (**Ctrl+Z** undo, **Ctrl+B** split, **Ctrl+S** save, …) work as always. To change any of them, open the editor's **Settings** (**Ctrl+,**) and go to **Shortcuts**. Clips Kitty keeps your changes.
 - If your graphics card can't be used, or the editor can't start, the Editor page says so with **Try again**. Updating the graphics driver usually helps.
 - The editor needs Windows.
 

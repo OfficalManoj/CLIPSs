@@ -358,6 +358,8 @@ Every call checks it comes from the main window's own page (as `plugin-session` 
 | `setVisible(visible)` | `host.set_visible` |
 | `focus()` / `blur()` | `host.focus` / `host.blur` (blur only when the editor has the keys, asked fresh) |
 | `close()` | `host.close`, back to the lists |
+| `prepare()` | (FL2) start the editor hidden with no project while one is made; nothing when one runs |
+| `unprepare()` | (FL2) close an editor `prepare()` started that never got a project |
 | `reveal(projectId, index)` | Explorer on that project's recorded export (`-1` = the latest); the path comes from the engine |
 | `ask({message, detail, buttons, defaultId, cancelId})` | a native question, drawn above the editor; the button's index |
 | `getState()`, `onState(cb)` | `{running, projectId, visible, focused, dirty, exporting, software, error, ended, code}` |
@@ -518,3 +520,60 @@ One line each; the records are in `state.json` (K1 and K2 `defects`).
 - Typing quickly into the editor's caption text box from the test driver dropped characters (the change still landed); a person typing was not tried. GUESS: the driver's speed.
 - The page's new strings are in English in every language until the translators add them (t() falls back to English).
 - K3 bundles the editor; until then it is found only through `CLIPS_KITTY_EDITOR_DIR`.
+
+## FL2 (2026-11-20): Ctrl keys, a faster first open, fixes, the first Concat update
+
+### The first Concat update (U1, U2; the fork's side)
+
+- Concat v0.2.12 (995b2054) merged into `kitty/embed` (merge 1a74a02a; the branch at 4d70ba5a with the PATCHES.md records). The editor build is Actions run **44855595570**, built at 1fa05725 ("Clips Kitty Editor 0.2.12, based on Concat 0.2.12").
+- Effort: about 1 hour, of it 41.5 minutes the Actions build; 52 upstream commits new to the fork, 25 files changed on both sides, 2 conflicts of one hunk each (`platform.rs`, `studio/edit.rs`), built on the first try. The details are in the fork's PATCHES.md, "Updating from Concat".
+- A weekly upstream check (`.github/workflows/upstream-check.yml` on `kitty/embed`) syncs the fork's `main` with Concat's and opens an "Update to Concat vX" pull request for a new release. Two owner steps are open: the schedule only fires from the default branch, and a `KITTY_SYNC_TOKEN` secret is needed when upstream commits touch workflow files.
+
+### Ctrl shortcuts (C1, ED31)
+
+Inside Clips Kitty no shortcut is a bare letter, and Backspace never deletes a clip. No editor code changes: before it starts the editor, the main process (`ui/src/main/editorKeys.ts`) lays this table into the editor's own settings file, `keybinds` in `%APPDATA%\com.clipskitty.editor\settings.json` (or `portable\settings.json` beside a portable build): an action's id to one chord, which replaces that action's whole default list.
+
+| Action (id) | Concat v0.2.12 | Inside Clips Kitty |
+|---|---|---|
+| Freeze (`freeze`) | F | Ctrl+F |
+| Delete left (`delete-left`) | Q | Ctrl+Shift+Q |
+| Delete right (`delete-right`) | W | Ctrl+Shift+W |
+| Split tool (`split-tool`) | B | Ctrl+Shift+B |
+| Mute (`mute`) | M | Ctrl+M |
+| Pan tool (`pan`) | H | Ctrl+H |
+| Snap to edges (`snap`) | N | Ctrl+N |
+| Preview axis (`preview-axis`) | S | Ctrl+Shift+S |
+| Delete (`delete`) | Delete, Backspace | Delete |
+| Delete and close the gap (`ripple-delete`) | Shift+Delete, Shift+Backspace | Shift+Delete |
+
+- These are all the bare-key defaults in keymap.rs at v0.2.12 apart from the ones that stay: Space (play), Home, End and the four arrows (Shift+arrow steps ten frames). Every Ctrl chord the editor ships stays (save Ctrl+S, import Ctrl+I, export Ctrl+E, settings Ctrl+comma, undo Ctrl+Z, redo Ctrl+Shift+Z and Ctrl+Y, select all Ctrl+A, copy Ctrl+C, paste Ctrl+V, duplicate Ctrl+D, split at playhead Ctrl+B, zoom Ctrl+= or Ctrl++ and Ctrl+-), and none of the new ones is one of them or one the window keeps (Ctrl+O, Ctrl+W, Ctrl+Q, F10, Alt+F/E/V). Slint matches a window binding's modifiers exactly, so Ctrl+Shift+Q and Ctrl+Shift+W are not the window's Ctrl+Q and Ctrl+W (checked in the app).
+- **How it is written:** read, the `keybinds` entries laid over, everything else in the file left as it is, written beside it and moved over it; never while the editor runs (only from `start()`, with no editor running). A file that is not JSON settings is left alone (the editor sets such a file aside itself) and tried again at the next start.
+- **Once per table version, never over the person's choice:** `KEYS_TABLE_VERSION` (1). What was written is remembered per settings file in Clips Kitty's own data (`editor-shortcuts.json` in the app's user data folder), not in the editor's file. A file that already had this version is not touched. With a newer table, an action is set only where the file holds nothing for it or still holds what was written last; anything else is the person's (moved or cleared in Settings > Shortcuts) and stays. A chord a person had set before Clips Kitty ever ran stays too.
+- The editor's menus, tooltips and Settings > Shortcuts read the same table, so they name the Ctrl chords by themselves ("Split tool (Ctrl+Shift+B)", "Snap to edges Ctrl+N").
+- **Reset goes back to the Ctrl chords (fix round, K-D36):** the same table is also written as `hostKeybinds`, the editor's defaults inside Clips Kitty. Its Reset and Reset all in Settings > Shortcuts go back to these chords, never to a bare letter or Backspace. This took one fork change (keymap.rs `defaults_of`, prefs.rs `host_keybinds`; PATCHES.md "The host's own default shortcuts"), so it needs editor build 44879315991 or later. `hostKeybinds` is Clips Kitty's own key, which the editor never writes, so it is kept equal to the table at every start; `keybinds` is still written once per table version. A typed field still takes its own letters, Backspace and Delete before any shortcut, as before.
+
+### A faster first open (F1)
+
+- **Full-frame 9:16 clips** (the source is already 9:16, so the tracker's crop is the whole frame): `fastbase.make` reads the clip's layout from 5 frames (the mean difference of the 5 of 8 bands that agree best, against the whole frame filling the screen and against the face-safe layout) and makes the base as an identity crop, with the clip's colour, the BT.601 untagging and the loudness as before. A face-safe clip of such a source, a letterboxed one, or one that matches neither goes the full way.
+- **Vertical Live clips** of a 9:16 source: the base is the whole frame as the pipeline's single encode makes it (`modes.fit_filter`, the clip's colour, the source's own colours, the loudness), with no reading of the clip's file. A Vertical Live clip of another shape still goes the full way.
+- **A crop that never moves** (a centred crop) is made the fast way too: its crop script is empty, which FFmpeg's `sendcmd` refused, so such clips went the full way (K-D31).
+- Proof, against the clip's own render path's base (speech_vertical_20s's clip): SSIM 0.9994 to 0.9996 at 5 points, 600 frames each, -14.4 LUFS each; Vertical Live 0.9996; Vertical Live with the vintage look 0.9983; tracked with the vintage look 0.9988.
+- **The editor starts while the project is made:** when the page waits for a project being built it calls `prepare()`; with no editor running, the main process starts one hidden with no `--project` (the Ctrl table is written first). `show()` then finds it running and opens the project with `host.open_project`, sets its bounds and shows it: the person never sees it empty. An open that ends without a project calls `unprepare()`, which closes only an editor that has none; one left without a project is closed 10 minutes after its start. A prepared editor that fails says nothing; the `show()` after it starts the editor again and says why if that fails too. The idle close counts from the editor's own start as well as from when the page was hidden.
+- **Measured** in the desktop app (editor build 44855595570, RTX 3060, the project deleted between runs): speech_vertical_20s's clip **4.57 / 4.22 / 4.11 s** (18.5 s before); real_150s's 24.8 s clip **12.48 / 12.15 / 12.47 s** (13.6 s before). The editor process was running 0.2 to 0.8 s after the click.
+
+### Fixes (F2 to F5)
+
+- **F2, K-D32:** `registry.load` reads the manifest under the lock its writers hold, and tries a refused read (a sharing violation while `os.replace` swaps the file) again for up to 0.5 s; a file that reads but is not JSON is not waited for. The two route tests that were flaky under load passed 50 runs in a row with a test loop beside them.
+- **F3, K-D33:** the opening bar counts a failed project's progress as none and starts again when its build restarts (`lib/editorOpening.ts`, `nextOpeningProgress`).
+- **F4, K-D34:** the Export sheet's line is Clips Kitty's. The page reads the shown project again when it is shown again (and before a start again), and when the line changed the main process sends it with `host.open_project` on the folder the editor already has open, which the editor answers at once without opening anything again (`embed.rs` `open_project`, `same_folder`). After the clip is deleted the sheet says "Export folder: …" and starts the name as "<name> - <date>".
+- **F5:** state.json K-D15 fixed in the fork at ee029aff (field focus); K-D1 done (QC rounds 2 to 4 walked the desktop app).
+
+### Black-box fix round (FL2)
+
+- **S7, K-D35 (not a defect, no change):** "Edit a file from your PC" sends the path the dialog returns unchanged (`pickVideoFile` returns `filePaths[0]`; the page sends it with `JSON.stringify`). In the desktop app with a real backslash path through the dialog hook, the request carried the test file's full Windows path with all 5 backslashes, the engine answered 200 and own_clip_45s opened (16:9, 45 s). The reported path had lost exactly what a JavaScript string literal loses when a path is typed into it with single backslashes (`\c`, `\e`, `\m`, `\o` dropped, `\b` turned into a backspace character), so the test script's own quoting, not the app, broke it.
+- **X1, K-D36 (fixed):** Reset in the editor's Settings > Shortcuts put Mute back on a bare M, and M alone then muted the selected clip. Fixed with `hostKeybinds` (section "Ctrl shortcuts" above): fork commit 0bac504c on `kitty/embed`, editor build 44879315991.
+
+### Tests (FL2)
+
+- `tests/test_ui_editor_fl2.py`: the shortcut table against Concat v0.2.12's action table and reserved chords, the settings file's place, the merge into a real file under Node (a fresh file, a file with other settings and the person's chords, a second start, a newer table, an unreadable file), the main process writing it before the spawn; the bar and the sheet's line under Node; the prepare, unprepare and retell wiring.
+- `tests/test_kitty_editor_fl2.py`: the record read race (a refused read tried again, an unreadable one still damaged, two threads reading beside a writer), full-frame and Vertical Live bases from small FFmpeg videos, a face-safe clip left to the full render, a crop that never moves.
