@@ -448,9 +448,28 @@ def _post_line(post: dict) -> str:
         return f"{where}: published, link not known yet (links arrive within minutes; check again)"
     if state in ("failed", "rejected"):
         return f"{where}: failed: {post.get('error') or 'no reason given'}"
-    if post.get("scheduled_for"):
+    # A direct YouTube upload keeps its publish time after that time has
+    # passed, so the time is shown only while the post is still waiting.
+    if state in POST_STATES_WAITING and post.get("scheduled_for"):
         return f"{where}: scheduled for {_utc_time(post['scheduled_for'])}"
+    if state == "private":
+        return f"{where}: private on YouTube (not public, so there is no link to share)"
+    if state == "checking":
+        return f"{where}: its time has passed; checking whether it went live (check again in a few minutes)"
     return f"{where}: {state or 'unknown'}"
+
+
+POST_STATES_WAITING = ("scheduled", "queued", "processing")
+
+
+class ToolError(Exception):
+    """A tool's own answer that is an error, with words meant for the agent."""
+
+
+ENGINE_TOO_OLD = (
+    "This Clips Kitty engine is too old for clip_posts: it has no way to read a "
+    "clip's posts. Update Clips Kitty to the latest version, then ask again."
+)
 
 
 # server/agent.py cuts a tool's output at 4,000 characters; this stays under it.
@@ -462,9 +481,18 @@ def _posts_of(clip_id: int) -> list:
     try:
         out = _request("GET", f"/clips/{int(clip_id)}/posts")
     except urllib.error.HTTPError as e:
-        if e.code == 404:
+        if e.code != 404:
+            raise
+        # The engine says "no such clip" for a clip it does not have. Any
+        # other 404 (FastAPI's own "Not Found") means the route itself is
+        # missing: an engine from before GET /clips/{id}/posts.
+        try:
+            detail = json.loads(e.read().decode("utf-8", "replace") or "{}").get("detail")
+        except (ValueError, AttributeError, OSError):
+            detail = None
+        if detail == "no such clip":
             raise LookupError(f"No clip with id {int(clip_id)}. list_clips shows the ids.") from None
-        raise
+        raise ToolError(ENGINE_TOO_OLD) from None
     return list(out.get("posts") or [])
 
 
@@ -1405,6 +1433,8 @@ def _call_tool(params: dict) -> dict:
         return _tool_text(tool["handler"](args))
     except KeyError as e:
         return _tool_text(f"Missing argument: {e}", is_error=True)
+    except ToolError as e:
+        return _tool_text(str(e), is_error=True)
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "replace")[:400]
         return _tool_text(f"The engine refused that ({e.code}): {detail}", is_error=True)

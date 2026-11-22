@@ -518,6 +518,41 @@ def test_clip_posts_for_an_unknown_clip(monkeypatch):
     assert result["content"][0]["text"] == "No clip with id 999. list_clips shows the ids."
 
 
+def test_clip_posts_on_an_engine_without_the_posts_route(monkeypatch):
+    """An engine from before GET /clips/{id}/posts answers FastAPI's own 404."""
+    def fake(method, path, body=None, *a, **k):
+        if path.startswith("/videos/"):
+            return [{"id": 1}, {"id": 2}]
+        raise urllib.error.HTTPError(
+            "http://127.0.0.1:8765" + path, 404, "Not Found", {},
+            io.BytesIO(b'{"detail":"Not Found"}'))
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    for args in ({"clip_id": 7}, {"video_id": "abc"}):
+        result = _call("clip_posts", args)
+        text = result["content"][0]["text"]
+        assert result["isError"] is True
+        assert text == mcp.ENGINE_TOO_OLD
+        assert "too old" in text and "Update Clips Kitty" in text
+        assert "No clip with id" not in text
+
+
+def test_a_youtube_upload_past_its_time_is_not_called_scheduled(monkeypatch):
+    posts = [
+        _post("youtube", "youtube", "private", scheduled_for="2026-11-20T15:00:00Z"),
+        _post("youtube", "youtube", "checking", scheduled_for="2026-11-22T09:00:00Z"),
+        _post("youtube", "youtube", "scheduled", scheduled_for="2026-11-30T15:00:00Z"),
+    ]
+    monkeypatch.setattr(mcp, "_request", lambda *a, **k: {"clip_id": 7, "posts": posts})
+    assert _call("clip_posts", {"clip_id": 7})["content"][0]["text"] == "\n".join([
+        "Clip 7:",
+        "  youtube (youtube): private on YouTube (not public, so there is no link to share)",
+        "  youtube (youtube): its time has passed; checking whether it went live"
+        " (check again in a few minutes)",
+        "  youtube (youtube): scheduled for 2026-11-30 15:00 UTC",
+    ])
+
+
 def test_every_tool_is_named_in_the_api_guide():
     from pathlib import Path
 
