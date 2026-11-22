@@ -1514,7 +1514,8 @@ def _utf8_stdin():
     """stdin read as UTF-8, which MCP messages always are.
 
     A Windows pipe defaults to the ANSI code page (cp1252), so an emoji in a
-    tool's arguments raised UnicodeDecodeError and ended the server.
+    tool's arguments came through garbled, and one whose bytes cp1252 lacks could
+    raise UnicodeDecodeError and end the server.
     """
     buffer = getattr(sys.stdin, "buffer", None)
     if buffer is None:

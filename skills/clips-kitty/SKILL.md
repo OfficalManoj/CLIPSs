@@ -59,7 +59,7 @@ publish a clip.
 
 Posting goes through accounts the user connects themselves in Settings: WoopSocial for
 scheduled posts (`woopsocial_status`, `schedule_clips_plan`, `schedule_clips_execute`),
-Upload-Post for several platforms at once (`uploadpost_status`, `uploadpost_publish`), and
+Upload-Post for several platforms at once (`uploadpost_status`, `uploadpost_publish`, `uploadpost_result`), and
 YouTube on their own Google key (`youtube_status`, `publish_plan`, `publish_plan_execute`).
 Nothing posts without the user's clear yes: show the plan first, because posts go to their
 real accounts and cannot be taken back.
