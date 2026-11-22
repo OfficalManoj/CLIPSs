@@ -29,7 +29,7 @@ store. FFmpeg, the Ollama runtime and the Whisper weights, roughly 3 GB into
 one deliberately, run its script with `--force`:
 
 ```
-python scripts/fetch_ffmpeg.py --force
+python scripts/fetch_ffmpeg.py --force     # pinned version + SHA-256; bump both on purpose
 python scripts/fetch_ollama.py --force     # also re-run after bumping OLLAMA_VERSION
 python scripts/fetch_whisper.py --force
 ```

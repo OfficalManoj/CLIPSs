@@ -18,7 +18,13 @@ from analysis.metadata import ClipMetadata, generate_metadata_batch
 from core import cancel, progress
 from core.binaries import ffprobe
 from core.models import ClipCandidate, RenderedClip, Segment
-from core.outcome import explain_no_clips, summarise_run
+from core.outcome import (
+    RendersFailedError,
+    explain_no_clips,
+    note_render_failures,
+    renders_failed_message,
+    summarise_run,
+)
 from core.paths import cached_source, discard
 from core.state import StateDB
 from llm.registry import create_backend
@@ -46,6 +52,29 @@ def _render_failure_reason(err: Exception) -> str:
             "ran out of memory while encoding. Close other applications, or "
             "lower video.parallel_renders in settings.yaml"
         )
+
+    # An FFmpeg that does not know an option Clips Kitty passes refuses the
+    # whole command, so every clip fails identically. FFmpeg 9 removing
+    # -vsync did exactly that (#281), and its last line, "Error splitting the
+    # argument list: Option not found", names neither the option nor a fix.
+    # Only the command-line parse failure means that: "Option not found" on
+    # its own is also how every FFmpeg, the shipped one included, refuses a
+    # bad filter option, and telling that person their FFmpeg is unsupported
+    # would send them the wrong way.
+    unknown = re.search(r"Unrecognized option '([^'\n]*)'", text)
+    if unknown or "error splitting the argument list: option not found" in lowered:
+        named = f"the option -{unknown.group(1).lstrip('-')}" if unknown else "an option Clips Kitty uses"
+        return (
+            f"this FFmpeg version is not supported: it does not know {named}. "
+            "Use the FFmpeg that ships with Clips Kitty (running from source: "
+            "python scripts/fetch_ffmpeg.py)"
+        )[:300]
+    # A filter refusing one of its options. FFmpeg's last line ("Error
+    # opening output files: Option not found") hides which; this line names
+    # the option and the filter.
+    refused = re.search(r"Error applying option '[^'\n]*' to filter '[^'\n]*'[^\n]*", text)
+    if refused:
+        return refused.group(0).strip()[:300]
 
     # Not a known signature: keep one line rather than a wall — but the LAST
     # meaningful one, not the first.
@@ -706,6 +735,9 @@ def process_video(url: str, config: dict, db: StateDB, force: bool = False) -> l
     # reasons are counted and reported once at the end.
     last_failure: str | None = None
     repeated_failures = 0
+    # Every failed render's reason, for the outcome after the loop: a run in
+    # which every clip failed must not read as "nothing went wrong" (#281).
+    render_failures: list[str] = []
     # Gaming / Split-Screen: find the streamer's webcam once, from several of
     # the video's clips together, before any of them renders. Off -> None,
     # exactly the argument every render has always been given.
@@ -748,6 +780,11 @@ def process_video(url: str, config: dict, db: StateDB, force: bool = False) -> l
         except Exception as e:
             where = f"{candidate.start:.0f}s-{candidate.end:.0f}s"
             reason = _render_failure_reason(e)
+            if not isinstance(e, cancel.CancelledError):
+                # A render stopped by a cancel (a render PC's job cancelled
+                # on its side) is not a clip that failed: its text is only
+                # the video id, and it must not fail the run as one.
+                render_failures.append(reason)
             if reason == last_failure:
                 repeated_failures += 1      # reported once, after the loop
             else:
@@ -794,6 +831,20 @@ def process_video(url: str, config: dict, db: StateDB, force: bool = False) -> l
 
     if knowledge_thread is not None:
         knowledge_thread.join(timeout=600)  # normally finished during renders
+
+    if render_failures:
+        # The outcome was written before rendering and counts the moments
+        # chosen; record what failed, and when not one clip came out, fail
+        # the run with the reason instead of finishing it as "done" (#281).
+        outcome = note_render_failures(outcome, render_failures, len(made))
+        db.set_outcome(video.video_id, outcome)
+        if outcome.get("cause") == "render_failed":
+            print(f"      {explain_no_clips(outcome)}")
+            db.set_process_seconds(video.video_id, time.monotonic() - started)
+            db.set_video_status(video.video_id, "failed")
+            # Its own type, so a job that also makes the 16:9 output still
+            # makes it (server/jobs.py _both_formats).
+            raise RendersFailedError(renders_failed_message(outcome))
 
     # A match's story reels, when asked for (sports/core/reels.py): joined
     # from the clips just rendered.

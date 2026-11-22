@@ -429,7 +429,7 @@ An `appx:` block (identity `ClipsStudio.ClipsStudio`, publisher
 
 | Script | Fetches | Puts it in | Licence note written |
 |---|---|---|---|
-| `scripts/fetch_ffmpeg.py` | gyan.dev `ffmpeg-release-essentials.zip` (GPL build, libx264) → `ffmpeg.exe`, `ffprobe.exe` | `vendor/ffmpeg/` | `README-FFMPEG.txt` (source offer) |
+| `scripts/fetch_ffmpeg.py` | gyan.dev FFmpeg 8.1.2 essentials build (GPL, libx264), pinned by URL and SHA-256 → `ffmpeg.exe`, `ffprobe.exe` | `vendor/ffmpeg/` | `README-FFMPEG.txt` (source offer) |
 | `scripts/fetch_ollama.py` | `ollama-windows-amd64.zip` pinned `OLLAMA_VERSION = "v0.32.6"`, full tree incl. `lib/` GPU runners, zip-slip guarded | `vendor/ollama/` + `VERSION.txt` | `README-OLLAMA.txt` (MIT) |
 | `scripts/fetch_whisper.py` | `faster_whisper.utils.download_model` for `small` and `large-v3-turbo` | `vendor/whisper/<size>/` | `README-WHISPER.txt` (MIT) |
 | `scripts/fetch_asd_model.py` | TalkNet `pretrain_TalkSet.model` from two HF mirrors, min 50 MB | `models/` | (MIT, `NOTICE`) |

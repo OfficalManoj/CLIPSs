@@ -35,6 +35,40 @@ export default function NoClipsExplanation({ outcome, compact }: Props): JSX.Ele
 
   const { candidates, best_score, min_score, cause, measured, nothing_detected } = outcome
 
+  // Moments were chosen and every one failed while being made (core/outcome.py
+  // note_render_failures). Something did go wrong, and the minimum score has
+  // nothing to do with it (#281: an FFmpeg too new for the app).
+  if (cause === 'render_failed') {
+    // How many failed (core/outcome.py note_render_failures); `clips` is how
+    // many were chosen, the same number when not one could be made.
+    const failed = outcome.render_failed ?? outcome.clips
+    return (
+      <div
+        className={`border border-raised/60 rounded-lg p-3 space-y-2 ${size} max-w-2xl`}
+        role="note"
+      >
+        <p className="font-medium text-ink">
+          {t('The clips from this video failed while being made.')}
+        </p>
+        <p className="text-muted">
+          {failed === 1
+            ? t('1 clip was chosen, but it could not be made.')
+            : `${failed} ${t('clips were chosen, but none of them could be made.')}`}
+        </p>
+        {outcome.render_error && (
+          <p className="text-muted">
+            {t('What went wrong:')} <span className="text-ink">{outcome.render_error}</span>
+          </p>
+        )}
+        <p className="text-muted">
+          {t(
+            'Process the video again. If it fails again, send a report from Feedback; the job’s Log in the Queue has the details.'
+          )}
+        </p>
+      </div>
+    )
+  }
+
   const numbers =
     best_score === null || best_score === undefined
       ? `${candidates} ${t('moments were considered.')}`

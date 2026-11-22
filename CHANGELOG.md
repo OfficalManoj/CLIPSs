@@ -86,6 +86,18 @@ Kitty after you change it.
 
 ### Fixed
 
+- **Clips are made again with FFmpeg 9, and a run whose clips all fail now says so** (#281).
+  FFmpeg 9 dropped a setting Clips Kitty used on every clip, so on a PC running Clips Kitty
+  from the source code with its own, newer FFmpeg, every clip failed, and the app said
+  "No clips from this video, and nothing went wrong". The installed app was not affected:
+  it brings its own FFmpeg. Clips Kitty now uses the setting's newer name, which works on
+  old and new FFmpeg alike. When every clip of a video fails while being made, the job now
+  fails with the reason in plain words, and the video says the clips failed and what to do,
+  instead of suggesting a lower Minimum score. A job that also makes the 16:9 version still
+  makes it, and then says the 9:16 Shorts failed. If the reason is an FFmpeg Clips Kitty does
+  not support, it says so and points to the FFmpeg that comes with Clips Kitty
+  (`python scripts/fetch_ffmpeg.py` when running from source), which is now fixed to one
+  tested version and checked before use, so a build can't pick up a newer FFmpeg by surprise.
 - **A video added with "Upload video file" now keeps every setting you chose for it.**
   The chosen Gaming detector or Marketplace pipeline, Sports, the clip direction, Gaming
   scoring and the Rate, Understand and Suggest edits plugins were left out for uploaded

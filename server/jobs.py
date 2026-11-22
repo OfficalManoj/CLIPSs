@@ -765,21 +765,42 @@ class Worker(threading.Thread):
         ones already made skip themselves in seconds. Each pass gets half the
         progress bar, which never moves back and would otherwise sit at 99%
         through the whole second pass. If the 16:9 pass fails, the Shorts are
-        kept, the video stays processed, and the job says which part failed."""
+        kept, the video stays processed, and the job says which part failed.
+        If every Short failed while being made, the 16:9 pass still runs (it
+        renders its own way), and then the job says the Shorts failed (#281)."""
+        from core.outcome import RendersFailedError
         from core.pipeline import process_video
         from longform.process import process_longform
 
         self._progress_span(job_id, 0.0, 0.5)
-        process_video(payload["url"], copy.deepcopy(cfg), db, force=payload.get("force", False))
+        shorts_failed: RendersFailedError | None = None
+        try:
+            process_video(payload["url"], copy.deepcopy(cfg), db, force=payload.get("force", False))
+        except RendersFailedError as e:
+            shorts_failed = e
         self._progress_span(job_id, 0.5, 1.0)
         try:
             process_longform(payload["url"], cfg, db, payload["longform"])
         except CancelledError:
             raise
         except Exception as e:
+            if shorts_failed is not None:
+                # Both passes failed: the video is failed, as the Shorts
+                # pass left it, and the job names both.
+                if vid:
+                    db.set_video_status(vid, "failed")
+                raise RuntimeError(
+                    f"The 9:16 Shorts failed ({shorts_failed}); the 16:9 pass failed too: {e}"
+                ) from e
             if vid:
                 db.set_video_status(vid, "done")  # the Shorts pass finished
             raise RuntimeError(f"The 9:16 Shorts were made; the 16:9 pass failed: {e}") from e
+        if shorts_failed is not None:
+            if vid:
+                db.set_video_status(vid, "done")  # the 16:9 pass finished
+            raise RuntimeError(
+                f"The 16:9 output was made; the 9:16 Shorts failed: {shorts_failed}"
+            ) from shorts_failed
 
     def _rerender_clip(self, db: StateDB, payload: dict) -> None:
         """Re-render one clip from the original source video, with optionally

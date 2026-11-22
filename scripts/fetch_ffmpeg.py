@@ -20,6 +20,7 @@ that offer, and the installer ships it.
 """
 
 import argparse
+import hashlib
 import io
 import shutil
 import sys
@@ -30,11 +31,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEST = ROOT / "vendor" / "ffmpeg"
 
-# Pinned so a build is reproducible and a surprise upstream change can't
-# silently alter what ships. Bump deliberately.
-BUILD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
-BUILD_NAME = "gyan.dev ffmpeg-release-essentials (GPL)"
+# Pinned, by version AND by hash, so a build is reproducible and a surprise
+# upstream change can't silently alter what ships. This used to point at
+# gyan.dev's moving "release-essentials" link, which started serving FFmpeg 9
+# in November 2026; FFmpeg 9 removed -vsync, which made every clip fail
+# (#281). Bump deliberately, and test a new FFmpeg with the app first.
+FFMPEG_VERSION = "8.1.2"
+BUILD_URL = (
+    "https://github.com/GyanD/codexffmpeg/releases/download/"
+    f"{FFMPEG_VERSION}/ffmpeg-{FFMPEG_VERSION}-essentials_build.zip"
+)
+BUILD_SHA256 = "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec"
+BUILD_NAME = f"FFmpeg {FFMPEG_VERSION} essentials build by gyan.dev (GPL)"
 SOURCE_URL = "https://www.ffmpeg.org/download.html"
+# FFmpeg's own source for exactly this release.
+RELEASE_SOURCE_URL = f"https://ffmpeg.org/releases/ffmpeg-{FFMPEG_VERSION}.tar.xz"
 
 NOTICE = f"""FFmpeg
 ------
@@ -45,14 +56,33 @@ version 3 or later, because this build includes GPL components (libx264).
 Clips Kitty invokes FFmpeg as a separate program and does not link
 against it.
 
-The complete corresponding source code for FFmpeg is available from:
+The complete corresponding source code for FFmpeg {FFMPEG_VERSION} is
+available from:
+    {RELEASE_SOURCE_URL}
     {SOURCE_URL}
+The build itself (archive SHA-256 {BUILD_SHA256}):
     {BUILD_URL}
 
 FFmpeg is a trademark of Fabrice Bellard.
 """
 
 WANTED = ("ffmpeg.exe", "ffprobe.exe")
+
+
+def check_archive(blob: bytes, expected: str = BUILD_SHA256) -> str | None:
+    """None when the downloaded archive is the pinned build; otherwise why
+    not, in words. Checked before anything is extracted."""
+    got = hashlib.sha256(blob).hexdigest()
+    if got == expected.lower():
+        return None
+    return (
+        f"The download is not the pinned FFmpeg {FFMPEG_VERSION} build: its SHA-256 is\n"
+        f"  {got}\n"
+        f"but should be\n"
+        f"  {expected}\n"
+        "Nothing was extracted. If the file was replaced upstream, test the new\n"
+        "build with the app before changing BUILD_SHA256 in scripts/fetch_ffmpeg.py."
+    )
 
 
 def fetch(force: bool = False) -> int:
@@ -75,6 +105,12 @@ def fetch(force: bool = False) -> int:
         print(f"  {DEST}")
         return 1
     print(f"  got {len(blob) / 1e6:.0f} MB")
+
+    problem = check_archive(blob)
+    if problem:
+        print(f"\n{problem}")
+        return 1
+    print("  SHA-256 matches the pinned build")
 
     found = 0
     with zipfile.ZipFile(io.BytesIO(blob)) as z:

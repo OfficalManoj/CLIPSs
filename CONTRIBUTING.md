@@ -147,8 +147,12 @@ Things worth knowing before you change any of it:
   wheels carry the cuBLAS/cuDNN DLLs that CTranslate2 needs for GPU
   transcription, so a CPU build silently drops Whisper to CPU as well.
 - **FFmpeg comes from `vendor/`,** fetched by `scripts/fetch_ffmpeg.py` and
-  gitignored. Never call `ffmpeg` by bare name. Use `core.binaries.ffmpeg()`,
-  or an installed copy will look for a binary the user doesn't have.
+  gitignored. The script is pinned to one FFmpeg release and checks its
+  SHA-256; bump it on purpose, after trying the new FFmpeg with the app
+  (FFmpeg 9 removed `-vsync` and every clip failed, #281). Running from
+  source, use this FFmpeg rather than your own. Never call `ffmpeg` by bare
+  name. Use `core.binaries.ffmpeg()`, or an installed copy will look for a
+  binary the user doesn't have.
 - **Code signing is off** (`signAndEditExecutable: false`). electron-builder
   otherwise downloads a bundle containing macOS symlinks, which an ordinary
   Windows account cannot extract. The trade-off and how to re-enable it are

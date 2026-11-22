@@ -108,6 +108,49 @@ def _cause(out: dict) -> str | None:
     return None
 
 
+def note_render_failures(out: dict, reasons: list[str], made: int) -> dict:
+    """The outcome after rendering, given each failed render's reason and how
+    many clips came out of the run (the ones made again included).
+
+    summarise_run is written before rendering, so on its own it counts the
+    moments chosen as clips. When FFmpeg refused every one of them (#281: an
+    FFmpeg too new for an option Clips Kitty passed), the app then said "No
+    clips from this video, and nothing went wrong". This puts the failures in
+    the outcome, and names them as the cause when nothing came out at all.
+
+    Nothing failed: `out` itself, unchanged. Otherwise a copy with
+    `render_failed` (how many) and `render_error` (the commonest reason; the
+    first seen on a tie), plus cause "render_failed" when `made` is 0.
+    """
+    if not reasons:
+        return out
+    counts: dict[str, int] = {}
+    for reason in reasons:
+        counts[reason] = counts.get(reason, 0) + 1
+    commonest = max(counts, key=counts.__getitem__)   # first seen wins a tie
+    noted = {**out, "render_failed": len(reasons), "render_error": commonest}
+    if not made:
+        noted["cause"] = "render_failed"
+    return noted
+
+
+class RendersFailedError(RuntimeError):
+    """Every clip of a run failed while being made (cause "render_failed").
+
+    A RuntimeError, so whoever ran the video sees it fail with the message;
+    its own type, so a job that makes 9:16 Shorts and the 16:9 output
+    (server/jobs.py _both_formats) can still make the 16:9 output."""
+
+
+def renders_failed_message(out: dict) -> str:
+    """The error a run raises when not one of its clips could be made."""
+    n = out.get("render_failed", 0)
+    reason = out.get("render_error") or "unknown error"
+    if n == 1:
+        return f"The clip failed while being made: {reason}"
+    return f"All {n} clips failed while being made: {reason}"
+
+
 def explain_no_clips(out: dict) -> str:
     """One line for the log. The UI builds its own wording from the numbers,
     so this stays terse and does not try to be the user-facing copy."""
@@ -117,6 +160,9 @@ def explain_no_clips(out: dict) -> str:
         head += f", best scored {best} against a threshold of {floor}"
 
     cause = out.get("cause")
+    if cause == "render_failed":
+        return (f"No clips: {out.get('render_failed', 0)} clip(s) failed while being made: "
+                f"{out.get('render_error') or 'unknown error'}")
     if cause == "no_people":
         return (head + ". Nothing person-shaped was detected in "
                 f"{out['nothing_detected']} of {out['measured']} measured windows, which is "

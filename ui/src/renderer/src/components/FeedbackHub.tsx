@@ -65,7 +65,9 @@ export default function FeedbackHub(): JSX.Element {
   const zeroClipOutcome = (() => {
     const v = videos.find((x) => x.video_id === videoId)
     const o = v?.outcome
-    return o && o.clips === 0 && o.cause ? o : null
+    // A run whose clips failed while being made is a fault, never "nothing
+    // is wrong": that one is for the report itself (#281).
+    return o && o.clips === 0 && o.cause && o.cause !== 'render_failed' ? o : null
   })()
 
   const set = (k: string, v: string): void => setAnswers((a) => ({ ...a, [k]: v }))

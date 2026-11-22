@@ -143,9 +143,11 @@ Computer Vision and Image Understanding 267 (2026) 104713,
 https://doi.org/10.1016/j.cviu.2026.104713.
 
 FFmpeg is fetched at build time by scripts/fetch_ffmpeg.py rather than kept
-in this repository. The builds used are LGPL-2.1-or-later, or GPL-2.0-or-later
-where they include GPL-licensed components; the exact terms ship with the
-binary in the installer.
+in this repository. The script is pinned to one release (FFmpeg 8.1.2, the
+gyan.dev essentials build) and checks the download's SHA-256 before using it.
+That build is GPL-3.0-or-later because it includes GPL-licensed components
+(libx264); the exact terms and the offer of FFmpeg's source ship with the
+binary in the installer as README-FFMPEG.txt.
 
 Ollama is fetched at build time by scripts/fetch_ollama.py rather than kept in
 this repository, and ships unmodified. Its MIT licence travels with it in the

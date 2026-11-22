@@ -145,6 +145,12 @@ def both(tmp_path, monkeypatch):
         seen.append(cfg)
         w._record_progress(7, {"stage": "render", "clip": 4, "total": 4})
         calls.append(("percent", w.progress_snapshot(7)["percent"]))
+        if cfg.get("shorts_fail"):
+            # What process_video does when every 9:16 render failed (#281).
+            from core.outcome import RendersFailedError
+
+            db.set_video_status(VID, "failed")
+            raise RendersFailedError("All 3 clips failed while being made: FFmpeg refused -vsync")
         db.set_video_status(VID, "done")
         return []
 
@@ -186,3 +192,27 @@ def test_a_failed_16x9_pass_keeps_the_shorts_and_says_which_part_failed(both):
     with pytest.raises(RuntimeError, match="9:16 Shorts were made; the 16:9 pass failed: encoder exploded"):
         w._both_formats(db, 7, VID, payload, {})
     assert db.video_status(VID) == "done"
+
+
+def test_shorts_that_all_failed_still_get_the_16x9_made(both):
+    """Every 9:16 render failing (#281: an FFmpeg that refused an option of
+    the cut) must not cost the job its 16:9 output, which renders its own
+    way: the 16:9 pass runs, the video is processed, and the job says the
+    Shorts failed and why."""
+    w, db, calls, _ = both
+    payload = {"url": URL, "longform": {"mode": "short_clips", "shorts": True}}
+    with pytest.raises(RuntimeError, match="16:9 output was made; the 9:16 Shorts failed: "
+                                           "All 3 clips failed while being made: FFmpeg refused -vsync"):
+        w._both_formats(db, 7, VID, payload, {"shorts_fail": True})
+    steps = [c for c in calls if c[0] != "percent"]
+    assert steps == [("shorts", URL, False), ("longform", URL, "short_clips")]
+    assert db.video_status(VID) == "done"
+
+
+def test_both_passes_failing_names_both_and_leaves_the_video_failed(both):
+    w, db, _, _ = both
+    payload = {"url": URL, "longform": {"mode": "short_clips", "shorts": True, "fail": True}}
+    with pytest.raises(RuntimeError, match=r"9:16 Shorts failed \(All 3 clips .*\); the 16:9 pass failed too: "
+                                           "encoder exploded"):
+        w._both_formats(db, 7, VID, payload, {"shorts_fail": True})
+    assert db.video_status(VID) == "failed"

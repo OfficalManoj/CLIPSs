@@ -320,6 +320,9 @@ def _no_clips_error(outcome: dict) -> str:
     """Why a finished video had no clips to publish, for the item."""
     from core.outcome import rated_out_names
 
+    if (outcome or {}).get("cause") == "render_failed":
+        return (f"Every clip failed while being made ({outcome.get('render_error') or 'unknown error'}), "
+                "so there were no clips to publish.")
     names = rated_out_names(outcome) if (outcome or {}).get("cause") == "rated_out" else []
     if names:
         return (f"{', '.join(names)} rated every moment under the minimum score ({outcome.get('min_score')}), "

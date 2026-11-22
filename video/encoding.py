@@ -156,7 +156,9 @@ def sampled_frames(clip_path, every: int, width: int, height: int, hwaccel: bool
         "-i", str(clip_path),
         # Escape the comma: it separates filter arguments otherwise.
         "-vf", f"select='not(mod(n\\,{step}))'",
-        "-vsync", "0",              # keep the selected frames, do not resample
+        # Keep the selected frames, do not resample. -fps_mode passthrough
+        # is what -vsync 0 meant; FFmpeg 9 removed -vsync (#281).
+        "-fps_mode", "passthrough",
         "-pix_fmt", "bgr24",        # what OpenCV and the models expect
         "-f", "rawvideo", "-",
     ]

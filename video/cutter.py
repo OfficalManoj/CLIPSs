@@ -48,7 +48,10 @@ def cut_clip(
         # Force CONSTANT frame rate. Twitch/Kick VODs are often variable frame
         # rate; the tracked crop rewrites video at a constant fps in OpenCV, so
         # without this the video duration drifts from the audio -> A/V desync.
-        "-vsync", "cfr",
+        # -fps_mode, not -vsync: FFmpeg 9 removed -vsync and refuses the
+        # whole command over it, so every clip failed (#281). Same meaning;
+        # -fps_mode exists since FFmpeg 5.1.
+        "-fps_mode", "cfr",
         *audio_filter_args(normalize),     # sync, and loudness for a final clip
         *video_encoder_args(),  # NVENC when available, libx264 otherwise
         "-c:a", "aac", "-b:a", "128k",

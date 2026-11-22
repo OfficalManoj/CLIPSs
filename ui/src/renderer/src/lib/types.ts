@@ -8,8 +8,21 @@ export interface RunOutcome {
   rejected: Record<string, number>
   measured: number
   nothing_detected: number
-  /** Only set when no clips came out, and only when the evidence earns it. */
-  cause: 'no_people' | 'duplicates' | 'below_threshold' | 'no_candidates' | 'rated_out' | null
+  /** Only set when no clips came out, and only when the evidence earns it.
+   *  'render_failed': clips were chosen, and every one failed while being
+   *  made (core/outcome.py note_render_failures). */
+  cause:
+    | 'no_people'
+    | 'duplicates'
+    | 'below_threshold'
+    | 'no_candidates'
+    | 'rated_out'
+    | 'render_failed'
+    | null
+  /** Clips that failed while being made, and the commonest reason. Only
+   *  present when at least one did. */
+  render_failed?: number
+  render_error?: string
   /** The clip direction given with the job, and what came of it. */
   intent?: ClipDirection
   /** A Sports job: what the match gave (sports/core/clips.py report). */
