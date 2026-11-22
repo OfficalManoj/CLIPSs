@@ -159,8 +159,10 @@ def test_keyboard_and_screen_reader():
     # A click in the editor leaves no page button focused (Space would press it).
     assert "(document.activeElement as HTMLElement | null)?.blur?.()" in page
     app = _read(APP)
-    assert "document.addEventListener('pointerdown', back, true)" in app
-    assert "document.addEventListener('focusin', back, true)" in app
+    # A press and a focus in the page are told apart (FL2 D1): a focus the
+    # page fires only because the window came back does not take the keys.
+    assert "document.addEventListener('pointerdown', press, true)" in app
+    assert "document.addEventListener('focusin', focus, true)" in app
 
 
 def test_questions_over_the_editor_are_native():
@@ -215,7 +217,10 @@ def test_the_export_sheet_is_told_where_the_file_goes():
     for words in ("Replaces this clip in the Library", "Export folder: {folder}",
                   "Goes to your Downloads folder", "Saved next to this clip, which was changed since"):
         assert f"t('{words}')" in lib, words
-    assert lib.count("await showOptions(") == 2
+    # The open, a start again, and the page shown again (FL2 F4: the line
+    # follows a clip deleted while its project was open).
+    assert lib.count("await showOptions(") == 3
+    assert "exportDestination(project, exportFolder, {" in lib
 
 
 def test_saved_as_this_clips_video_has_no_folder_tooltip():
@@ -235,12 +240,18 @@ def test_the_opening_bar_never_goes_back_or_says_100_before_the_editor_shows():
     project being opened moves it, and it stops at 99% until the editor has
     the project on screen (the page's bar goes when it does)."""
     lib = _read(UI / "lib" / "editor.ts")
-    assert "export const OPENING_MOST = 0.99" in lib
+    rules = _read(UI / "lib" / "editorOpening.ts")
+    assert "export const OPENING_MOST = 0.99" in rules and "export { OPENING_MOST }" in lib
+    assert "return Math.min(OPENING_MOST, Math.max(said, now))" in rules
     helper = lib[lib.index("export function openingProgress("):]
     helper = helper[:helper.index("\n}\n")]
-    assert "Math.min(OPENING_MOST, Math.max(before" in helper and "store.opening.id === project.id" in helper
+    assert "nextOpeningProgress(before, project, restart)" in helper and "store.opening.id === project.id" in helper
     ready = lib[lib.index("async function openReady("):lib.index("let opened: EditorProject")]
-    assert ready.count("progress: openingProgress(project)") == 2 and "project.progress ||" not in ready
+    assert "progress: openingProgress(project, restart)" in ready
+    assert ready.count("progress: openingProgress(project)") == 1 and "project.progress ||" not in ready
+    # Made again after failing: the bar starts again (FL2 F3; the rule itself
+    # runs under Node in tests/test_ui_editor_fl2.py).
+    assert "await openReady(opened, token, false, true)" in lib
     event = lib[lib.index("export function onEditorProjectEvent("):lib.index("let newsWaiter")]
     assert "store.opening.id !== e.id" in event and "openingProgress({ id: e.id, progress: e.progress })" in event
 

@@ -123,6 +123,30 @@ def _damaged(project_id: str, why: str) -> dict:
             "source_file": "", "media": [], "notes": [], "exports": [], "damaged": True}
 
 
+# How long a read waits for a manifest being replaced (FL2 F2).
+READ_PATIENCE = 0.5
+
+
+def _read_manifest(path: Path) -> str:
+    """The manifest's text, read under the lock its writers hold (save), so a
+    read in this process never meets the moment os.replace swaps the file.
+    On Windows a read from outside that lock (another process, a scanner
+    holding the new file) can still be refused for an instant: tried again for
+    up to READ_PATIENCE seconds before it counts. A missing file, or one that
+    reads but is not JSON, is not tried again."""
+    import time
+
+    until = time.monotonic() + READ_PATIENCE
+    while True:
+        try:
+            with _LOCK:
+                return path.read_text(encoding="utf-8")
+        except PermissionError:
+            if time.monotonic() >= until:
+                raise
+            time.sleep(0.02)
+
+
 def load(data_dir, project_id: str) -> dict:
     """The project's manifest. NotFound when there is no such folder; a
     manifest that can't be read comes back as a failed project (never hidden,
@@ -131,7 +155,7 @@ def load(data_dir, project_id: str) -> dict:
     if not home.is_dir():
         raise NotFound(project_id)
     try:
-        manifest = json.loads((home / MANIFEST).read_text(encoding="utf-8"))
+        manifest = json.loads(_read_manifest(home / MANIFEST))
     except (OSError, ValueError):
         return _damaged(project_id, "This project's record can't be read.")
     if not isinstance(manifest, dict) or manifest.get("id") != project_id or manifest.get("kind") not in KINDS:

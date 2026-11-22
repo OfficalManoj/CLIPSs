@@ -24,6 +24,7 @@ import {
   noteSentences,
   openEditorProject,
   openInEditor,
+  refreshShownProject,
   restartEditor,
   useEditorStore
 } from '../lib/editor'
@@ -132,7 +133,8 @@ function ProjectLists(): JSX.Element {
   }
 
   const pickFile = async (): Promise<void> => {
-    const path = await window.studio.pickVideoFile()
+    // No clips are made on this path: the dialog says so (FL2 D6).
+    const path = await window.studio.pickVideoFile(t('Choose a video to edit'))
     if (path) void openInEditor({ kind: 'file', path, shape: fileShape })
   }
 
@@ -360,9 +362,17 @@ function ProjectView({
     if (store.shownId && !rt.running && !rt.error && rt.ended !== 'unexpected') void ensureEditorShown()
   }, [store.shownId, rt.running, rt.error, rt.ended])
 
+  // Coming back to the page: the shown project is read again, so the Export
+  // sheet's line follows a clip deleted meanwhile (FL2 F4).
+  useEffect(() => {
+    void refreshShownProject()
+  }, [])
+
   // A click in the editor takes the keys: no button of the page stays
   // focused (Space would press it). Ctrl+F6 in the editor gives them back,
-  // and focus goes to "Projects".
+  // and focus goes to "Projects". (Switching to another program and back
+  // is not reported as the editor letting go: the main process gives the
+  // keys back to the editor then, FL2 D1.)
   const wasFocused = useRef(false)
   useEffect(() => {
     if (rt.focused) {
@@ -373,6 +383,33 @@ function ProjectView({
     }
     wasFocused.current = rt.focused
   }, [rt.focused])
+
+  // Ctrl+F6 in the app's page gives the keys to the editor again, the way
+  // back from Ctrl+F6 in the editor (FL2 D1), while it is shown. Given when
+  // F6 is let go: an F6 still down would reach the editor, which takes
+  // Ctrl+F6 as leaving again.
+  const editorUp = wanted && rt.visible
+  useEffect(() => {
+    if (!editorUp) return
+    let pressed = false
+    const onDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'F6') return
+      pressed = e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey
+      if (pressed) e.preventDefault()
+    }
+    const onUp = (e: KeyboardEvent): void => {
+      if (e.key !== 'F6' || !pressed) return
+      pressed = false
+      e.preventDefault()
+      void bridge?.focus()
+    }
+    document.addEventListener('keydown', onDown)
+    document.addEventListener('keyup', onUp)
+    return () => {
+      document.removeEventListener('keydown', onDown)
+      document.removeEventListener('keyup', onUp)
+    }
+  }, [bridge, editorUp])
 
   const notes = noteSentences(store.project?.notes)
   const showNotes = notes.length > 0 && !store.notesSeen

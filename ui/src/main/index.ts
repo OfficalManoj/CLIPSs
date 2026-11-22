@@ -516,9 +516,11 @@ ipcMain.handle('pick-audio-file', async () => {
   return result.canceled ? null : result.filePaths[0]
 })
 
-ipcMain.handle('pick-video-file', async () => {
+// `title`: the caller's own words (already translated), for a use that makes
+// no clips (the Editor page's "Edit a file from your PC", FL2 D6).
+ipcMain.handle('pick-video-file', async (_event, title?: unknown) => {
   const result = await dialog.showOpenDialog({
-    title: 'Choose a video to make clips from',
+    title: typeof title === 'string' && title.trim() && title.length <= 200 ? title : 'Choose a video to make clips from',
     properties: ['openFile'],
     filters: [
       { name: 'Video', extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm', 'm4v', 'ts', 'flv'] },

@@ -36,7 +36,7 @@ interface Window {
   studio: {
     platform: string
     pickAudioFile: () => Promise<string | null>
-    pickVideoFile: () => Promise<string | null>
+    pickVideoFile: (title?: string) => Promise<string | null>
     /** Multi-select, for queueing a batch of local files at once. */
     pickVideoFiles: () => Promise<string[]>
     pickImageFile: () => Promise<string | null>
@@ -86,10 +86,14 @@ interface Window {
       setBounds: (rect: { x: number; y: number; width: number; height: number }) => Promise<{ ok: boolean }>
       setVisible: (visible: boolean) => Promise<{ ok: boolean }>
       focus: () => Promise<{ ok: boolean }>
-      blur: () => Promise<{ ok: boolean }>
+      blur: (why?: 'pointer' | 'focus') => Promise<{ ok: boolean }>
       close: () => Promise<{ ok: boolean }>
       getState: () => Promise<Record<string, unknown> | null>
       setWords?: (words: { message: string; keep: string; quit: string }) => Promise<{ ok: boolean }>
+      /** Start the editor hidden, with no project, while one is made (FL2 F1). */
+      prepare?: () => Promise<{ ok: boolean }>
+      /** Close an editor started by prepare that never got its project. */
+      unprepare?: () => Promise<{ ok: boolean }>
       reveal: (projectId: string, index: number) => Promise<boolean>
       ask: (question: {
         message: string

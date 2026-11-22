@@ -527,3 +527,28 @@ The Kokoro voice that Voicebox uses by default was already in the repo as an opt
 **Rejected:** a faster encoder setting for the full render (it changed the tracker's framing); re-running tracking with fewer samples or without the shot check (a different framing from the clip's); the editor's own FFmpeg with NVENC (the owner's rule); making the base ahead of time for every clip (work and disk for clips never opened).
 
 **To undo:** `fastbase.make` returning None sends every clip to the full render, which is the code before this change with only the models' loading moved earlier; `video.encoding.cpu_encoder_args` changes nothing outside its block.
+
+**Checked in FL2 (P1, 2026-11-21): the fast base keeps libx264 ultrafast CRF 16.** Measured in the desktop app against veryfast CRF 20 (the old base), ultrafast CRF 20 and superfast CRF 18: all four play the 60 fps clip at 50.9 to 51.1 of 60 pictures a second, so the encoding is not what limits playback (none reaches 58). Ultrafast CRF 16 has the fastest first open (12.5 s) short of ultrafast CRF 20 (12.0 s), which loses picture quality (SSIM 0.9887 against 0.9920) that the editor's export would carry into the posted video; veryfast CRF 20 opens 3.9 s slower and superfast CRF 18 2.4 s slower for no better playback. NVENC was not tried (the bundled FFmpeg has none on this driver). The numbers are in [`api/k2-editor.md`](api/k2-editor.md), "The base encoding (P1)".
+
+## ED31 · Inside Clips Kitty every editor shortcut needs Ctrl, set as data in the editor's own shortcut settings
+
+**Date:** 2026-11-20 · **Step:** FL2 (C1) · As built; the plan's ED31
+
+**Context:** Concat's keyboard puts eight actions on bare letters (Q and W cut left and right, F freezes, B the split tool, M mutes, H the pan tool, N snapping, S the preview axis) and deletes a clip with Backspace as well as Delete. Inside Clips Kitty the editor sits beside the app's own page, and a letter typed while the keyboard was in the editor but not in a text field cut the timeline (the K2 click-through, decision 2; the owner chose a modifier).
+
+**Decision:**
+- Each of those actions gets a free Ctrl or Ctrl+Shift chord: freeze Ctrl+F, delete left Ctrl+Shift+Q, delete right Ctrl+Shift+W, split tool Ctrl+Shift+B, mute Ctrl+M, pan Ctrl+H, snap Ctrl+N, preview axis Ctrl+Shift+S; delete is Delete only and delete-and-close-the-gap Shift+Delete only. Space, the arrows, Home/End and every Ctrl chord the editor ships stay. These were all of keymap.rs's bare-key defaults at Concat v0.2.12 besides the ones that stay.
+- No editor code: the main process writes the table into the editor's own settings file (`keybinds`, the same entries Settings > Shortcuts writes) before it starts the editor, merged into the file, written beside it and moved over it (`ui/src/main/editorKeys.ts`).
+- Written once per version of the table, and never over a chord the person set: an action is set only where the file holds nothing for it or still holds what Clips Kitty last wrote, which Clips Kitty remembers in its own data, per settings file.
+
+**Why:** the keys are data the editor already reads; a person can still move any of them in Settings > Shortcuts, and the menus and tooltips name them from the same table, so nothing in the fork has to change and a Concat update cannot break it.
+
+**Trade-offs accepted:** the editor run on its own (outside Clips Kitty) uses the same settings folder, so it has the Ctrl chords too. Reset in Settings > Shortcuts puts an action back on Concat's own key (a bare letter, Backspace for Delete) until Clips Kitty's table changes version. A change of the table reaches a person's file only where they did not move that action.
+
+**Rejected:** a key filter in the fork's embed code (fork code for what is data); the bare letters left as Concat ships them (the owner's call); Ctrl+Q and Ctrl+W for the two cuts (the window's close and quit); Ctrl+S for the preview axis (save) and Ctrl+B for the split tool (split at the playhead); writing the table at every start (it would undo a Reset the person chose).
+
+**To undo:** remove `shortcutDefaults(exe)` from `start()` in `ui/src/main/editor.ts`; Settings > Shortcuts' Reset all puts a file back as Concat ships it.
+
+**Changed in the FL2 fix round (K-D36):** the Reset trade-off above was found in the black-box check (Mute reset to M, and M alone muted a clip), against "Shortcuts need Ctrl". The table is now also written as `hostKeybinds`, which a small fork change (keymap.rs `defaults_of`, prefs.rs `host_keybinds`, fork 0bac504c) reads as the defaults: Reset and Reset all go back to the Ctrl chords. That key is Clips Kitty's own and the editor never writes it, so it is kept equal to the table at every start; this undoes no choice of the person's, who still moves keys through `keybinds`, written once per table version as before. The one piece of fork code is generic (a host's defaults as data), not a key filter. To undo it: stop writing `hostKeybinds` in `ui/src/main/editorKeys.ts`; an editor without the fork change ignores the key.
+
+**Changed in the FL2 UX fix round (K-D38):** writing the table into `keybinds` as well made Settings > Shortcuts show all ten actions as changed by the person. Since `hostKeybinds` carries the table as the defaults, `keybinds` now gets none of it, and what Clips Kitty wrote there earlier (still what it last wrote, or the action's table chord) is taken out at each start; a chord the person chose stays (table version 2). This needs an editor that reads `hostKeybinds` (build 44879315991 or later, which the app ships with); an older test build would show its bare letters again. The trade-off above about Reset no longer applies.

@@ -25,7 +25,9 @@ import { app, BrowserWindow, dialog, ipcMain, screen, shell, type IpcMainInvokeE
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { connect, createServer } from 'node:net'
-import { win32 } from 'node:path'
+import { join, win32 } from 'node:path'
+import { GIVE_BACK_TRIES_MS, keysReturn, type AppAsk } from './editorFocus'
+import { applyShortcutDefaults, editorSettingsPath } from './editorKeys'
 
 const PROJECT_ID = /^[0-9a-f]{32}$/
 /** How long a start may take before the editor counts as not starting. */
@@ -84,9 +86,12 @@ interface Running {
   closing: boolean
   idleClosing: boolean
   software: boolean
+  /** '' while it has no project yet (started by prepare, FL2 F1). */
   projectId: string
   projectDir: string
   exportFolder: string
+  /** The Export sheet's line the editor was last given (FL2 F4). */
+  destination: string
   lastSeq: number
   /** Every project this process has had open, by its folder (normalised):
    *  an export is matched to its project by the folder the editor reports. */
@@ -119,6 +124,11 @@ let pub: EditorPublicState = {
   ended: '',
   code: null
 }
+/** Where the keyboard goes when the window is left and comes back (FL2 D1). */
+const keys = keysReturn()
+/** Presses in the app's own page (editor:blur), counted so that a give back
+ *  in flight yields to one (FL2 D1). */
+let pagePresses = 0
 
 // ---- small helpers ----------------------------------------------------------
 
@@ -263,6 +273,10 @@ function rpc(
   })
 }
 
+/** An editor asked to close that had not left when the wait ended (it
+ *  leaves by itself once it has saved). */
+let lingering = 0
+
 function alive(pid: number): boolean {
   try {
     process.kill(pid, 0) // signal 0 only asks whether it is there; nothing is sent
@@ -317,20 +331,48 @@ async function projectPlaces(projectId: string): Promise<ProjectPlaces | null> {
   return { dir, exportDir, exportName: typeof exportName === 'string' ? exportName : '' }
 }
 
+/** Clips Kitty's Ctrl chords laid into the editor's own settings before it
+ *  starts (FL2 C1, ui/src/main/editorKeys.ts). Only ever called with no
+ *  editor running; a failure never stops the start. */
+function shortcutDefaults(exe: string): void {
+  try {
+    const settings = editorSettingsPath(exe, process.env)
+    if (!settings) return
+    const outcome = applyShortcutDefaults(settings, join(app.getPath('userData'), 'editor-shortcuts.json'))
+    if (outcome === 'unreadable' || outcome === 'failed') {
+      console.warn(`the editor's shortcut settings were not written (${outcome}); tried again at its next start`)
+    }
+  } catch (e) {
+    console.warn(`the editor's shortcut settings were not written: ${(e as Error).message}`)
+  }
+}
+
+/** Start the editor on a project, or with none (`projectId` '': prepared
+ *  while a project is made, FL2 F1; hidden, and shown only once show()
+ *  has opened a project in it). A prepared start that fails says nothing:
+ *  the show() after it starts the editor again and says why if it fails. */
 async function start(projectId: string, exportFolder: string): Promise<{ ok: boolean; error?: string }> {
+  const prepared = projectId === ''
+  const say = (patch: Partial<EditorPublicState>): void => {
+    if (!prepared) setPub(patch)
+  }
   const launch = await engine('GET', '/editor/launch')
   const exe = launch.body?.exe
   if (!launch.ok || typeof exe !== 'string' || !exe) {
-    setPub({ running: false, projectId, error: 'missing', ended: '', code: null })
+    say({ running: false, projectId, error: 'missing', ended: '', code: null })
     return { ok: false, error: 'missing' }
   }
-  const places = await projectPlaces(projectId)
-  if (!places) {
+  const places = prepared ? null : await projectPlaces(projectId)
+  if (!prepared && !places) {
     setPub({ running: false, projectId, error: 'no_project', ended: '', code: null })
     return { ok: false, error: 'no_project' }
   }
   const win = deps?.window()
   if (!win || win.isDestroyed()) return { ok: false, error: 'cannot_start' }
+  // No editor runs here (one at a time, and this is only reached with none),
+  // nor one that was asked to close and had not left yet: its settings file
+  // is not being written by it. Otherwise the table waits for the next start.
+  if (ed === null && !(lingering && alive(lingering))) shortcutDefaults(exe)
 
   const token = randomBytes(32).toString('hex')
   const port = await freePort()
@@ -347,16 +389,20 @@ async function start(projectId: string, exportFolder: string): Promise<{ ok: boo
         '--embed', hwnd,
         '--bounds', `${r.x},${r.y},${r.width},${r.height}`,
         '--api', `127.0.0.1:${port}`,
-        '--project', places.dir,
-        '--export-dir', places.exportDir,
-        '--export-name', places.exportName,
-        ...(destinationOf(projectId) ? ['--export-note', destinationOf(projectId)] : []),
+        ...(places
+          ? [
+              '--project', places.dir,
+              '--export-dir', places.exportDir,
+              '--export-name', places.exportName,
+              ...(destinationOf(projectId) ? ['--export-note', destinationOf(projectId)] : [])
+            ]
+          : []),
         '--hidden'
       ],
       { detached: true, stdio: 'ignore', windowsHide: true, cwd: app.getPath('videos'), env }
     )
   } catch {
-    setPub({ running: false, projectId, error: 'cannot_start', ended: '', code: null })
+    say({ running: false, projectId, error: 'cannot_start', ended: '', code: null })
     return { ok: false, error: 'cannot_start' }
   }
   child.unref()
@@ -371,10 +417,11 @@ async function start(projectId: string, exportFolder: string): Promise<{ ok: boo
     idleClosing: false,
     software: false,
     projectId,
-    projectDir: places.dir,
+    projectDir: places?.dir ?? '',
     exportFolder,
+    destination: places ? destinationOf(projectId) : '',
     lastSeq: 0,
-    known: new Map([[folderKey(places.dir), { id: projectId, exportFolder }]]),
+    known: new Map(places ? [[folderKey(places.dir), { id: projectId, exportFolder }]] : []),
     timer: null,
     takeIn: Promise.resolve()
   }
@@ -400,7 +447,11 @@ async function start(projectId: string, exportFolder: string): Promise<{ ok: boo
     target.closing = true
     if (state) void rpc(target, 'host.close')
     ed = null
-    setPub({ running: false, error: 'cannot_start', ended: '', code: null })
+    // It may still be running: until it has gone, the next start leaves its
+    // settings file alone (shortcutDefaults), as after a close that timed out.
+    if (alive(target.pid)) lingering = target.pid
+    if (prepared) setPub({ running: false })
+    else setPub({ running: false, error: 'cannot_start', ended: '', code: null })
     return { ok: false, error: 'cannot_start' }
   }
   target.ready = true
@@ -412,7 +463,9 @@ async function start(projectId: string, exportFolder: string): Promise<{ ok: boo
     setPub({ software: true })
   } else {
     await rpc(target, 'host.set_bounds', { ...physicalBounds() })
-    if (wantVisible) await rpc(target, 'host.set_visible', { visible: true })
+    // A prepared editor has no project yet: it stays hidden (the person
+    // never sees an empty editor) until switchTo has opened one.
+    if (wantVisible && !prepared) await rpc(target, 'host.set_visible', { visible: true })
   }
   applyState(target, state)
   schedulePoll(target)
@@ -435,6 +488,12 @@ function onExit(target: Running, code: number | null): void {
       ended: target.idleClosing ? 'idle' : '',
       code: null
     })
+    return
+  }
+  if (target.projectId === '') {
+    // A prepared editor (no project yet) that ended: nothing to say; the
+    // show() for the project starts it again.
+    setPub({ running: false, visible: false, focused: false, exporting: null })
     return
   }
   // It ended by itself. Its work is saved as it goes (1.5 s after each change).
@@ -468,12 +527,37 @@ async function switchTo(target: Running, projectId: string, exportFolder: string
     await closeNow(target)
     return start(projectId, exportFolder)
   }
+  const wasPrepared = target.projectId === ''
   target.projectId = projectId
   target.projectDir = places.dir
   target.exportFolder = exportFolder
+  target.destination = destinationOf(projectId)
   target.known.set(folderKey(places.dir), { id: projectId, exportFolder })
   setPub({ projectId, dirty: false })
+  if (wasPrepared && !target.software) {
+    // Started while the project was made: shown now that it has the project.
+    await rpc(target, 'host.set_bounds', { ...physicalBounds() })
+    if (wantVisible) await rpc(target, 'host.set_visible', { visible: true })
+  }
   return { ok: true }
+}
+
+/** Tell the editor the Export sheet's new line for the project it has open
+ *  (FL2 F4): host.open_project on the folder it already has open opens
+ *  nothing again (the editor answers at once for its own folder) and only
+ *  points the sheet at the new place and line. Refused while it exports;
+ *  then it is told at the next show. */
+async function retell(target: Running, projectId: string): Promise<void> {
+  const places = await projectPlaces(projectId)
+  if (!places || ed !== target || target.projectId !== projectId) return
+  const destination = destinationOf(projectId)
+  const answer = await rpc(
+    target,
+    'host.open_project',
+    { path: target.projectDir, exportDir: places.exportDir, exportName: places.exportName, destination },
+    10000
+  )
+  if (!answer.error) target.destination = destination
 }
 
 async function closeNow(target: Running, waitMs = 10000, idle = false): Promise<void> {
@@ -503,7 +587,10 @@ async function closeNow(target: Running, waitMs = 10000, idle = false): Promise<
       code: null
     })
   }
-  if (!gone) console.warn('Clips Kitty Editor did not leave in time; it leaves by itself once it has saved')
+  if (!gone) {
+    lingering = target.pid
+    console.warn('Clips Kitty Editor did not leave in time; it leaves by itself once it has saved')
+  }
 }
 
 // ---- while it runs ----------------------------------------------------------
@@ -519,9 +606,12 @@ async function poll(target: Running): Promise<void> {
   const answer = await rpc(target, 'host.state', {}, 3000)
   if (ed !== target || target.closing) return
   if (answer.result) applyState(target, answer.result as HostState)
+  // Counted from its own start too: an editor started (or prepared, with no
+  // project, which is never shown) while the page was long hidden is not
+  // closed at its first look.
   if (
-    !wantVisible &&
-    Date.now() - hiddenSince > IDLE_CLOSE_MS &&
+    (!wantVisible || target.projectId === '') &&
+    Date.now() - Math.max(hiddenSince, target.startedAt) > IDLE_CLOSE_MS &&
     pub.exporting === null &&
     !pub.dirty
   ) {
@@ -544,7 +634,9 @@ function applyState(target: Running, state: HostState): void {
   const fraction = Number(state.export?.fraction) || 0
   setPub({
     visible: state.visible === true,
-    focused: state.focused === true,
+    // Not told while the window is in the background or just came back
+    // (editorFocus.ts): only the person handing the keys back is.
+    focused: keys.shown(state.focused === true, pub.focused, Date.now()),
     dirty: state.project?.dirty === true,
     exporting: state.export?.running
       ? { fraction: Math.max(fraction, pub.exporting?.fraction ?? 0), stage: String(state.export.stage || '') }
@@ -741,6 +833,57 @@ export function watchEditorWindow(win: BrowserWindow): void {
     win.on(name as 'resize', measure)
   }
   win.on('moved', () => void checkScale())
+  // The window left and activated again (Alt+Tab, the taskbar, its title
+  // bar): the keys go back to the editor when it had them (FL2 D1). Only
+  // this window's own activation; a dialog of the app or another program
+  // keeps whatever it has.
+  if (!win.isFocused()) keys.left(false)
+  win.on('blur', () => keys.left(pub.focused && wantVisible))
+  win.on('focus', () => {
+    if (keys.back(Date.now())) void giveKeysBack(win)
+  })
+}
+
+/** The keys to the editor again after the window came back, through the
+ *  same call a click in the editor amounts to (host.focus). Tried a few
+ *  times: the window's own page takes the focus a moment after it is
+ *  activated. Stops as soon as the editor has them, the page asked for
+ *  them (a click), or the window left again. */
+async function giveKeysBack(win: BrowserWindow): Promise<void> {
+  const from = Date.now()
+  for (const at of GIVE_BACK_TRIES_MS) {
+    const wait = from + at - Date.now()
+    if (wait > 0) await sleep(wait)
+    const target = ed
+    if (
+      !keys.givingBack(Date.now()) ||
+      !target?.ready ||
+      target.closing ||
+      target.software ||
+      target.projectId === '' ||
+      !wantVisible ||
+      win.isDestroyed() ||
+      !win.isFocused()
+    ) {
+      return
+    }
+    const live = await rpc(target, 'host.state', {}, 1000)
+    if ((live.result as HostState | undefined)?.focused === true) {
+      setPub({ focused: keys.shown(true, pub.focused, Date.now()) })
+      return
+    }
+    if (!keys.givingBack(Date.now()) || !win.isFocused()) return
+    const presses = pagePresses
+    await rpc(target, 'host.focus')
+    if (pagePresses !== presses) {
+      // A press in the page arrived while the keys were on their way to the
+      // editor: the press wins, as a click in the app always does.
+      await rpc(target, 'host.blur')
+      if (!win.isDestroyed()) win.webContents.focus()
+      setPub({ focused: false })
+      return
+    }
+  }
 }
 
 export function setupEditor(options: Deps): void {
@@ -766,6 +909,7 @@ export function setupEditor(options: Deps): void {
       if (target && target.projectId === projectId) {
         target.exportFolder = exportFolder
         target.known.set(folderKey(target.projectDir), { id: projectId, exportFolder })
+        if (target.ready && destination !== target.destination) await retell(target, projectId)
         if (target.ready && !target.software) {
           await rpc(target, 'host.set_bounds', { ...physicalBounds() })
           await rpc(target, 'host.set_visible', { visible: wantVisible })
@@ -791,12 +935,36 @@ export function setupEditor(options: Deps): void {
     const show = visible === true
     if (show !== wantVisible) hiddenSince = Date.now()
     wantVisible = show
+    if (!show) keys.reset() // hidden: nothing to give back when the window returns
     const target = ed
-    if (target?.ready && !target.software) {
+    // A prepared editor has no project yet and is never shown (FL2 F1).
+    if (target?.ready && !target.software && target.projectId !== '') {
       if (show) await rpc(target, 'host.set_bounds', { ...physicalBounds() })
       await rpc(target, 'host.set_visible', { visible: show })
     }
     return { ok: true }
+  })
+
+  // Start the editor while a project is made (FL2 F1), so that it is ready
+  // when the project is: hidden, with no project. Only when none runs; a
+  // running editor opens the next project itself (host.open_project).
+  ipcMain.handle('editor:prepare', (event) => {
+    if (!ownFrame(event)) return { ok: false }
+    return serial(async () => {
+      if (ed) return { ok: true }
+      return start('', '')
+    })
+  })
+
+  // The open it was prepared for ended without a project: closed again.
+  // Never an editor that has a project.
+  ipcMain.handle('editor:unprepare', (event) => {
+    if (!ownFrame(event)) return { ok: false }
+    return serial(async () => {
+      const target = ed
+      if (target && target.projectId === '' && !target.closing) await closeNow(target, 3000)
+      return { ok: true }
+    })
   })
 
   ipcMain.handle('editor:focus', async (event) => {
@@ -806,8 +974,14 @@ export function setupEditor(options: Deps): void {
     return { ok: true }
   })
 
-  ipcMain.handle('editor:blur', async (event) => {
+  ipcMain.handle('editor:blur', async (event, why: unknown) => {
     if (!ownFrame(event)) return { ok: false }
+    // A press in the page always takes the keys; a focus the page fired only
+    // because the window came back does not take them from the editor
+    // while they are being given back to it (FL2 D1).
+    const kind: AppAsk = why === 'focus' ? 'focus' : 'pointer'
+    if (kind === 'pointer') pagePresses++
+    if (!keys.appAsked(kind, Date.now())) return { ok: true }
     const target = ed
     if (!target?.ready) return { ok: true }
     // Asked fresh: the last poll can be up to half a second old.
@@ -816,6 +990,8 @@ export function setupEditor(options: Deps): void {
       await rpc(target, 'host.blur')
       const win = deps?.window()
       if (win && !win.isDestroyed()) win.webContents.focus()
+      // Said at once: the page took them, so it does not move its focus.
+      setPub({ focused: false })
     }
     return { ok: true }
   })

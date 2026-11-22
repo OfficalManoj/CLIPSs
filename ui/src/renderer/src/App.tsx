@@ -126,12 +126,13 @@ function Shell(): JSX.Element {
   // (a click in the editor gives them to the editor by itself).
   useEffect(() => {
     if (!editor.runtime.running) return
-    const back = (): void => noteAppPointer()
-    document.addEventListener('pointerdown', back, true)
-    document.addEventListener('focusin', back, true)
+    const press = (): void => noteAppPointer('pointer')
+    const focus = (): void => noteAppPointer('focus')
+    document.addEventListener('pointerdown', press, true)
+    document.addEventListener('focusin', focus, true)
     return () => {
-      document.removeEventListener('pointerdown', back, true)
-      document.removeEventListener('focusin', back, true)
+      document.removeEventListener('pointerdown', press, true)
+      document.removeEventListener('focusin', focus, true)
     }
   }, [editor.runtime.running])
   // Clip approvals are cards at the bottom right, which the editor would be
