@@ -26,11 +26,14 @@ Run it:
 The engine has to be running: open Clips Kitty, or `python main.py serve`.
 """
 
+import io
 import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 
 # The version this server prefers. A client asking for an older one gets that
 # version back if we know it, per the spec's version negotiation.
@@ -391,11 +394,130 @@ def _queue_status(_args: dict) -> str:
     )
     if queue.get("paused"):
         # A paused queue that nobody un-paused looks exactly like a broken app.
-        text += "\nThe queue is PAUSED, so nothing new will start until it is resumed."
+        text += (
+            "\nThe queue is PAUSED, so nothing new will start until it is resumed: "
+            "start_queue resumes it."
+        )
     estimate = queue.get("estimate") or {}
     if estimate.get("confident"):
         text += f"\nRoughly {int(estimate.get('queued_seconds', 0) / 60)} minutes of work waiting."
     return text
+
+
+def _start_queue(_args: dict) -> str:
+    """The Queue page's Start queue button.
+
+    The queue starts paused and POST /jobs does not start it, so a job queued
+    from here waits until someone presses Start. This presses it.
+    """
+    _request("POST", "/queue/resume")
+    queue = _request("GET", "/queue")
+    running = len(queue.get("processing") or [])
+    waiting = len(queue.get("queued") or [])
+    if not running and not waiting:
+        return "The queue is running, but nothing is waiting. Queue a video first."
+    if running:
+        return (
+            f"The queue is running: {running} processing now, {waiting} waiting. "
+            "Follow it with job_status."
+        )
+    return (
+        f"The queue is running: {waiting} waiting; the first starts now. "
+        "Follow it with job_status."
+    )
+
+
+def _utc_time(value: str) -> str:
+    """'2026-11-22T15:00:00Z' as '2026-11-22 15:00 UTC'; anything unreadable as given."""
+    try:
+        moment = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(timezone.utc)
+    return moment.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _post_line(post: dict) -> str:
+    """One post of a clip, in the words clip_posts promises."""
+    where = f"{post.get('platform') or '?'} ({post.get('provider') or '?'})"
+    state = str(post.get("state") or "")
+    if post.get("live") and post.get("post_url"):
+        return f"{where}: LIVE {post['post_url']}"
+    if state == "published":
+        return f"{where}: published, link not known yet (links arrive within minutes; check again)"
+    if state in ("failed", "rejected"):
+        return f"{where}: failed: {post.get('error') or 'no reason given'}"
+    if post.get("scheduled_for"):
+        return f"{where}: scheduled for {_utc_time(post['scheduled_for'])}"
+    return f"{where}: {state or 'unknown'}"
+
+
+# server/agent.py cuts a tool's output at 4,000 characters; this stays under it.
+CLIP_POSTS_MAX_LINES = 40
+CLIP_POSTS_MAX_CHARS = 3500
+
+
+def _posts_of(clip_id: int) -> list:
+    try:
+        out = _request("GET", f"/clips/{int(clip_id)}/posts")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise LookupError(f"No clip with id {int(clip_id)}. list_clips shows the ids.") from None
+        raise
+    return list(out.get("posts") or [])
+
+
+def _clip_posts(args: dict) -> str:
+    """Where clips were posted and whether each post is live, with its link.
+    Read-only: it never posts or changes anything."""
+    has_clip = args.get("clip_id") not in (None, "")
+    has_video = args.get("video_id") not in (None, "")
+    if has_clip == has_video:
+        return "Give exactly one: clip_id for one clip, or video_id for every clip of a video."
+
+    try:
+        if has_clip:
+            clip_id = int(args["clip_id"])
+            found = _posts_of(clip_id)
+            if not found:
+                return f"Clip {clip_id} has not been posted anywhere."
+            return "\n".join([f"Clip {clip_id}:"] + [f"  {_post_line(p)}" for p in found])
+
+        video_id = str(args["video_id"]).strip()
+        # Quoted: a space or an emoji in a mistyped id would otherwise be an
+        # invalid URL, which urllib raises past every handler here.
+        clips = _request("GET", f"/videos/{urllib.parse.quote(video_id, safe='')}/clips") or []
+        if not clips:
+            return (
+                f"No clips for {video_id}. Either it produced none, or the id is wrong: "
+                "list_videos shows the ids that exist."
+            )
+        lines: list[str] = []
+        not_posted = 0
+        for clip in clips:
+            found = _posts_of(int(clip["id"]))
+            if not found:
+                not_posted += 1
+                continue
+            lines.append(f"Clip {clip['id']}:")
+            lines += [f"  {_post_line(p)}" for p in found]
+    except LookupError as e:
+        return str(e)
+
+    if not lines:
+        return f"None of the {len(clips)} clips of {video_id} has been posted anywhere."
+    shown: list[str] = []
+    for line in lines:
+        if len(shown) >= CLIP_POSTS_MAX_LINES or sum(len(s) + 1 for s in shown) + len(line) > CLIP_POSTS_MAX_CHARS:
+            break
+        shown.append(line)
+    left_out = len(lines) - len(shown)
+    if left_out:
+        shown.append(f"... {left_out} more line(s) left out; ask about one clip with clip_id.")
+    if not_posted:
+        shown.append(f"{not_posted} clip{'' if not_posted == 1 else 's'} not posted anywhere.")
+    return "\n".join(shown)
 
 
 def _list_videos(_args: dict) -> str:
@@ -1165,6 +1287,35 @@ TOOLS: list[dict] = [
         "handler": _queue_status,
     },
     {
+        "name": "start_queue",
+        "title": "Start the queue",
+        "description": (
+            "The Queue page's Start queue button. queue_video and queue_local_file only add "
+            "to the queue; it stays stopped until someone starts it. Call this when the "
+            "person wants the video processed now; queue_status shows anything else waiting."
+        ),
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": _start_queue,
+    },
+    {
+        "name": "clip_posts",
+        "title": "Where a clip was posted",
+        "description": (
+            "Where clips were posted and whether each post is live, with its link. Give "
+            "clip_id for one clip, or video_id for every clip of a video. Read-only: posts "
+            "nothing. A post can show as published a few minutes before its link is known; "
+            "check again then."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "clip_id": {"type": "integer", "description": "One clip, from list_clips"},
+                "video_id": {"type": "string", "description": "Every clip of this video"},
+            },
+        },
+        "handler": _clip_posts,
+    },
+    {
         "name": "list_videos",
         "title": "List processed videos",
         "description": "Videos Clips Kitty has processed, newest first, with clip counts.",
@@ -1221,9 +1372,11 @@ TOOLS: list[dict] = [
 
 INSTRUCTIONS = (
     "Clips Kitty turns long videos into short vertical clips, entirely on this computer. "
-    "Queue work with queue_video or queue_local_file, follow it with job_status, then read "
-    "the results with list_clips and export_clip. Processing a long stream takes tens of "
-    "minutes, so never block on it: queue, then check back."
+    "Queue work with queue_video or queue_local_file, start the queue with start_queue (it "
+    "stays stopped until started), follow it with job_status, then read the results with "
+    "list_clips and export_clip. Processing a long stream takes tens of minutes, so never "
+    "block on it: queue, then check back. clip_posts tells where a clip was posted and "
+    "gives the link once the post is live."
 )
 
 
@@ -1310,7 +1463,7 @@ def handle(message: dict) -> dict | None:
 def serve(stdin=None, stdout=None) -> int:
     """Read messages until stdin closes. Nothing but MCP messages may go to
     stdout, which is why anything worth saying goes to stderr."""
-    source = stdin if stdin is not None else sys.stdin
+    source = stdin if stdin is not None else _utf8_stdin()
     sink = stdout if stdout is not None else sys.stdout
     for raw in source:
         line = raw.strip()
@@ -1325,6 +1478,18 @@ def serve(stdin=None, stdout=None) -> int:
         if response is not None:
             _write(sink, response)
     return 0
+
+
+def _utf8_stdin():
+    """stdin read as UTF-8, which MCP messages always are.
+
+    A Windows pipe defaults to the ANSI code page (cp1252), so an emoji in a
+    tool's arguments raised UnicodeDecodeError and ended the server.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is None:
+        return sys.stdin
+    return io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", newline="")
 
 
 def _write(sink, message: dict) -> None:

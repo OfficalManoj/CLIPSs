@@ -364,3 +364,188 @@ def test_a_matchs_events_and_reels_said_to_the_assistant_reach_the_job(monkeypat
     assert sent["sport"] == sport
     props = mcp.SPORT_PARAM["properties"]
     assert "events" in props and props["reels"]["items"]["enum"] == ["recap", "teams", "players"]
+
+
+# ---- start_queue and clip_posts ---------------------------------------------
+
+
+def _call(name: str, arguments: dict) -> dict:
+    return _send(_request(30, "tools/call", {"name": name, "arguments": arguments}))["result"]
+
+
+def test_the_new_tools_are_offered():
+    names = {t["name"] for t in _send(_request(29, "tools/list"))["result"]["tools"]}
+    assert {"start_queue", "clip_posts"} <= names
+    assert len(names) == len(mcp.TOOLS) == 21
+
+
+def test_start_queue_presses_start_then_reads_the_queue(monkeypatch):
+    calls = []
+
+    def fake(method, path, body=None, *a, **k):
+        calls.append((method, path))
+        if path == "/queue":
+            return {"paused": False, "processing": [], "queued": [{"id": 4}, {"id": 5}]}
+        return {"paused": False}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    result = _call("start_queue", {})
+    assert calls == [("POST", "/queue/resume"), ("GET", "/queue")]
+    assert result["isError"] is False
+    assert result["content"][0]["text"] == (
+        "The queue is running: 2 waiting; the first starts now. Follow it with job_status."
+    )
+
+
+def test_start_queue_with_nothing_waiting_says_so(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", lambda m, p, b=None, *a, **k: (
+        {"processing": [], "queued": []} if p == "/queue" else {"paused": False}))
+    text = _call("start_queue", {})["content"][0]["text"]
+    assert "nothing is waiting" in text
+
+
+def test_a_paused_queue_names_start_queue(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", lambda *a, **k: {"paused": True, "capacity": 5})
+    assert "start_queue" in _call("queue_status", {})["content"][0]["text"]
+    assert "start_queue" in mcp.INSTRUCTIONS and "clip_posts" in mcp.INSTRUCTIONS
+
+
+def _post(platform, provider, state, **extra):
+    row = {"clip_id": 7, "platform": platform, "provider": provider, "state": state,
+           "post_id": "", "post_url": "", "error": "", "request_id": "", "scheduled_for": "",
+           "live": False, "created_at": "2026-11-22 10:00:00", "updated_at": "2026-11-22 10:00:00"}
+    row.update(extra)
+    return row
+
+
+FOUR_POSTS = [
+    _post("tiktok", "woopsocial", "published", post_url="https://example.com/v/1", live=True),
+    _post("youtube", "woopsocial", "queued", scheduled_for="2026-11-22T15:00:00Z"),
+    _post("instagram", "woopsocial", "published"),
+    _post("facebook", "uploadpost", "failed", error="video too short"),
+]
+
+
+def test_clip_posts_reads_one_clip(monkeypatch):
+    calls = []
+
+    def fake(method, path, body=None, *a, **k):
+        calls.append((method, path))
+        return {"clip_id": 7, "posts": FOUR_POSTS}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    result = _call("clip_posts", {"clip_id": 7})
+    assert calls == [("GET", "/clips/7/posts")]
+    assert result["isError"] is False
+    assert result["content"][0]["text"] == "\n".join([
+        "Clip 7:",
+        "  tiktok (woopsocial): LIVE https://example.com/v/1",
+        "  youtube (woopsocial): scheduled for 2026-11-22 15:00 UTC",
+        "  instagram (woopsocial): published, link not known yet (links arrive within minutes; check again)",
+        "  facebook (uploadpost): failed: video too short",
+    ])
+
+
+def test_clip_posts_for_a_clip_never_posted(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", lambda *a, **k: {"clip_id": 3, "posts": []})
+    assert _call("clip_posts", {"clip_id": 3})["content"][0]["text"] == (
+        "Clip 3 has not been posted anywhere."
+    )
+
+
+def test_clip_posts_wants_exactly_one_of_clip_and_video(monkeypatch):
+    def explode(*_a, **_k):
+        raise AssertionError("nothing should be asked of the engine")
+
+    monkeypatch.setattr(mcp, "_request", explode)
+    assert "exactly one" in _call("clip_posts", {})["content"][0]["text"]
+    assert "exactly one" in _call("clip_posts", {"clip_id": 1, "video_id": "v"})["content"][0]["text"]
+
+
+def test_clip_posts_for_a_video_lists_only_posted_clips(monkeypatch):
+    calls = []
+    answers = {
+        "/videos/abc/clips": [{"id": 1}, {"id": 2}, {"id": 3}],
+        "/clips/1/posts": {"clip_id": 1, "posts": [FOUR_POSTS[0]]},
+        "/clips/2/posts": {"clip_id": 2, "posts": []},
+        "/clips/3/posts": {"clip_id": 3, "posts": []},
+    }
+
+    def fake(method, path, body=None, *a, **k):
+        calls.append((method, path))
+        return answers[path]
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    text = _call("clip_posts", {"video_id": "abc"})["content"][0]["text"]
+    assert calls == [("GET", "/videos/abc/clips"), ("GET", "/clips/1/posts"),
+                     ("GET", "/clips/2/posts"), ("GET", "/clips/3/posts")]
+    assert text == "\n".join([
+        "Clip 1:",
+        "  tiktok (woopsocial): LIVE https://example.com/v/1",
+        "2 clips not posted anywhere.",
+    ])
+
+
+def test_clip_posts_for_a_big_video_stays_under_the_assistants_cut(monkeypatch):
+    clips = [{"id": n} for n in range(1, 61)]
+    long_url = "https://example.com/" + "x" * 60
+
+    def fake(method, path, body=None, *a, **k):
+        if path.startswith("/videos/"):
+            return clips
+        clip_id = int(path.split("/")[2])
+        return {"clip_id": clip_id, "posts": [
+            _post("tiktok", "woopsocial", "published", post_url=long_url, live=True),
+            _post("youtube", "woopsocial", "published", post_url=long_url, live=True),
+        ]}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    text = _call("clip_posts", {"video_id": "big"})["content"][0]["text"]
+    lines = text.split("\n")
+    assert len(text) < 3600
+    assert len(lines) <= mcp.CLIP_POSTS_MAX_LINES + 2
+    assert "more line(s) left out" in lines[-1]
+
+
+def test_clip_posts_for_an_unknown_clip(monkeypatch):
+    def fake(method, path, body=None, *a, **k):
+        raise urllib.error.HTTPError(
+            "http://127.0.0.1:8765" + path, 404, "Not Found", {},
+            io.BytesIO(b'{"detail":"no such clip"}'))
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    result = _call("clip_posts", {"clip_id": 999})
+    assert result["content"][0]["text"] == "No clip with id 999. list_clips shows the ids."
+
+
+def test_every_tool_is_named_in_the_api_guide():
+    from pathlib import Path
+
+    guide = (Path(__file__).resolve().parents[1] / "docs" / "API.md").read_text(encoding="utf-8")
+    missing = [t["name"] for t in mcp.TOOLS if f"`{t['name']}`" not in guide]
+    assert not missing, f"MCP tools docs/API.md never names: {missing}"
+
+
+def test_stdin_is_read_as_utf8_whatever_the_console_code_page(monkeypatch):
+    """A Windows pipe defaults to cp1252; MCP messages are UTF-8 and may carry emoji."""
+    focus = "the 🔥 moments – near the end"
+    message = _request(31, "tools/call", {
+        "name": "queue_video", "arguments": {"url": "https://youtu.be/x", "focus": focus}})
+    raw = (json.dumps(message, ensure_ascii=False) + "\n").encode("utf-8")
+    monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(raw), encoding="cp1252"))
+    sent = {}
+    monkeypatch.setattr(mcp, "_request", lambda m, p, b=None, *a, **k: sent.update(b or {})
+                        or {"job_id": 12})
+    stdout = io.StringIO()
+    assert mcp.serve(stdout=stdout) == 0
+    reply = json.loads(stdout.getvalue())
+    assert reply["result"]["isError"] is False
+    assert sent["focus"] == focus
+
+
+def test_clip_posts_quotes_a_mistyped_video_id(monkeypatch):
+    calls = []
+    monkeypatch.setattr(mcp, "_request", lambda m, p, b=None, *a, **k: calls.append(p) or [])
+    text = _call("clip_posts", {"video_id": "my video"})["content"][0]["text"]
+    assert calls == ["/videos/my%20video/clips"]
+    assert text.startswith("No clips for my video.")

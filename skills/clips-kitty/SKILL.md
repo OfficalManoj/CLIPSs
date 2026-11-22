@@ -27,7 +27,8 @@ not something to work around.
 
 ## How to work
 
-1. **Queue** with `queue_video` (a link) or `queue_local_file` (a file on disk).
+1. **Queue** with `queue_video` (a link) or `queue_local_file` (a file on disk), then
+   **start** with `start_queue`: the queue stays stopped until someone starts it.
 2. **Check back** with `job_status`. Processing a two-hour stream takes tens of minutes on
    a good machine. Never sit in a polling loop: report the job id, and check when the user
    next asks or after a long wait.
@@ -51,6 +52,18 @@ not something to work around.
 
 ## What it will not do
 
-There is no cloud tier, no upload of the user's footage anywhere, and no posting to social
-platforms except YouTube, which the user switches on themselves with their own Google key.
-Do not offer those.
+There is no cloud tier, and the user's footage is never uploaded anywhere unless they
+publish a clip.
+
+## Publishing
+
+Posting goes through accounts the user connects themselves in Settings: WoopSocial for
+scheduled posts (`woopsocial_status`, `schedule_clips_plan`, `schedule_clips_execute`),
+Upload-Post for several platforms at once (`uploadpost_status`, `uploadpost_publish`), and
+YouTube on their own Google key (`youtube_status`, `publish_plan`, `publish_plan_execute`).
+Nothing posts without the user's clear yes: show the plan first, because posts go to their
+real accounts and cannot be taken back.
+
+`clip_posts` tells where a clip (or every clip of a video) was posted, and gives the link
+once the post is live. A post can show as published a few minutes before its link is
+known; check again then.

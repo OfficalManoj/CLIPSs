@@ -1569,10 +1569,19 @@ Installed builds ship the engine as `api.exe` in the app's `resources\backend` f
 the command there is `api.exe mcp`. `CLIPS_STUDIO_API` overrides the address if the engine
 is on another port.
 
-Thirteen tools. Processing: `queue_video`, `queue_local_file`, `job_status`,
-`queue_status`, `list_videos`, `list_clips`, `clip_captions`, `export_clip`,
-`engine_status`. Publishing: `youtube_status`, `publish_plan`,
-`publish_plan_execute`, `publish_status`.
+Twenty-one tools. Processing: `queue_video`, `queue_local_file`, `start_queue`,
+`job_status`, `queue_status`, `list_videos`, `list_clips`, `clip_captions`,
+`export_clip`, `engine_status`. Scheduling through WoopSocial: `woopsocial_status`,
+`schedule_clips_plan`, `schedule_clips_execute`. Several platforms through Upload-Post:
+`uploadpost_status`, `uploadpost_publish`, `uploadpost_result`. YouTube: `youtube_status`,
+`publish_plan`, `publish_plan_execute`, `publish_status`. Where a clip went, any provider:
+`clip_posts`.
+
+Queueing only adds to the queue, which stays stopped until someone starts it, so
+`start_queue` is the Queue page's Start queue button (`POST /queue/resume`).
+`clip_posts` is read-only (`GET /clips/{id}/posts`, or every clip of a video): one line
+per post, LIVE with its link, scheduled, failed with the reason, or published with the
+link not known yet, which is normal for a few minutes after a post goes out.
 
 The publishing tools are deliberately two steps. `publish_plan` returns a
 proposal and says in its own output that nothing has been uploaded; an agent is

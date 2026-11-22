@@ -12,6 +12,11 @@ fixed were often broken in a way that only showed up on somebody else's machine.
 
 ### Added
 
+- **Two new tools for AI agents (MCP).** `start_queue` presses the Queue page's Start
+  queue button, so a video an agent queued starts processing, and `clip_posts` tells
+  where each clip was posted and gives the link once a post is live. The MCP server
+  also reads emoji in requests correctly on Windows now, instead of stopping.
+
 - **Optional Clip updates.** App-wide Approve/Deny cards, private Discord
   updates and an Away from desk approval gate, with local-model wording and
   plain-text fallback. Includes a configurable attorney joke popup. Off by default.
