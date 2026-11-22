@@ -1,9 +1,10 @@
 """Editor suite FL2, the app's part.
 
 C1, Ctrl shortcuts (ui/src/main/editorKeys.ts): the table written into Clips
-Kitty Editor's own settings before it starts, merged into the file without
-touching anything else, written once per table version, and never over a
-chord the person chose in Settings > Shortcuts. The module runs under Node
+Kitty Editor's own settings before it starts as the editor's defaults
+("hostKeybinds"), without touching anything else; since the UX fix round
+(D2) no table chord in "keybinds", and what the first writer put there taken
+out again, never a chord the person chose in Settings > Shortcuts. The module runs under Node
 here, as tests/test_ui_steps.py runs lib/steps.ts, against real files in a
 temporary folder.
 
@@ -139,25 +140,37 @@ def _apply(tmp_path, settings_path: Path, record_path: Path) -> str:
                  {"s": str(settings_path), "r": str(record_path)})
 
 
-def test_a_fresh_editor_gets_the_table_and_nothing_else(tmp_path):
+TABLE = {"freeze": "ctrl+f", "delete-left": "ctrl+shift+q", "delete-right": "ctrl+shift+w",
+         "split-tool": "ctrl+shift+b", "mute": "ctrl+m", "pan": "ctrl+h", "snap": "ctrl+n",
+         "preview-axis": "ctrl+shift+s", "delete": "delete", "ripple-delete": "shift+delete"}
+
+
+def _record_key(settings: Path) -> str:
+    return str(settings).replace("/", "\\").lower()
+
+
+def _record(record: Path, settings: Path) -> dict:
+    return json.loads(record.read_text(encoding="utf-8"))[_record_key(settings)]
+
+
+def test_a_fresh_editor_gets_the_table_as_its_defaults_and_no_changed_shortcuts(tmp_path):
+    """D2: the table is the editor's defaults ("hostKeybinds"); "keybinds",
+    what Settings > Shortcuts shows as changed, gets none of it."""
     settings = tmp_path / "Roaming" / "com.clipskitty.editor" / "settings.json"
     record = tmp_path / "kitty" / "editor-shortcuts.json"
     assert _apply(tmp_path, settings, record) == "written"
     written = json.loads(settings.read_text(encoding="utf-8"))
-    assert sorted(written) == ["hostKeybinds", "keybinds"] and written["keybinds"]["freeze"] == "ctrl+f"
-    # The same table as the editor's defaults inside Clips Kitty (X1).
-    assert written["hostKeybinds"] == written["keybinds"]
-    assert written["keybinds"]["delete"] == "delete" and len(written["keybinds"]) == 10
-    kept = json.loads(record.read_text(encoding="utf-8"))
-    (key, entry), = kept.items()
-    assert entry["table"] == 1 and entry["wrote"] == written["keybinds"]
-    assert key == str(settings).replace("/", "\\").lower()
+    assert written == {"hostKeybinds": TABLE}
+    assert _record(record, settings) == {"table": 2, "wrote": {}}
     # No staging file is left beside either.
     assert sorted(p.name for p in settings.parent.iterdir()) == ["settings.json"]
     assert sorted(p.name for p in record.parent.iterdir()) == ["editor-shortcuts.json"]
+    before = settings.read_bytes()
+    assert _apply(tmp_path, settings, record) == "current"
+    assert settings.read_bytes() == before
 
 
-def test_the_table_is_merged_into_existing_settings_without_touching_other_keys(tmp_path):
+def test_other_settings_and_the_persons_chords_are_left_as_they_are(tmp_path):
     settings = tmp_path / "settings.json"
     settings.write_text(json.dumps({**SETTINGS, "keybinds": {"undo": "ctrl+u", "mute": ""}}, indent=2),
                         encoding="utf-8")
@@ -165,60 +178,72 @@ def test_the_table_is_merged_into_existing_settings_without_touching_other_keys(
     assert _apply(tmp_path, settings, record) == "written"
     written = json.loads(settings.read_text(encoding="utf-8"))
     assert {k: v for k, v in written.items() if k not in ("keybinds", "hostKeybinds")} == SETTINGS
-    binds = written["keybinds"]
     # The person's own choices before Clips Kitty ever ran stay: undo moved,
     # mute taken off its key.
-    assert binds["undo"] == "ctrl+u" and binds["mute"] == ""
-    assert binds["freeze"] == "ctrl+f" and binds["ripple-delete"] == "shift+delete"
-    wrote = json.loads(record.read_text(encoding="utf-8"))[str(settings).replace("/", "\\").lower()]["wrote"]
-    assert "mute" not in wrote and wrote["freeze"] == "ctrl+f"
+    assert written["keybinds"] == {"undo": "ctrl+u", "mute": ""}
+    assert written["hostKeybinds"] == TABLE
 
 
-def test_written_once_per_table_and_never_over_a_chord_the_person_changed(tmp_path):
+def test_what_the_first_fl2_writer_left_is_cleaned_and_the_persons_chord_kept(tmp_path):
+    """A file as table 1 left it (keybinds = the whole table, remembered as
+    written), after the person moved freeze and cleared pan: the table's
+    entries go, theirs stay; once, then the file is current."""
+    settings = tmp_path / "settings.json"
+    record = tmp_path / "record.json"
+    binds = {**TABLE, "freeze": "ctrl+shift+f", "pan": "", "undo": "ctrl+u"}
+    settings.write_text(json.dumps({**SETTINGS, "keybinds": binds, "hostKeybinds": TABLE}), encoding="utf-8")
+    record.write_text(json.dumps({_record_key(settings): {"table": 1, "wrote": TABLE}}), encoding="utf-8")
+    assert _apply(tmp_path, settings, record) == "written"
+    written = json.loads(settings.read_text(encoding="utf-8"))
+    assert written["keybinds"] == {"freeze": "ctrl+shift+f", "pan": "", "undo": "ctrl+u"}
+    assert written["hostKeybinds"] == TABLE
+    assert {k: v for k, v in written.items() if k not in ("keybinds", "hostKeybinds")} == SETTINGS
+    assert _record(record, settings) == {"table": 2, "wrote": {}}
+    before = settings.read_bytes()
+    assert _apply(tmp_path, settings, record) == "current"
+    assert settings.read_bytes() == before
+
+
+def test_an_entry_still_what_an_older_table_wrote_is_taken_out(tmp_path):
+    """An action whose chord changed between tables: the entry still holding
+    what Clips Kitty wrote before (never touched by the person) goes too."""
+    settings = tmp_path / "settings.json"
+    record = tmp_path / "record.json"
+    settings.write_text(json.dumps({"keybinds": {"snap": "ctrl+shift+n", "mute": "ctrl+shift+m"}}), encoding="utf-8")
+    record.write_text(json.dumps({_record_key(settings): {"table": 1, "wrote": {"snap": "ctrl+shift+n"}}}),
+                      encoding="utf-8")
+    assert _apply(tmp_path, settings, record) == "written"
+    assert json.loads(settings.read_text(encoding="utf-8"))["keybinds"] == {"mute": "ctrl+shift+m"}
+
+
+def test_a_table_chord_set_again_is_the_default_and_goes(tmp_path):
+    """Every start: an entry equal to its default (an action set back on its
+    table chord, or written again by an older Clips Kitty) is taken out; it
+    changes nothing the person can press."""
     settings = tmp_path / "settings.json"
     record = tmp_path / "record.json"
     assert _apply(tmp_path, settings, record) == "written"
-    # The person moves freeze in Settings > Shortcuts, and resets snap (the
-    # editor removes the entry; hostKeybinds keeps it on Ctrl+N, X1).
     data = json.loads(settings.read_text(encoding="utf-8"))
-    data["keybinds"]["freeze"] = "ctrl+shift+f"
-    del data["keybinds"]["snap"]
+    data["keybinds"] = {"snap": "ctrl+n", "freeze": "ctrl+g"}
     settings.write_text(json.dumps(data), encoding="utf-8")
-    before = settings.read_bytes()
-    assert _apply(tmp_path, settings, record) == "current"
-    assert settings.read_bytes() == before                 # this table was already written: untouched
-
-    # A newer table (the version raised): written again where the file
-    # still holds what was written last, or nothing; the moved key stays.
-    entry = json.loads(record.read_text(encoding="utf-8"))
-    for value in entry.values():
-        value["table"] = 0
-    record.write_text(json.dumps(entry), encoding="utf-8")
     assert _apply(tmp_path, settings, record) == "written"
-    binds = json.loads(settings.read_text(encoding="utf-8"))["keybinds"]
-    assert binds["freeze"] == "ctrl+shift+f" and binds["snap"] == "ctrl+n" and binds["mute"] == "ctrl+m"
-    wrote = next(iter(json.loads(record.read_text(encoding="utf-8")).values()))["wrote"]
-    assert wrote["freeze"] == "ctrl+f"           # still knows the change was the person's
+    assert json.loads(settings.read_text(encoding="utf-8"))["keybinds"] == {"freeze": "ctrl+g"}
 
 
 def test_the_hosts_defaults_are_kept_as_the_table(tmp_path):
     """X1: Reset in the editor's Settings > Shortcuts goes back to
     "hostKeybinds", so that key is kept equal to the table at every start,
-    even once the keybinds were written, and nothing else is touched."""
+    and nothing else is touched."""
     settings = tmp_path / "settings.json"
     record = tmp_path / "record.json"
     assert _apply(tmp_path, settings, record) == "written"
-    # The person resets Mute (the editor removes the entry), and an editor
-    # without the host key dropped it, and changed it once by hand.
     data = json.loads(settings.read_text(encoding="utf-8"))
-    del data["keybinds"]["mute"]
     del data["hostKeybinds"]
     settings.write_text(json.dumps({**SETTINGS, **data}), encoding="utf-8")
     assert _apply(tmp_path, settings, record) == "written"
     written = json.loads(settings.read_text(encoding="utf-8"))
-    assert written["hostKeybinds"]["mute"] == "ctrl+m" and len(written["hostKeybinds"]) == 10
-    assert "mute" not in written["keybinds"]          # the person's reset stays a reset
-    assert {k: v for k, v in written.items() if k not in ("keybinds", "hostKeybinds")} == SETTINGS
+    assert written["hostKeybinds"] == TABLE and "keybinds" not in written
+    assert {k: v for k, v in written.items() if k != "hostKeybinds"} == SETTINGS
     written["hostKeybinds"]["pan"] = "h"
     settings.write_text(json.dumps(written), encoding="utf-8")
     assert _apply(tmp_path, settings, record) == "written"
@@ -238,16 +263,16 @@ def test_a_settings_file_that_will_not_read_is_left_alone(tmp_path):
     assert _apply(tmp_path, settings, record) == "unreadable"
 
 
-def test_the_merge_rule(tmp_path):
-    got = _keys(tmp_path, "return [m.mergeKeybinds({}, null), m.mergeKeybinds({freeze: 'x', pan: 'ctrl+h'}, null),"
-                          " m.mergeKeybinds({freeze: 'ctrl+f'}, {freeze: 'ctrl+f'}, {freeze: 'ctrl+g'}),"
-                          " m.mergeKeybinds({freeze: 'x'}, {freeze: 'ctrl+f'}, {freeze: 'ctrl+g'})]")
-    fresh, theirs, newer, moved = got
-    assert fresh["changed"] and fresh["keybinds"] == fresh["wrote"]
-    assert theirs["keybinds"]["freeze"] == "x" and "freeze" not in theirs["wrote"]
-    assert theirs["wrote"]["pan"] == "ctrl+h"            # already the chord: counted as written
-    assert newer["keybinds"] == {"freeze": "ctrl+g"} and newer["wrote"] == {"freeze": "ctrl+g"}
-    assert moved["keybinds"] == {"freeze": "x"} and moved["wrote"] == {"freeze": "ctrl+f"} and not moved["changed"]
+def test_the_cleaning_rule(tmp_path):
+    got = _keys(tmp_path, "return [m.cleanKeybinds({}, null),"
+                          " m.cleanKeybinds({freeze: 'x', pan: 'ctrl+h', undo: 'ctrl+h'}, null),"
+                          " m.cleanKeybinds({freeze: 'ctrl+f'}, {freeze: 'ctrl+f'}, {freeze: 'ctrl+g'}),"
+                          " m.cleanKeybinds({freeze: 'x', mute: ''}, {freeze: 'ctrl+f', mute: 'ctrl+m'})]")
+    empty, theirs, older, moved = got
+    assert empty == {"keybinds": {}, "removed": []}
+    assert theirs == {"keybinds": {"freeze": "x", "undo": "ctrl+h"}, "removed": ["pan"]}
+    assert older == {"keybinds": {}, "removed": ["freeze"]}
+    assert moved == {"keybinds": {"freeze": "x", "mute": ""}, "removed": []}
 
 
 def test_the_main_process_writes_the_table_before_it_starts_the_editor():

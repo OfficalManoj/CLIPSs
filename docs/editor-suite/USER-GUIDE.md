@@ -273,7 +273,7 @@ If you don't see **Editor** in the menu on the left, your copy of Clips Kitty do
 ### Open a clip in the editor
 
 1. Go to **Clip Editor** and pick a video.
-2. Point at a clip and click **Edit** (next to **Publish**). You can also click **Edit** next to **Edit this clip**.
+2. Point at a clip and click **Open in editor** (next to **Publish**). You can also click a clip and then **Open in editor**, next to **Edit this clip** in the clip's panel.
 3. The **Editor** page opens. The first time, Clips Kitty gets the clip ready, which takes a few seconds for most clips and up to a minute or two for some (gaming, sport or letterboxed clips); you see how far it is. After that it opens straight away.
 
 In the editor:

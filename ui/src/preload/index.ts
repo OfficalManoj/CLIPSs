@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('studio', {
   // Native audio-file picker (editor's background-music field).
   pickAudioFile: (): Promise<string | null> => ipcRenderer.invoke('pick-audio-file'),
   // Native video-file picker (Dashboard "upload a video file").
-  pickVideoFile: (): Promise<string | null> => ipcRenderer.invoke('pick-video-file'),
+  pickVideoFile: (title?: string): Promise<string | null> => ipcRenderer.invoke('pick-video-file', title),
   // Multi-select variant, for queueing a batch of local files at once.
   pickVideoFiles: (): Promise<string[]> => ipcRenderer.invoke('pick-video-files'),
   // Native image-file picker (watermark logo upload).
@@ -66,7 +66,7 @@ contextBridge.exposeInMainWorld('studio', {
       ipcRenderer.invoke('editor:setBounds', rect),
     setVisible: (visible: boolean): Promise<{ ok: boolean }> => ipcRenderer.invoke('editor:setVisible', visible),
     focus: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('editor:focus'),
-    blur: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('editor:blur'),
+    blur: (why?: 'pointer' | 'focus'): Promise<{ ok: boolean }> => ipcRenderer.invoke('editor:blur', why),
     close: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('editor:close'),
     getState: (): Promise<Record<string, unknown> | null> => ipcRenderer.invoke('editor:getState'),
     setWords: (words: { message: string; keep: string; quit: string }): Promise<{ ok: boolean }> =>

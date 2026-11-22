@@ -452,10 +452,12 @@ export function openingProgress(
 }
 
 let appPointerAt = 0
-/** A click or focus in the app's own page (App.tsx): the keys go back to it. */
-export function noteAppPointer(): void {
+/** A click or focus in the app's own page (App.tsx): the keys go back to it.
+ *  A focus the page fires only because the window came back does not take
+ *  them from the editor while they are given back to it (FL2 D1). */
+export function noteAppPointer(why: 'pointer' | 'focus' = 'pointer'): void {
   appPointerAt = Date.now()
-  if (store.runtime.running) void window.studio?.editor?.blur()
+  if (store.runtime.running) void window.studio?.editor?.blur(why)
 }
 
 /** Whether the keys left the editor because of a click in the app. */

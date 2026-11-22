@@ -9,31 +9,33 @@
 // the app's own page, so a stray letter must never cut the timeline: every
 // one of those gets a Ctrl chord, and Delete alone deletes.
 //
-// No editor code changes for this (ED31): the chords are written into the
-// editor's settings file as data, by the main process, before it starts the
-// editor (never while it runs), merged into the file without touching any
-// other key, written beside it and moved over it. They are written once per
-// version of the table below, and never over a chord the person changed in
-// Settings > Shortcuts afterwards: an action is set only where the file still
-// holds what Clips Kitty last wrote there, or nothing. What was last written
-// is remembered in Clips Kitty's own data folder, per settings file, not in
-// the editor's file. The editor's menus and tooltips name each action's chord
-// from the same table, so they follow by themselves.
+// The chords are written into the editor's settings file as data, by the
+// main process, before it starts the editor (never while it runs), merged
+// into the file without touching any other key, written beside it and moved
+// over it. They go into "hostKeybinds" (FL2 X1), the editor's defaults inside
+// Clips Kitty: its menus, tooltips and Settings > Shortcuts name each action's
+// chord from there, and Reset and Reset all go back to it rather than to the
+// bare letters. That key is Clips Kitty's own (the editor never writes it),
+// so it is kept equal to the table at every start. This needed one fork
+// change (PATCHES.md, "The host's own default shortcuts"), so it needs editor
+// build 44879315991 or later; an older editor ignores the key.
 //
-// The same table is also written as "hostKeybinds" (FL2 X1), the editor's
-// defaults inside Clips Kitty: Reset and Reset all in Settings > Shortcuts go
-// back to it rather than to the bare letters. That key is Clips Kitty's own
-// (the editor never writes it), so it is kept equal to the table at every
-// start. This needed one fork change (PATCHES.md, "The host's own default
-// shortcuts"); an editor without it ignores the key.
+// "keybinds" is the person's: Settings > Shortcuts writes an action there
+// only when they change it. FL2's first writer (table 1) put the whole table
+// there as well, so every action showed as changed (D2); now none of the
+// table's chords is written there, and an entry Clips Kitty wrote (still
+// what it last wrote, or the action's table chord) is taken out. A chord the
+// person chose stays. What was last written is remembered in Clips Kitty's
+// own data folder, per settings file, not in the editor's file.
 //
 // Node built-ins only, so tests/test_ui_editor_fl2.py runs it under Node.
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-/** Raise when KITTY_KEYS changes: each settings file is then written once more
- *  (still never over a chord the person chose). */
-export const KEYS_TABLE_VERSION = 1
+/** Raise when KITTY_KEYS or the way it is written changes. 2 (FL2 D2): the
+ *  table lives in "hostKeybinds" only, and what table 1 wrote into
+ *  "keybinds" is taken out again (never a chord the person chose). */
+export const KEYS_TABLE_VERSION = 2
 
 /** The editor's action ids (keymap.rs ACTIONS) and their chords inside Clips
  *  Kitty: the eight bare-letter defaults of Concat v0.2.12, each on a free
@@ -81,37 +83,35 @@ export function editorSettingsPath(exe: string, env: Record<string, string | und
 
 export interface KeysRecord {
   table: number
-  /** What Clips Kitty last wrote for each action in that file. */
+  /** What Clips Kitty last wrote into "keybinds" for each action in that
+   *  file (since table 2: nothing). */
   wrote: Record<string, string>
 }
 
-/** The keybinds after Clips Kitty's table is laid over `current` (what the
- *  file holds), given what it wrote last time (`last`): each action of the
- *  table is set where the file holds nothing for it, or still holds what was
- *  last written; anything else is the person's choice and stays. Every other
- *  action in the file is left as it is. `wrote` is what to remember: the
- *  chord written, or for an action the person changed, what had been written
- *  before (so a later table still knows the change was theirs). */
-export function mergeKeybinds(
+/** The keybinds with the entries Clips Kitty itself wrote taken out (FL2
+ *  D2): since the table is the editor's defaults ("hostKeybinds"), an entry
+ *  holding a table chord only makes Settings > Shortcuts show that action
+ *  as changed. An entry of the table's actions is taken out when it is that
+ *  action's chord in the table, or still what Clips Kitty last wrote there
+ *  (`last`); any other entry is the person's choice (moved, or cleared to
+ *  "") and stays, as does every other action. */
+export function cleanKeybinds(
   current: Record<string, unknown> | null | undefined,
   last: Record<string, string> | null | undefined,
   table: Readonly<Record<string, string>> = KITTY_KEYS
-): { keybinds: Record<string, unknown>; wrote: Record<string, string>; changed: boolean } {
+): { keybinds: Record<string, unknown>; removed: string[] } {
   const keybinds: Record<string, unknown> = { ...(current ?? {}) }
-  const wrote: Record<string, string> = {}
-  let changed = false
+  const removed: string[] = []
   for (const [id, chord] of Object.entries(table)) {
+    if (!Object.prototype.hasOwnProperty.call(keybinds, id)) continue
     const there = keybinds[id]
     const before = last?.[id]
-    if (there === undefined || there === chord || (before !== undefined && there === before)) {
-      if (there !== chord) changed = true
-      keybinds[id] = chord
-      wrote[id] = chord
-    } else if (before !== undefined) {
-      wrote[id] = before
+    if (there === chord || (before !== undefined && there === before)) {
+      delete keybinds[id]
+      removed.push(id)
     }
   }
-  return { keybinds, wrote, changed }
+  return { keybinds, removed }
 }
 
 function readJson(path: string): unknown {
@@ -141,18 +141,23 @@ function recordKey(settingsPath: string): string {
 
 export type KeysOutcome = 'written' | 'current' | 'unreadable' | 'failed'
 
-/** Lay Clips Kitty's chords into the editor's settings file at
- *  `settingsPath`, remembering what was written in `recordPath` (Clips
- *  Kitty's own data). The keybinds only when this file has not had this
- *  table version yet; "hostKeybinds" whenever it is not the table. Call it
- *  only while the editor is not running. Never throws:
+/** Make Clips Kitty's chords the editor's defaults in its settings file at
+ *  `settingsPath`: "hostKeybinds" kept equal to the table, and in
+ *  "keybinds" none of the table's chords (cleanKeybinds), so Settings >
+ *  Shortcuts shows nothing as changed that the person did not change. What
+ *  was written is remembered in `recordPath` (Clips Kitty's own data). Call
+ *  it only while the editor is not running. Never throws:
  *
- *  - 'current': this file already had this table; nothing touched.
- *  - 'written': the file now has the table (or already held it).
+ *  - 'current': nothing to change; nothing touched.
+ *  - 'written': the file now holds the table as its defaults.
  *  - 'unreadable': the file is there but is not settings (the editor sets
  *    such a file aside itself); nothing is written, and it is tried again
  *    at the next start.
- *  - 'failed': it could not be written; tried again at the next start. */
+ *  - 'failed': it could not be written; tried again at the next start.
+ *
+ *  Needs an editor that reads "hostKeybinds" (build 44879315991 or later,
+ *  the build the app ships with); an older one would show its own bare
+ *  letters again. */
 export function applyShortcutDefaults(settingsPath: string, recordPath: string): KeysOutcome {
   let records: Record<string, KeysRecord> = {}
   try {
@@ -180,25 +185,28 @@ export function applyShortcutDefaults(settingsPath: string, recordPath: string):
   // Shortcuts go back to (keymap.rs defaults_of), so a reset never puts an
   // action back on a bare letter. Clips Kitty's own key: kept equal to the
   // table at every start.
-  const hostOk = sameKeys(settings[HOST_KEYS], KITTY_KEYS)
-  if (tableDone && hostOk) return 'current'
   const next: Record<string, unknown> = { ...settings }
-  let write = !hostOk
-  if (!hostOk) next[HOST_KEYS] = { ...KITTY_KEYS }
-  let merged: ReturnType<typeof mergeKeybinds> | null = null
-  if (!tableDone) {
-    const there = settings.keybinds
-    const current = there && typeof there === 'object' && !Array.isArray(there) ? (there as Record<string, unknown>) : {}
-    merged = mergeKeybinds(current, record?.wrote)
-    if (merged.changed || !(there && typeof there === 'object')) {
-      next.keybinds = merged.keybinds
+  let write = false
+  if (!sameKeys(settings[HOST_KEYS], KITTY_KEYS)) {
+    next[HOST_KEYS] = { ...KITTY_KEYS }
+    write = true
+  }
+  // The table's chords out of "keybinds" (D2): what an earlier Clips Kitty
+  // wrote there (table 1 wrote the whole table) and an entry equal to its
+  // default. Every start, so a person's chord stays and the rest is clean.
+  const there = settings.keybinds
+  if (there && typeof there === 'object' && !Array.isArray(there)) {
+    const cleaned = cleanKeybinds(there as Record<string, unknown>, tableDone ? null : record?.wrote)
+    if (cleaned.removed.length > 0) {
+      next.keybinds = cleaned.keybinds
       write = true
     }
   }
+  if (!write && tableDone) return 'current'
   try {
     if (write) writeWhole(settingsPath, next)
-    if (merged) {
-      records[key] = { table: KEYS_TABLE_VERSION, wrote: merged.wrote }
+    if (!tableDone) {
+      records[key] = { table: KEYS_TABLE_VERSION, wrote: {} }
       writeWhole(recordPath, records)
     }
   } catch {

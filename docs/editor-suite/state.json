@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "Clips Kitty editor suite",
-  "updated": "2026-11-20",
+  "updated": "2026-11-22",
   "about": "Machine-readable tracker for the editor suite. STATUS.md is the readable view of this file; when they disagree, this file wins. Acceptance criteria are copied from the plan's Proof column; step 0 also carries the checks from the plan's section on keeping plain auto-clipping identical. depends_on is read from the plan's text (which earlier step's output a step uses): the plan gives the run order, not a dependency list.",
   "now": "1",
   "stop_after_phase": 2,
@@ -2596,6 +2596,13 @@
           "check": "F3 and F4 in the desktop app",
           "outcome": "pass",
           "evidence": "F3: a clip project recorded as failed at 80% (its video removed) opened from Recent projects: the bar read 2%, 5%, then about 24% while it was made again, never 80%, and the editor showed it when it was ready (it was never shown empty). F4: the open project's clip deleted on the Clip Editor page; back on the Editor page the editor's Export sheet said 'Export folder: <the export folder>' with the name '<name> - <date>' (it said 'Replaces this clip in the Library' before)"
+        },
+        {
+          "date": "2026-11-22",
+          "agent": "Engineering (Clips Kitty), UX fix round",
+          "check": "D1 to D7 in the desktop app on the owner's second monitor (editor build 44879315991), and the regression gates",
+          "outcome": "pass",
+          "evidence": "See K-D37 to K-D43; screenshots outside the repository. Gates: see the round's report."
         }
       ],
       "defects": [
@@ -2670,6 +2677,62 @@
           "routed_to": "eng-fork",
           "status": "fixed",
           "summary": "X1: Reset next to Mute in the editor's Settings > Shortcuts put it back on a bare M, and M alone then muted the selected clip. Fixed: Clips Kitty also writes its table as hostKeybinds in the editor's settings (kept equal to the table at every start; the editor never writes it), and the fork reads an action's defaults through it (keymap.rs defaults_of, prefs.rs host_keybinds; fork 0bac504c, build 44879315991), so Reset and Reset all go back to the Ctrl chords. Checked in the desktop app with build 44879315991: Mute moved to Ctrl+Shift+M, its Reset showed Ctrl+M (no arrow); with the clip selected M alone changed nothing (undo still greyed), Ctrl+M muted it (undone with Ctrl+Z). Tests: keymap::tests::the_hosts_defaults_are_what_reset_puts_back, tests/test_ui_editor_fl2.py test_the_hosts_defaults_are_kept_as_the_table"
+        },
+        {
+          "id": "K-D37",
+          "date": "2026-11-22",
+          "found_by": "ux",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "MAJOR. When Clips Kitty's window became the front window again (Alt+Tab, the taskbar) after the editor had had the keys, they landed on '← Projects' (focus ring): Ctrl chords did nothing, and Space or Enter closed the project view (also QC's two unexplained closes). Leaving the window made the editor report that it lost the keys, which the page took for Ctrl+F6. Fixed: ui/src/main/editorFocus.ts (rules, run under Node) fed by the window's own blur and focus in ui/src/main/editor.ts: while the window is not active the page is not told the editor let go; when it is activated again and the editor had the keys, the main process gives them back with host.focus (the call a click in the editor amounts to; tried at 0/150/400/900 ms until the editor reports them; the page's own focus on activation does not take them meanwhile; a press in the page always wins). An app control that had the keys keeps them; dialogs, the Feedback Hub and a hidden editor get nothing given back. Ctrl+F6 in the page gives the keys to the editor (both ways). Checked on the second monitor with build 44879315991: Ctrl+N toggled snap, Space played and paused, no focus ring; the sidebar kept the keys; Tab from '← Projects' reaches the editor area and Enter enters it; a Feedback Hub field kept the keys across the switch. Tests: tests/test_ui_editor_fl2_ux.py"
+        },
+        {
+          "id": "K-D38",
+          "date": "2026-11-22",
+          "found_by": "qc",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "Settings > Shortcuts showed the reset arrow beside all ten actions Clips Kitty wrote, although each equals its default inside Clips Kitty (hostKeybinds). Fixed: KEYS_TABLE_VERSION 2 writes none of the table into keybinds and takes out what Clips Kitty wrote there (an entry still equal to what it last wrote, or to the action's table chord); a chord the person chose stays. Needs an editor that reads hostKeybinds (build 44879315991 or later, which the app ships with); an older test build would show its bare letters again, and Clips Kitty does not try to tell builds apart. Checked in the desktop app with a copy of the settings folder: fresh, no arrows and the Ctrl chords; a table 1 file with one chord of the person's cleaned at the next start, only that arrow left after a restart; Reset and Reset all gave the Ctrl chords; bare q w f m h n s b and Backspace did nothing to a selected clip (pictures identical); 'kitty zebra words BRAKE jump' typed with real key presses landed exactly (24 clips before and after). Tests: tests/test_ui_editor_fl2.py"
+        },
+        {
+          "id": "K-D39",
+          "date": "2026-11-22",
+          "found_by": "review",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "When an editor never answered host.state within START_TIMEOUT_MS, start() set ed to null without remembering its pid, so the next start could rewrite the editor's settings file and start a second editor while the first still ran. Fixed: lingering = target.pid while it is alive, as after a close that timed out, so the next start leaves the settings file alone. Not fixed: the next start still starts a second editor beside the first, and lingering holds one pid only (review after the UX fix round). Test: test_an_editor_that_never_answered_is_remembered_until_it_has_gone"
+        },
+        {
+          "id": "K-D40",
+          "date": "2026-11-22",
+          "found_by": "qc",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "FL2's docs were missing: the base encoding decision (P1), the P1 numbers, the fork commits F6 b21a33d5 and X1 0bac504c and the build FL2 was checked with (44879315991), STATUS.md, and these records. Done: DECISIONS.md ED28's FL2 note, api/k2-editor.md FL2 ('The base encoding (P1)', 'UX fix round'), STATUS.md. FL2's CI light runs show 3 failures on this PC for the base and the worktree alike (test_plugin_docs 1, test_plugin_sdk_new 2), where earlier records say 27"
+        },
+        {
+          "id": "K-D41",
+          "date": "2026-11-22",
+          "found_by": "black-box",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "The user guide said to click 'Edit' next to Publish; the clip card's button is 'Open in editor' and the clip's panel has 'Open in editor' beside 'Edit this clip'. Fixed in USER-GUIDE.md ('Open a clip in the editor')"
+        },
+        {
+          "id": "K-D42",
+          "date": "2026-11-22",
+          "found_by": "black-box",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "'Edit a file from your PC' > 'Choose a file…' opened a dialog titled 'Choose a video to make clips from', although no AI runs on that path. Fixed: the page passes t('Choose a video to edit') to pickVideoFile; pick-video-file keeps the old title when none is given. Checked in the desktop app (the dialog hook's log): 'Choose a video to edit' from the Editor page, 'Choose videos to add to the queue' from Add videos, unchanged"
+        },
+        {
+          "id": "K-D43",
+          "date": "2026-11-22",
+          "found_by": "ux",
+          "routed_to": "eng-ck",
+          "status": "fixed",
+          "summary": "The UX check left the test editor's settings file with a resized remembered layout (width 1056, height 785, changed panel ratios). Fixed: layout set back to the editor's default (none; prefs.rs SavedLayout), every other key kept (keybinds empty, hostKeybinds the table); backed up first. No preview zoom is kept in that file. A project opened afterwards showed the default layout"
         }
       ]
     }

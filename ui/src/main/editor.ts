@@ -26,6 +26,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { connect, createServer } from 'node:net'
 import { join, win32 } from 'node:path'
+import { GIVE_BACK_TRIES_MS, keysReturn, type AppAsk } from './editorFocus'
 import { applyShortcutDefaults, editorSettingsPath } from './editorKeys'
 
 const PROJECT_ID = /^[0-9a-f]{32}$/
@@ -123,6 +124,11 @@ let pub: EditorPublicState = {
   ended: '',
   code: null
 }
+/** Where the keyboard goes when the window is left and comes back (FL2 D1). */
+const keys = keysReturn()
+/** Presses in the app's own page (editor:blur), counted so that a give back
+ *  in flight yields to one (FL2 D1). */
+let pagePresses = 0
 
 // ---- small helpers ----------------------------------------------------------
 
@@ -441,6 +447,9 @@ async function start(projectId: string, exportFolder: string): Promise<{ ok: boo
     target.closing = true
     if (state) void rpc(target, 'host.close')
     ed = null
+    // It may still be running: until it has gone, the next start leaves its
+    // settings file alone (shortcutDefaults), as after a close that timed out.
+    if (alive(target.pid)) lingering = target.pid
     if (prepared) setPub({ running: false })
     else setPub({ running: false, error: 'cannot_start', ended: '', code: null })
     return { ok: false, error: 'cannot_start' }
@@ -625,7 +634,9 @@ function applyState(target: Running, state: HostState): void {
   const fraction = Number(state.export?.fraction) || 0
   setPub({
     visible: state.visible === true,
-    focused: state.focused === true,
+    // Not told while the window is in the background or just came back
+    // (editorFocus.ts): only the person handing the keys back is.
+    focused: keys.shown(state.focused === true, pub.focused, Date.now()),
     dirty: state.project?.dirty === true,
     exporting: state.export?.running
       ? { fraction: Math.max(fraction, pub.exporting?.fraction ?? 0), stage: String(state.export.stage || '') }
@@ -822,6 +833,57 @@ export function watchEditorWindow(win: BrowserWindow): void {
     win.on(name as 'resize', measure)
   }
   win.on('moved', () => void checkScale())
+  // The window left and activated again (Alt+Tab, the taskbar, its title
+  // bar): the keys go back to the editor when it had them (FL2 D1). Only
+  // this window's own activation; a dialog of the app or another program
+  // keeps whatever it has.
+  if (!win.isFocused()) keys.left(false)
+  win.on('blur', () => keys.left(pub.focused && wantVisible))
+  win.on('focus', () => {
+    if (keys.back(Date.now())) void giveKeysBack(win)
+  })
+}
+
+/** The keys to the editor again after the window came back, through the
+ *  same call a click in the editor amounts to (host.focus). Tried a few
+ *  times: the window's own page takes the focus a moment after it is
+ *  activated. Stops as soon as the editor has them, the page asked for
+ *  them (a click), or the window left again. */
+async function giveKeysBack(win: BrowserWindow): Promise<void> {
+  const from = Date.now()
+  for (const at of GIVE_BACK_TRIES_MS) {
+    const wait = from + at - Date.now()
+    if (wait > 0) await sleep(wait)
+    const target = ed
+    if (
+      !keys.givingBack(Date.now()) ||
+      !target?.ready ||
+      target.closing ||
+      target.software ||
+      target.projectId === '' ||
+      !wantVisible ||
+      win.isDestroyed() ||
+      !win.isFocused()
+    ) {
+      return
+    }
+    const live = await rpc(target, 'host.state', {}, 1000)
+    if ((live.result as HostState | undefined)?.focused === true) {
+      setPub({ focused: keys.shown(true, pub.focused, Date.now()) })
+      return
+    }
+    if (!keys.givingBack(Date.now()) || !win.isFocused()) return
+    const presses = pagePresses
+    await rpc(target, 'host.focus')
+    if (pagePresses !== presses) {
+      // A press in the page arrived while the keys were on their way to the
+      // editor: the press wins, as a click in the app always does.
+      await rpc(target, 'host.blur')
+      if (!win.isDestroyed()) win.webContents.focus()
+      setPub({ focused: false })
+      return
+    }
+  }
 }
 
 export function setupEditor(options: Deps): void {
@@ -873,6 +935,7 @@ export function setupEditor(options: Deps): void {
     const show = visible === true
     if (show !== wantVisible) hiddenSince = Date.now()
     wantVisible = show
+    if (!show) keys.reset() // hidden: nothing to give back when the window returns
     const target = ed
     // A prepared editor has no project yet and is never shown (FL2 F1).
     if (target?.ready && !target.software && target.projectId !== '') {
@@ -911,8 +974,14 @@ export function setupEditor(options: Deps): void {
     return { ok: true }
   })
 
-  ipcMain.handle('editor:blur', async (event) => {
+  ipcMain.handle('editor:blur', async (event, why: unknown) => {
     if (!ownFrame(event)) return { ok: false }
+    // A press in the page always takes the keys; a focus the page fired only
+    // because the window came back does not take them from the editor
+    // while they are being given back to it (FL2 D1).
+    const kind: AppAsk = why === 'focus' ? 'focus' : 'pointer'
+    if (kind === 'pointer') pagePresses++
+    if (!keys.appAsked(kind, Date.now())) return { ok: true }
     const target = ed
     if (!target?.ready) return { ok: true }
     // Asked fresh: the last poll can be up to half a second old.
@@ -921,6 +990,8 @@ export function setupEditor(options: Deps): void {
       await rpc(target, 'host.blur')
       const win = deps?.window()
       if (win && !win.isDestroyed()) win.webContents.focus()
+      // Said at once: the page took them, so it does not move its focus.
+      setPub({ focused: false })
     }
     return { ok: true }
   })

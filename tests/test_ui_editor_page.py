@@ -159,8 +159,10 @@ def test_keyboard_and_screen_reader():
     # A click in the editor leaves no page button focused (Space would press it).
     assert "(document.activeElement as HTMLElement | null)?.blur?.()" in page
     app = _read(APP)
-    assert "document.addEventListener('pointerdown', back, true)" in app
-    assert "document.addEventListener('focusin', back, true)" in app
+    # A press and a focus in the page are told apart (FL2 D1): a focus the
+    # page fires only because the window came back does not take the keys.
+    assert "document.addEventListener('pointerdown', press, true)" in app
+    assert "document.addEventListener('focusin', focus, true)" in app
 
 
 def test_questions_over_the_editor_are_native():
