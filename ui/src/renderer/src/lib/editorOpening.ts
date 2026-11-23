@@ -50,3 +50,32 @@ export function exportDestination(
   }
   return exportFolder ? words.folder.replace('{folder}', exportFolder) : words.downloads
 }
+
+/** What the Editor page's Publish can do for the shown project (FL3):
+ *
+ *  - 'none': no button. Not a clip project, or its clip is gone (a whole
+ *    video's or a file's export goes to the export folder, not the Library).
+ *  - 'export_first': off. Publish sends the clip in the Library, so the
+ *    edit has to be exported (taken in as the clip's video) first.
+ *  - 'kept_beside': off. The last export was saved next to the clip, which
+ *    had been changed meanwhile, so the clip's video is not the edit.
+ *  - 'clip_changed': off. The clip was changed after the export replaced
+ *    its video, so its video is no longer the edit.
+ *  - 'ready': on. The clip's video is the project's last export. */
+export type PublishState = 'none' | 'export_first' | 'kept_beside' | 'clip_changed' | 'ready'
+
+export function publishState(
+  project: {
+    kind?: string
+    clip?: { id: number } | null
+    clip_gone?: boolean
+    clip_changed?: boolean
+    exports?: { result: string }[]
+  } | null
+): PublishState {
+  if (project?.kind !== 'clip' || !project.clip || project.clip_gone) return 'none'
+  const last = (project.exports ?? []).at(-1)
+  if (last?.result === 'kept_beside') return 'kept_beside'
+  if (last?.result !== 'replaced_clip') return 'export_first'
+  return project.clip_changed ? 'clip_changed' : 'ready'
+}

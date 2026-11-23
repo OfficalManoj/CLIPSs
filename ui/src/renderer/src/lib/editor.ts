@@ -6,9 +6,11 @@
  *  exactly as it was, and a project being made keeps being made while the
  *  person is on another page.
  *
- *  Every way in (a Library clip's Edit, Quick edit's Edit, a video's Edit
- *  whole video, the page's own lists) calls openInEditor() or
- *  openEditorProject(); App.tsx switches to the page on 'open-editor-page'. */
+ *  Every way in (a Library clip's Edit, Quick edit's Edit, the page's own
+ *  lists: Recent projects, "Edit a whole video" and "Edit a file from your
+ *  PC") calls openInEditor() or openEditorProject(); App.tsx switches to the
+ *  page on 'open-editor-page'. The Clip Editor's "Edit whole video" was
+ *  removed in FL3. */
 import { useEffect, useState } from 'react'
 import { editorApi, EditorRouteError, type EditorOpenRequest, type EditorProject, type EditorTakeIn } from './api'
 import { exportDestination, nextOpeningProgress, OPENING_MOST } from './editorOpening'
@@ -108,6 +110,9 @@ function openErrorText(e: unknown): string {
     if (e.reason === 'missing') return t('The editor is not installed with this copy of Clips Kitty.')
     if (e.status === 404) return t('That clip or video is no longer in the Library.')
     if (e.status === 400 && /look like a video/.test(e.message)) return t('That file doesn’t look like a video.')
+    if (e.status === 503 && /could not read/.test(e.message)) {
+      return t('Clips Kitty could not read the video’s file. Try again in a moment.')
+    }
     if (e.status === 400) return t('Clips Kitty can’t open that file. Choose a video file.')
     if (e.status === 0) return t('Clips Kitty is still starting. Try again in a moment.')
   }
@@ -196,9 +201,10 @@ async function openReady(first: EditorProject, token: number, mayRemake = true, 
     try {
       project = await editorApi.project(project.id)
     } catch (e) {
-      set({ opening: null, openError: openErrorText(e) })
+      if (token === openToken) set({ opening: null, openError: openErrorText(e) })
       return
     }
+    if (token !== openToken) return
     set({ opening: { name: project.name, progress: openingProgress(project), id: project.id } })
   }
   if (token !== openToken) return
@@ -218,9 +224,12 @@ async function openReady(first: EditorProject, token: number, mayRemake = true, 
       if (token === openToken) await openReady({ ...project, state: 'building' }, token, false)
       return
     }
-    set({ opening: null, openError: openErrorText(e) })
+    if (token === openToken) set({ opening: null, openError: openErrorText(e) })
     return
   }
+  // Every answer of a stopped or replaced open is left alone: it must not
+  // start this open again, nor wipe the newer one with its failure.
+  if (token !== openToken) return
   if (opened.state === 'building') {
     // Made again (it had failed): its bar starts again too (FL2 F3).
     await openReady(opened, token, false, true)
@@ -230,16 +239,25 @@ async function openReady(first: EditorProject, token: number, mayRemake = true, 
     set({ opening: null, openError: opened.message || t('The project could not be opened.') })
     return
   }
-  if (token !== openToken) return
   const bridge = window.studio?.editor
   if (!bridge) {
     set({ opening: null, openError: t('The editor could not start.') })
     return
   }
-  const shown = await bridge.show(opened.id, await showOptions(opened))
+  // The options first, then the last look at the token, then show at once:
+  // "Projects" pressed while the options were read must stop this open.
+  const options = await showOptions(opened)
   if (token !== openToken) return
+  const shown = await bridge.show(opened.id, options)
+  if (token !== openToken) {
+    // Stopped while the editor opened it: an editor left with nothing shown
+    // or being opened on the page is closed again, never left running
+    // hidden. One that another open took over is that open's.
+    if (!store.shownId && !store.opening) await bridge.close()
+    return
+  }
   if (!shown.ok && shown.error === 'exporting') {
-    set({ opening: null, notice: { text: t('The editor is exporting. Open another project when it has finished.') } })
+    set({ opening: null, openError: t('The editor is exporting. Open another project when it has finished.') })
     return
   }
   const recovered = (opened.recovered ?? []).map(exportNotice).filter((n): n is EditorNotice => !!n)
@@ -297,14 +315,111 @@ export async function refreshShownProject(): Promise<void> {
   await bridge.show(id, await showOptions(project))
 }
 
+/** The shown project read again after one of its exports was taken in, so
+ *  the page's Publish knows whether the clip's video is now the edit (FL3).
+ *  Only the page's copy changes: the editor is not told anything. */
+export async function rereadShownProject(projectId?: string): Promise<void> {
+  const id = store.shownId
+  if (!id || (projectId && projectId !== id)) return
+  try {
+    const project = await editorApi.project(id)
+    if (store.shownId === id) set({ project })
+  } catch {
+    // Read again at the next open or export.
+  }
+}
+
+/** The question asked before a project being exported is closed: leaving
+ *  stops the export. True when the person chose to close it. */
+async function closeWhileExporting(): Promise<boolean> {
+  if (!store.runtime.exporting) return true
+  const answer = await askNative(t('The editor is still exporting. Close the project and stop the export?'), [
+    t('Keep exporting'),
+    t('Close')
+  ])
+  return answer === 1
+}
+
+/** Another open starting while a project is shown (F1 desktop fix): the
+ *  shown one is saved and closed the way "Projects" does it, so nothing of
+ *  it (its editor, name, notices or Publish) stays on screen while the new
+ *  one is made. Asked first while it exports. Null when the person kept
+ *  exporting (the new open does not start), else the close under way
+ *  (wrapped, so it is not waited for here: the page switches at once and
+ *  the engine is asked meanwhile). */
+type Leave = { closing: Promise<unknown> } | null
+const NOTHING_TO_CLOSE: Leave = { closing: Promise.resolve() }
+let leaving: Promise<Leave> | null = null
+function leaveShownProject(): Promise<Leave> {
+  // A second open while the first still asks (a double click) waits on the
+  // same answer: one question, one close.
+  if (!leaving) {
+    leaving = (async (): Promise<Leave> => {
+      if (!(await closeWhileExporting())) return null
+      const closing = window.studio?.editor?.close()
+      return { closing: closing ? closing.catch(() => undefined) : Promise.resolve() }
+    })().finally(() => {
+      leaving = null
+    })
+  }
+  return leaving
+}
+
+/** The open is for the project already shown: it stays as it is (its
+ *  editor, its undo history, an export under way), and only the page is
+ *  shown. Never closed and started again. */
+function keepShown(): void {
+  gotoPage()
+}
+
+/** The page from the moment an open starts: no project shown, nothing of
+ *  an earlier one (its notices, its notes), the opening bar at 0. */
+function startOpening(): void {
+  set({
+    shownId: null,
+    project: null,
+    opening: { name: '', progress: 0 },
+    openError: '',
+    notice: null,
+    notesSeen: false
+  })
+}
+
 /** Open a clip, a Library video or a file in the editor: made first when
  *  there is no project for it yet. */
 export async function openInEditor(req: EditorOpenRequest): Promise<void> {
+  const shown = store.shownId
+  // The shown project's own clip: it stays shown.
+  if (shown && req.kind === 'clip' && store.project?.id === shown && store.project.clip?.id === req.clip_id) {
+    keepShown()
+    return
+  }
+  // A whole video or a file while a project is shown: the engine is asked
+  // first, as its answer may be the shown project (kept) or another one.
+  let early: Awaited<ReturnType<typeof editorApi.open>> | null = null
+  if (shown && req.kind !== 'clip') {
+    gotoPage()
+    try {
+      early = await editorApi.open(req)
+    } catch (e) {
+      if (store.shownId === shown) set({ notice: { text: openErrorText(e), failure: true } })
+      return
+    }
+    if (store.shownId && early.project.id === store.shownId) {
+      keepShown()
+      return
+    }
+  }
+  // Nothing awaited when no project is shown: the page switches at once.
+  const left = store.shownId ? await leaveShownProject() : NOTHING_TO_CLOSE
+  if (left === null) return
+  const closing = left.closing
   const token = ++openToken
   gotoPage()
-  set({ opening: { name: '', progress: 0 }, openError: '' })
+  startOpening()
   try {
-    let answer = await editorApi.open(req)
+    let answer = early ?? (await editorApi.open(req))
+    await closing
     if (token !== openToken) return
     if (req.kind === 'clip' && !answer.created && (await wantsFresh(answer.project))) {
       answer = await editorApi.open({ ...req, fresh: true })
@@ -319,11 +434,20 @@ export async function openInEditor(req: EditorOpenRequest): Promise<void> {
 
 /** Open a project from the page's list (or from Quick edit's question). */
 export async function openEditorProject(id: string): Promise<void> {
+  if (store.shownId && id === store.shownId) {
+    keepShown()
+    return
+  }
+  // Nothing awaited when no project is shown: the page switches at once.
+  const left = store.shownId ? await leaveShownProject() : NOTHING_TO_CLOSE
+  if (left === null) return
+  const closing = left.closing
   const token = ++openToken
   gotoPage()
-  set({ opening: { name: '', progress: 0 }, openError: '' })
+  startOpening()
   try {
     let project = await editorApi.project(id)
+    await closing
     if (token !== openToken) return
     if (project.clip && (await wantsFresh(project))) {
       project = (await editorApi.open({ kind: 'clip', clip_id: project.clip.id, fresh: true })).project
@@ -347,7 +471,11 @@ export async function ensureEditorShown(): Promise<void> {
   const project = await editorApi.project(id).catch(() => store.project)
   if (store.shownId !== id) return
   if (project && project !== store.project) set({ project })
-  await bridge.show(id, await showOptions(project))
+  const options = await showOptions(project)
+  // Looked at again right before show: an open of another project that
+  // started meanwhile must not get this one's editor started under it.
+  if (store.shownId !== id) return
+  await bridge.show(id, options)
 }
 
 /** Try again after a start that failed or a software-only start. */
@@ -361,24 +489,27 @@ export async function restartEditor(): Promise<void> {
 /** "Projects": the editor saves and leaves, and the page shows the lists.
  *  While it exports, the person is asked first: leaving stops the export. */
 export async function closeEditorProject(): Promise<void> {
-  if (store.runtime.exporting) {
-    const answer = await askNative(t('The editor is still exporting. Close the project and stop the export?'), [
-      t('Keep exporting'),
-      t('Close')
-    ])
-    if (answer !== 1) return
-  }
+  if (!(await closeWhileExporting())) return
   ++openToken
-  set({ shownId: null, project: null, opening: null, notesSeen: false })
+  // Nothing of the project closed stays: its notices go with it (F1 U-3).
+  set({ shownId: null, project: null, opening: null, openError: '', notice: null, notesSeen: false })
   await window.studio?.editor?.close()
+}
+
+/** A notice in the strip from the page itself (FL3: Publish could not open). */
+export function showEditorNotice(notice: EditorNotice): void {
+  set({ notice })
 }
 
 export function clearEditorNotice(): void {
   set({ notice: null })
 }
 
+/** The Editor page entered again (from the sidebar or another page): an
+ *  earlier failed open's reason goes, so the lists show again, never a
+ *  failure the person already left. Not while a project is shown or opening. */
 export function clearOpenError(): void {
-  set({ openError: '' })
+  if (!store.shownId && !store.opening && store.openError) set({ openError: '' })
 }
 
 export function markNotesSeen(): void {
@@ -394,7 +525,11 @@ export function connectEditorBridge(): void {
   bridge.onState((s) => set({ runtime: { ...store.runtime, ...(s as Partial<EditorRuntime>) } }))
   bridge.onExport((answer) => {
     const notice = exportNotice(answer as unknown as EditorTakeIn)
-    if (notice) set({ notice })
+    // Only the shown project's: a late answer of a project being closed
+    // never shows on the next one while it opens.
+    if (notice && (answer as unknown as EditorTakeIn).project_id === store.shownId) set({ notice })
+    // The shown project's exports changed: Publish follows them (FL3).
+    void rereadShownProject((answer as unknown as EditorTakeIn).project_id)
   })
   void bridge.getState().then((s) => {
     if (s) set({ runtime: { ...store.runtime, ...(s as Partial<EditorRuntime>) } })

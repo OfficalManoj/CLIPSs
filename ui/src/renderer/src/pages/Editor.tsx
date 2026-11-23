@@ -4,7 +4,9 @@
  *  main process INSIDE this window, over this page's editor area. With no
  *  project shown the page lists recent projects and the two ways to start one
  *  here; with a project shown it is a 36 px strip of the app's own and the
- *  area, which the editor covers.
+ *  area, which the editor covers. A project being opened shows that strip
+ *  and area at once, never the lists (FL3: "Open in editor" goes straight
+ *  to the clip).
  *
  *  The editor is a native window above the web page, so nothing of the app's
  *  own may be drawn into the area while it shows: things that would hold the
@@ -12,6 +14,7 @@
  *  the strip. The page's state lives in lib/editor.ts, so leaving the page
  *  and coming back shows the work as it was. */
 import { useEffect, useRef, useState } from 'react'
+import PublishAllDialog from '../components/PublishAllDialog'
 import { api, editorApi, type EditorProject, type EditorShape } from '../lib/api'
 import {
   appPointerRecent,
@@ -25,23 +28,29 @@ import {
   openEditorProject,
   openInEditor,
   refreshShownProject,
+  rereadShownProject,
   restartEditor,
+  showEditorNotice,
   useEditorStore
 } from '../lib/editor'
-import { useEditorCoverHolds } from '../lib/editorCover'
+import { useEditorCover, useEditorCoverHolds } from '../lib/editorCover'
+import { publishState } from '../lib/editorOpening'
 import { t } from '../lib/i18n'
+import { readPublishSetup, type PublishSetup } from '../lib/publishSetup'
 import { useEvents } from '../lib/useEvents'
-import type { StudioEvent, Video } from '../lib/types'
+import type { Clip, StudioEvent, Video } from '../lib/types'
 
+/** "Same as the video" first, and the default (FL3): a video starts in its
+ *  own shape; the other four are there to change it. */
 export const SHAPES: { value: EditorShape; label: string }[] = [
+  { value: 'source', label: 'Same as the video' },
   { value: '16:9', label: '16:9' },
   { value: '9:16', label: '9:16' },
   { value: '1:1', label: '1:1' },
   { value: '4:5', label: '4:5' }
 ]
 
-/** The shape select, shared by both ways to start a project here and by the
- *  Library's "Edit whole video". */
+/** The shape select, shared by both ways to start a project here. */
 export function ShapeSelect({
   value,
   onChange,
@@ -54,19 +63,30 @@ export function ShapeSelect({
   return (
     <select
       id={id}
-      className="input !w-24 text-sm"
+      className="input !w-44 text-sm"
       value={value}
       onChange={(e) => onChange(e.target.value as EditorShape)}
       aria-label={t('Shape')}
-      title={t('The shape of the video you make: 16:9 wide, 9:16 tall, 1:1 square, 4:5 portrait')}
+      title={t(
+        'The shape of the video you make. Same as the video keeps its own shape. Or pick 16:9 wide, 9:16 tall, 1:1 square or 4:5 portrait.'
+      )}
     >
       {SHAPES.map((s) => (
         <option key={s.value} value={s.value}>
-          {s.label}
+          {s.value === 'source' ? t('Same as the video') : s.label}
         </option>
       ))}
     </select>
   )
+}
+
+/** A project's shape as the shape box says it. A project made with "Same
+ *  as the video" is kept under its named shape plus the video's own size
+ *  (source_size), so that size is what tells it from the same shape picked
+ *  by hand (F1 N-2). */
+export function shapeLabel(project: Pick<EditorProject, 'shape' | 'source_size'>): string {
+  if (project.shape === 'source' || project.source_size) return t('Same as the video')
+  return project.shape ?? ''
 }
 
 const KIND_ICON: Record<EditorProject['kind'], { icon: string; label: string }> = {
@@ -86,8 +106,8 @@ function ProjectLists(): JSX.Element {
   const [projects, setProjects] = useState<EditorProject[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [videoId, setVideoId] = useState('')
-  const [videoShape, setVideoShape] = useState<EditorShape>('16:9')
-  const [fileShape, setFileShape] = useState<EditorShape>('16:9')
+  const [videoShape, setVideoShape] = useState<EditorShape>('source')
+  const [fileShape, setFileShape] = useState<EditorShape>('source')
   const [listError, setListError] = useState('')
 
   const load = (): void => {
@@ -141,30 +161,8 @@ function ProjectLists(): JSX.Element {
   return (
     <div className="p-6 space-y-5 max-w-4xl">
       <h2 className="text-2xl font-bold">{t('Editor')}</h2>
-      {store.opening && (
-        <div className="card space-y-2" role="status" aria-live="polite">
-          <p className="text-sm">
-            {store.opening.name
-              ? t('Getting “{name}” ready…').replace('{name}', store.opening.name)
-              : t('Getting the project ready…')}
-          </p>
-          <div className="h-1.5 rounded bg-raised overflow-hidden">
-            <div
-              className="h-full bg-accent transition-all"
-              style={{ width: `${Math.round(Math.min(1, Math.max(0.02, store.opening.progress)) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
-      {store.openError && (
-        <p className="text-sm text-amber-400" role="alert">
-          {store.openError}{' '}
-          <button type="button" className="underline text-muted" onClick={clearOpenError}>
-            {t('Dismiss')}
-          </button>
-        </p>
-      )}
-      {/* Always there, so a notice that appears is read out (a live region
+      {/* A project being opened, or one that could not be opened, shows in
+          the strip (ProjectView), never here (F1). Always there, so a notice that appears is read out (a live region
           added together with its text is not). */}
       <p role="status" className="text-sm text-accent empty:hidden" title={store.notice?.tooltip}>
         {store.notice && !store.notice.failure ? store.notice.text : null}
@@ -195,6 +193,9 @@ function ProjectLists(): JSX.Element {
                   title={p.state === 'failed' ? p.message : t(KIND_ICON[p.kind]?.label ?? 'A clip')}
                 >
                   {p.name || t('Untitled project')}
+                  {/* Two projects of one video in different shapes have the
+                      same name: the shape tells them apart (F1 N-2). */}
+                  {p.kind !== 'clip' && p.shape && <span className="text-muted"> · {shapeLabel(p)}</span>}
                   {p.state === 'failed' && <span className="text-amber-400"> · {t('Not finished')}</span>}
                   {p.clip_gone && <span className="text-muted"> · {t('Clip deleted')}</span>}
                 </button>
@@ -276,7 +277,9 @@ function ProjectLists(): JSX.Element {
 /** The state at the strip's right: "Saved", "Saving…", "Exporting 42%". */
 function stateText(store: ReturnType<typeof editorStore>): string {
   const rt = store.runtime
-  if (!rt.running) return ''
+  // Nothing shown yet (a project being opened): what the editor said of an
+  // earlier project is not this one's (F1 U-2).
+  if (!rt.running || !store.shownId) return ''
   if (rt.exporting) return `${t('Exporting')} ${Math.round(rt.exporting.fraction * 100)}%`
   return rt.dirty ? t('Saving…') : t('Saved')
 }
@@ -300,8 +303,16 @@ function ProjectView({
 }): JSX.Element {
   const store = useEditorStore()
   const holds = useEditorCoverHolds()
+  // Publish (FL3): the same one-clip window as the Clips page's, through the
+  // same provider, and on under the same rule: it opens whether or not a
+  // provider is set up, and the window itself says what is (review fix S1,
+  // F1 U-4). The editor is hidden while it is open (the cover rule).
+  const [publishSetup, setPublishSetup] = useState<PublishSetup | null>(null)
+  const [publishClip, setPublishClip] = useState<Clip | null>(null)
+  useEditorCover(publishClip !== null)
   const area = useRef<HTMLDivElement>(null)
   const projectsButton = useRef<HTMLButtonElement>(null)
+  const publishButton = useRef<HTMLButtonElement>(null)
   const rt = store.runtime
   const bridge = window.studio.editor
 
@@ -411,6 +422,61 @@ function ProjectView({
     }
   }, [bridge, editorUp])
 
+  const shownProject = store.shownId && store.project?.id === store.shownId ? store.project : null
+  const publish = publishState(shownProject)
+  // Why Publish is off, or null when it is on. Off only for the clip's own
+  // state: the publishing setup is read when it is clicked.
+  const exportWhy: string | null = rt.exporting
+    ? t('Wait for the export to finish.')
+    : publish === 'export_first'
+      ? t('Export first: Publish sends the clip in your Library.')
+      : publish === 'kept_beside'
+        ? t(
+            'Your last export was saved next to this clip, not as its video, because the clip was changed in the Clip Editor meanwhile. Publish would send the other video, so it is off.'
+          )
+        : publish === 'clip_changed'
+          ? t(
+              'This clip was changed in the Clip Editor after your export, so its video in your Library is not your edit. Publish would send that video, so it is off.'
+            )
+          : null
+  const publishOff = exportWhy
+  const openPublish = async (): Promise<void> => {
+    // Off (aria-disabled, so Tab still reaches it and its reason is read
+    // out): the click does nothing (F1 U-6).
+    if (publishOff !== null) return
+    const id = shownProject?.id
+    const clipId = shownProject?.clip?.id
+    const videoId = shownProject?.clip?.video_id
+    if (!id || clipId === undefined || !videoId) return
+    // Read again first: the clip may have changed since the strip was drawn.
+    await rereadShownProject(id)
+    const now = editorStore()
+    if (now.shownId !== id || publishState(now.project) !== 'ready') return
+    let clips: Clip[]
+    try {
+      clips = await api.clips(videoId)
+    } catch {
+      // Not read (Clips Kitty busy or starting): the clip may well be there.
+      if (editorStore().shownId === id) {
+        showEditorNotice({ text: t('Clips Kitty could not read the clip. Try again in a moment.'), failure: true })
+      }
+      return
+    }
+    if (editorStore().shownId !== id) return
+    const clip = clips.find((c) => c.id === clipId)
+    if (clip) {
+      // Through the provider set up now, as the Clips page's window is.
+      const setup = await readPublishSetup()
+      if (editorStore().shownId !== id) return
+      setPublishSetup(setup)
+      setPublishClip(clip)
+      return
+    }
+    showEditorNotice({ text: t('This clip is no longer in the Library.'), failure: true })
+    // Read again, so the project says its clip is gone and Publish goes away.
+    await rereadShownProject(id)
+  }
+
   const notes = noteSentences(store.project?.notes)
   const showNotes = notes.length > 0 && !store.notesSeen
   const status = stateText(store)
@@ -418,7 +484,19 @@ function ProjectView({
   const covered = holds > 0
 
   let message: { text: string; tooltip?: string; button: string; action: () => void } | null = null
-  if (rt.software) {
+  // While a project is being opened (none shown yet) the area only says
+  // "Opening the editor…": what the editor said of an earlier run is not news.
+  if (!store.shownId) {
+    // An open that failed says why in the strip, and here the way back (F1 F-1).
+    message =
+      store.openError && !store.opening
+        ? {
+            text: t('Go back to your projects to open another one.'),
+            button: `← ${t('Projects')}`,
+            action: () => void closeEditorProject()
+          }
+        : null
+  } else if (rt.software) {
     message = {
       text: t('The editor cannot use this PC’s graphics card, so it cannot be shown here.'),
       tooltip: t('Updating the graphics driver usually fixes this.'),
@@ -448,39 +526,67 @@ function ProjectView({
           type="button"
           className="px-2 py-0.5 rounded-md bg-raised hover:bg-raised/70"
           onClick={() => void closeEditorProject()}
-          title={t('Save and close this project')}
+          title={
+            store.shownId
+              ? t('Save and close this project')
+              : store.opening
+                ? t('Stop opening it and go back to your projects. A project being made is still made and stays in Recent projects.')
+                : t('Back to your projects')
+          }
         >
           ← {t('Projects')}
         </button>
-        <span className="font-medium truncate max-w-[16rem]" title={store.project?.name}>
-          {store.project?.name}
-        </span>
-        {store.opening?.name && (
-          <span className="text-muted truncate" role="status">
-            {t('Getting “{name}” ready…').replace('{name}', store.opening.name)}{' '}
-            {Math.round(store.opening.progress * 100)}%
+        {store.shownId && (
+          <span className="font-medium truncate max-w-[16rem]" title={store.project?.name}>
+            {store.project?.name}
+          </span>
+        )}
+        {store.opening && (
+          <span className="flex items-center gap-2 min-w-0 text-muted" role="status">
+            <span className="truncate">
+              {store.opening.name
+                ? t('Getting “{name}” ready…').replace('{name}', store.opening.name)
+                : t('Getting the project ready…')}{' '}
+              {Math.round(store.opening.progress * 100)}%
+            </span>
+            <span className="w-24 h-1.5 shrink-0 rounded bg-raised overflow-hidden" aria-hidden="true">
+              <span
+                className="block h-full bg-accent transition-all"
+                style={{ width: `${Math.round(Math.min(1, Math.max(0.02, store.opening.progress)) * 100)}%` }}
+              />
+            </span>
+          </span>
+        )}
+        {!store.shownId && !store.opening && store.openError && (
+          <span role="alert" className="text-amber-400 truncate" title={store.openError}>
+            {store.openError}
           </span>
         )}
         {showNotes && (
           <span className="text-muted truncate" title={notes.join('\n')}>
             {t('Some things from the clip are not carried over.')}{' '}
-            <button type="button" className="underline" onClick={markNotesSeen} aria-label={t('Dismiss')}>
+            <button
+              type="button"
+              className="underline"
+              onClick={markNotesSeen}
+              aria-label={t('Dismiss: {notice}').replace('{notice}', t('Some things from the clip are not carried over.'))}
+            >
               ✕
             </button>
           </span>
         )}
         {/* The notice's live regions are always there, so a notice that
             appears (an export taken in) is read out: role="status", or
-            role="alert" when something went wrong. */}
-        <span role="status" className="sr-only">
+            role="alert" when something went wrong. They are also what shows
+            it, so its words are there once (F1 U-5). */}
+        <span role="status" className="text-accent truncate empty:hidden" title={store.notice?.tooltip}>
           {store.notice && !store.notice.failure ? store.notice.text : ''}
         </span>
-        <span role="alert" className="sr-only">
+        <span role="alert" className="text-amber-400 truncate empty:hidden" title={store.notice?.tooltip}>
           {store.notice?.failure ? store.notice.text : ''}
         </span>
         {store.notice && (
-          <span className={`${store.notice.failure ? 'text-amber-400' : 'text-accent'} truncate`} title={store.notice.tooltip}>
-            <span aria-hidden="true">{store.notice.text}</span>
+          <span className="shrink-0">
             {store.notice.revealProject && (
               <button
                 type="button"
@@ -490,17 +596,39 @@ function ProjectView({
                 {t('Show in folder')}
               </button>
             )}{' '}
-            <button type="button" className="underline text-muted" onClick={clearEditorNotice} aria-label={t('Dismiss')}>
+            <button
+              type="button"
+              className="underline text-muted"
+              onClick={clearEditorNotice}
+              aria-label={t('Dismiss: {notice}').replace('{notice}', store.notice.text)}
+            >
               ✕
             </button>
           </span>
         )}
-        {approvals > 0 && (
+        {/* Only with a project shown: during an open the cards themselves are
+            up (App.tsx draws them while no project is shown). */}
+        {store.shownId && approvals > 0 && (
           <button type="button" className="px-2 py-0.5 rounded-md bg-accent/20 text-accent shrink-0" onClick={onShowApprovals}>
             {t('Clip approvals')} ({approvals})
           </button>
         )}
-        <span className="ml-auto text-muted shrink-0">{status}</span>
+        {/* Publish and the project's state together at the right (mockup 03). */}
+        <span className="ml-auto flex items-center gap-3 shrink-0">
+          {publish !== 'none' && (
+            <button
+              ref={publishButton}
+              type="button"
+              className="px-2 py-0.5 rounded-md bg-accent/20 text-accent hover:bg-accent/30 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
+              onClick={() => void openPublish()}
+              aria-disabled={publishOff !== null}
+              title={publishOff || t('Send this clip to your social accounts, as you last exported it.')}
+            >
+              ↗ {t('Publish')}
+            </button>
+          )}
+          <span className="text-muted">{status}</span>
+        </span>
         {/* An export's start and each quarter, not every poll of it. */}
         <span className="sr-only" aria-live="polite">
           {announced}
@@ -508,7 +636,8 @@ function ProjectView({
       </div>
       <div
         ref={area}
-        tabIndex={0}
+        // Behind a window of the app's own (Publish), Tab never reaches it.
+        tabIndex={covered ? -1 : 0}
         role="application"
         aria-label={t('Editor. Press Enter to use it, Ctrl+F6 to come back.')}
         className="flex-1 min-h-0 relative bg-base outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -529,7 +658,7 @@ function ProjectView({
             </div>
           </div>
         ) : (
-          !rt.visible &&
+          (!store.shownId || !rt.visible) &&
           !covered && (
             <p className="absolute inset-0 grid place-items-center text-muted text-sm" role="status">
               {t('Opening the editor…')}
@@ -537,6 +666,14 @@ function ProjectView({
           )
         )}
       </div>
+      {publishClip && publishSetup && (
+        <PublishAllDialog
+          clips={[publishClip]}
+          provider={publishSetup.provider}
+          onClose={() => setPublishClip(null)}
+          returnFocus={publishButton}
+        />
+      )}
     </div>
   )
 }
@@ -549,5 +686,17 @@ export default function Editor({
   onShowApprovals: () => void
 }): JSX.Element {
   const store = useEditorStore()
-  return store.shownId ? <ProjectView approvals={approvals} onShowApprovals={onShowApprovals} /> : <ProjectLists />
+  // Entered again (the sidebar, another page): an old failed open's reason
+  // goes, so the page never stays on a failure the person left (F1).
+  useEffect(() => {
+    clearOpenError()
+  }, [])
+  // A project being opened goes straight to its strip and area (FL3): the
+  // lists show only with nothing shown or being opened. An open that failed
+  // says why in the area, with "Projects" as the way back (F1).
+  return store.shownId || store.opening || store.openError ? (
+    <ProjectView approvals={approvals} onShowApprovals={onShowApprovals} />
+  ) : (
+    <ProjectLists />
+  )
 }

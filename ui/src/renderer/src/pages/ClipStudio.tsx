@@ -21,9 +21,8 @@ import { useEvents } from '../lib/useEvents'
 import { useExportJobs } from '../lib/useExportJobs'
 import { useJobWatch } from '../lib/useJobWatch'
 import { openInEditor } from '../lib/editor'
+import { readPublishSetup } from '../lib/publishSetup'
 import { useEditorFound } from '../lib/editorStatus'
-import type { EditorShape } from '../lib/api'
-import { ShapeSelect } from './Editor'
 import type { StudioTarget } from '../App'
 import type { Clip, ExportJob, RemakePreview, StudioEvent, Video } from '../lib/types'
 
@@ -52,8 +51,6 @@ export default function ClipStudio({
   const [editingClipId, setEditingClipId] = useState<number | null>(null)
   // Clips Kitty Editor (editor suite K2): offered only when it is found.
   const editorFound = useEditorFound()
-  const [wholeOpen, setWholeOpen] = useState(false)
-  const [wholeShape, setWholeShape] = useState<EditorShape>('16:9')
   const [videoSearch, setVideoSearch] = useState('')
   // Publishing is only offered once Upload-Post is switched on AND a key
   // is stored — the same rule the editor tab follows.
@@ -164,17 +161,12 @@ export default function ClipStudio({
   }, [remakeBusy, activeVideo])
 
   useEffect(() => {
-    // Either provider makes batch publishing available.
-    Promise.allSettled([api.woopSocialStatus(), api.uploadPostStatus()]).then(
-      ([woop, up]) => {
-        const wsReady =
-          woop.status === 'fulfilled' && Boolean(woop.value.enabled && woop.value.has_key)
-        const upReady =
-          up.status === 'fulfilled' && Boolean(up.value.enabled && up.value.has_key)
-        setPublishReady(wsReady || upReady)
-        setPublishProvider(wsReady ? 'woopsocial' : 'uploadpost')
-      }
-    )
+    // Either provider makes batch publishing available (the same rule as
+    // the Editor page's Publish: lib/publishSetup.ts).
+    void readPublishSetup().then((setup) => {
+      setPublishReady(setup.ready)
+      setPublishProvider(setup.provider)
+    })
   }, [])
 
   useEffect(() => {
@@ -527,40 +519,6 @@ export default function ClipStudio({
               >
                 {t('Make clips again…')}
               </button>
-              {editorFound && activeVideo && (
-                <div className="relative">
-                  <button
-                    className="btn-ghost !py-1 !px-3 text-xs"
-                    aria-haspopup="dialog"
-                    aria-expanded={wholeOpen}
-                    onClick={() => setWholeOpen((o) => !o)}
-                    title={t('Open this whole video in the editor')}
-                  >
-                    {t('Edit whole video')}
-                  </button>
-                  {wholeOpen && (
-                    <div
-                      role="dialog"
-                      aria-label={t('Edit whole video')}
-                      className="absolute z-40 right-0 mt-1 flex gap-2 items-center rounded-lg bg-surface border border-raised shadow-xl p-2"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') setWholeOpen(false)
-                      }}
-                    >
-                      <ShapeSelect value={wholeShape} onChange={setWholeShape} />
-                      <button
-                        className="btn-accent !py-1 !px-3 text-xs"
-                        onClick={() => {
-                          setWholeOpen(false)
-                          void openInEditor({ kind: 'video', video_id: activeVideo, shape: wholeShape })
-                        }}
-                      >
-                        {t('Open')}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
             {exportNotice && <p className="text-sm text-accent">{exportNotice}</p>}
             {remakeNotice && <p className="text-sm text-accent">{remakeNotice}</p>}

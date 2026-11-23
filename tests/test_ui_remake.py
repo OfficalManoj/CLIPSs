@@ -334,13 +334,19 @@ def test_the_keyboard_stays_in_the_dialog_and_goes_back_to_the_button():
     never to the Library behind it, and closing it (Escape, Cancel, a click
     outside or Make clips again) puts the keyboard back on what opened it."""
     dialog = _source("components/RemakeDialog.tsx")
-    assert "const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null" in dialog
-    assert "if (opener && opener.isConnected && !(opener as HTMLButtonElement).disabled) opener.focus()" in dialog
-    assert "if (e.key !== 'Tab' || !box.current) return" in dialog
-    assert "box.current.querySelectorAll<HTMLElement>(FOCUSABLE)" in dialog
-    assert "if (e.shiftKey && (lost || active === first || active === box.current))" in dialog
-    assert "} else if (!e.shiftKey && (lost || active === last)) {" in dialog
-    assert dialog.count("e.preventDefault()") == 3
+    # The rule lives in lib/useDialogFocus.ts, shared with the Publish window (F1 U-1).
+    assert "useDialogFocus(box, onClose)" in dialog
+    hook = _source("lib/useDialogFocus.ts")
+    assert "returnTo?.current ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)" in hook
+    assert "if (opener && opener.isConnected && !(opener as HTMLButtonElement).disabled) opener.focus()" in hook
+    assert "if (e.key !== 'Tab' || !box.current) return" in hook
+    assert "box.current.querySelectorAll<HTMLElement>(FOCUSABLE)" in hook
+    assert "if (e.shiftKey && (lost || active === first || active === box.current))" in hook
+    assert "} else if (!e.shiftKey && (lost || active === last)) {" in hook
+    assert hook.count("e.preventDefault()") == 3
+    publish = _source("components/PublishAllDialog.tsx")
+    assert "useDialogFocus(box, () => {\n    if (!busy) onClose()\n  }, returnFocus)" in publish
+    assert "aria-label={clips.length === 1 ? t('Publish this clip') : t('Publish all clips')}" in publish
 
 
 def test_the_queue_pages_panel_is_as_it_was_unless_asked():

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { api } from '../lib/api'
 import { t } from '../lib/i18n'
+import { useDialogFocus } from '../lib/useDialogFocus'
 import DiscordDestinationSelect from './DiscordDestinationSelect'
 import type { Clip } from '../lib/types'
 import {
@@ -29,11 +30,15 @@ import {
 export default function PublishAllDialog({
   clips,
   provider,
-  onClose
+  onClose,
+  returnFocus
 }: {
   clips: Clip[]
   provider: Provider
   onClose: () => void
+  /** Where the keyboard goes when the window closes (the Editor page's
+   *  Publish); without it, what had the focus when it opened. */
+  returnFocus?: RefObject<HTMLElement>
 }): JSX.Element {
   const [platforms, setPlatforms] = useState<string[]>([])
   const [discordDestination, setDiscordDestination] = useState<number | null>(null)
@@ -55,6 +60,13 @@ export default function PublishAllDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState<{ started: number; skipped: { clip_id: number; reason: string }[] } | null>(null)
+  // The keyboard starts in the window and stays in it; Escape is Cancel
+  // (never while it publishes, as Cancel is off then); closed, it goes back
+  // to the button that opened it (F1 U-1, as Make clips again does).
+  const box = useRef<HTMLDivElement>(null)
+  useDialogFocus(box, () => {
+    if (!busy) onClose()
+  }, returnFocus)
 
   const backend =
     provider === 'woopsocial'
@@ -174,11 +186,16 @@ export default function PublishAllDialog({
       className="fixed inset-0 z-50 bg-base/80 backdrop-blur-sm grid place-items-center p-6"
       role="dialog"
       aria-modal="true"
-      aria-label={t('Publish all clips')}
-      onClick={onClose}
+      aria-label={clips.length === 1 ? t('Publish this clip') : t('Publish all clips')}
+      onClick={() => {
+        // Not while it publishes, as Escape and Cancel (F1 review).
+        if (!busy) onClose()
+      }}
     >
       <div
-        className="card w-full max-w-lg space-y-4 max-h-[85vh] overflow-y-auto"
+        ref={box}
+        tabIndex={-1}
+        className="card w-full max-w-lg space-y-4 max-h-[85vh] overflow-y-auto outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div>

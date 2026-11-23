@@ -39,11 +39,35 @@ MESSAGES = {
     "windows_only": "The editor runs on Windows only.",
 }
 UNFINISHED = "This project was not finished. Open it again to make it."
+# The shape a whole video or a file starts in unless another is picked: the
+# video's own (FL3: a 9:16 video no longer opens in a 16:9 frame).
+SOURCE_SHAPE = "source"
+
+
+# The largest "Same as the video" canvas: 1080 on the short side, like the
+# four named shapes (9:16 is 1080x1920), and 3840 on the long side. A 4K
+# file is scaled down to it, its shape kept: FL2 never went above 1920x1080,
+# and a bigger canvas is heavier to play and export at the minimum spec.
+SOURCE_SHORT_MAX = 1080
+SOURCE_LONG_MAX = 3840
+
+
+def source_canvas(width: int, height: int) -> tuple[int, int]:
+    """A video's own picture size (as shown) as an editor canvas: scaled
+    down, its shape kept, to fit SOURCE_SHORT_MAX and SOURCE_LONG_MAX, never
+    up; each side even (encoders need it), never below 2."""
+    width, height = max(1, int(width)), max(1, int(height))
+    scale = min(1.0, SOURCE_SHORT_MAX / min(width, height), SOURCE_LONG_MAX / max(width, height))
+    if scale < 1.0:
+        width, height = round(width * scale / 2) * 2, round(height * scale / 2) * 2
+    return max(2, width - width % 2), max(2, height - height % 2)
 
 
 class OpenIn(BaseModel):
     """Open or make a project: {"kind": "clip", "clip_id", "fresh"}, {"kind":
-    "video", "video_id", "shape"} or {"kind": "file", "path", "shape"}."""
+    "video", "video_id", "shape"} or {"kind": "file", "path", "shape"}. A
+    video's or a file's shape is one of registry.SHAPES, or "source" (also
+    when it is left out): the video's own picture size (FL3)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -484,7 +508,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         info = build.probe(source)
         if not info["video"]:
             raise Failure("That file doesn't look like a video.")
-        width, height = registry.SHAPES[manifest["shape"]]
+        width, height = registry.canvas_of(manifest) or registry.SHAPES["16:9"]
         canvas = {"width": width, "height": height, "fps_num": info["fps_num"], "fps_den": info["fps_den"]}
         # A Library video's download is named by the engine's cache
         # (local_<hash>.mp4, <video id>.mp4); a file from the PC keeps its own name.
@@ -503,10 +527,43 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         return f"{width}x{height}"
 
     def _shape(value) -> str:
-        shape = value or "16:9"
-        if shape not in registry.SHAPES:
-            raise HTTPException(400, f"shape is one of {', '.join(registry.SHAPES)}.")
+        """The shape asked for: one of registry.SHAPES, or SOURCE_SHAPE when
+        none is sent (the video's own, FL3)."""
+        shape = value or SOURCE_SHAPE
+        if shape != SOURCE_SHAPE and shape not in registry.SHAPES:
+            raise HTTPException(400, f"shape is {SOURCE_SHAPE} or one of {', '.join(registry.SHAPES)}.")
         return shape
+
+    def _source_shape(info: dict) -> tuple[str, dict]:
+        """"Same as the video": the shape a project is kept under, named the
+        way a clip project's is (_shape_of: "9:16", or "1440x1080" for one
+        that is none of the four), and the manifest fields that give its
+        canvas the video's own picture size as shown (source_canvas)."""
+        width, height = source_canvas(info.get("shown_width") or info["width"],
+                                      info.get("shown_height") or info["height"])
+        return _shape_of(width, height), {"source_size": [width, height]}
+
+    def _probed(source: Path) -> dict:
+        """The source probed for opening it: "could not read" (503) when
+        the probe itself failed, as a download still writing it can make
+        it; "doesn't look like a video" (400) only for a file read that has
+        no picture."""
+        info = build.probe(source)
+        if not info.get("read", True):
+            raise HTTPException(503, "could not read the video's file")
+        if not info["video"]:
+            raise HTTPException(400, "that file doesn't look like a video")
+        return info
+
+    def _sized_shape(shape: str, source: Path, info: dict | None = None) -> tuple[str, tuple[int, int], dict]:
+        """The shape a project is kept under, its canvas size (a project is
+        reused only at the same size: 9:16 picked by hand on a 720x1280
+        video is not its 720x1280 "Same as the video" project), and the
+        manifest fields for a new one."""
+        if shape != SOURCE_SHAPE:
+            return shape, registry.SHAPES[shape], {}
+        named, sized = _source_shape(info or _probed(source))
+        return named, tuple(sized["source_size"]), sized
 
     def _only(body: OpenIn, *allowed: str) -> None:
         extra = [k for k in ("clip_id", "fresh", "video_id", "path", "shape")
@@ -555,7 +612,8 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                 source = cached_source(data_dir / "downloads", video["video_id"])
                 if source is None or not source.is_file():
                     raise HTTPException(404, "This video's file isn't in Clips Kitty any more.")
-                existing = registry.find_for_video(data_dir, video["video_id"], shape)
+                shape, size, sized = _sized_shape(shape, source)
+                existing = registry.find_for_video(data_dir, video["video_id"], shape, size)
                 if existing is not None and view(existing, d)["state"] != "failed":
                     return {"project": view(existing, d), "created": False}
                 exe = editor()
@@ -564,7 +622,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                     return {"project": view(registry.load(data_dir, existing["id"]), d), "created": False}
                 name = registry.safe_name(video["title"], "Video")
                 made = new_manifest("video", name, video_id=video["video_id"], shape=shape,
-                                    media=[str(source.resolve())])
+                                    media=[str(source.resolve())], **sized)
             else:
                 _only(body, "path", "shape")
                 shape = _shape(body.shape)
@@ -575,9 +633,8 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                 if picked is None:
                     raise HTTPException(400, "not a video file this app can open")
                 source = picked[0]
-                if not build.probe(source)["video"]:
-                    raise HTTPException(400, "that file doesn't look like a video")
-                existing = registry.find_for_file(data_dir, source, shape)
+                shape, size, sized = _sized_shape(shape, source, _probed(source))
+                existing = registry.find_for_file(data_dir, source, shape, size)
                 if existing is not None and view(existing, d)["state"] != "failed":
                     return {"project": view(existing, d), "created": False}
                 exe = editor()
@@ -585,7 +642,8 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                     start(existing["id"], exe)
                     return {"project": view(registry.load(data_dir, existing["id"]), d), "created": False}
                 name = registry.safe_name(source.stem, "Video")
-                made = new_manifest("file", name, shape=shape, source_file=str(source), media=[str(source)])
+                made = new_manifest("file", name, shape=shape, source_file=str(source), media=[str(source)],
+                                    **sized)
             start(made["id"], exe)
             return {"project": view(registry.load(data_dir, made["id"]), d), "created": True}
         finally:
