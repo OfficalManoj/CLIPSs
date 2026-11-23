@@ -28,6 +28,7 @@
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](../../CONTRIBUTING.md)
 [![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)](../../docs/DOCKER.md)
 [![ColinGPT9/clips-studio MCP server](https://glama.ai/mcp/servers/ColinGPT9/clips-studio/badges/score.svg)](https://glama.ai/mcp/servers/ColinGPT9/clips-studio)
+[![Last commit](https://img.shields.io/github/last-commit/ColinGPT9/clips-studio)](https://github.com/ColinGPT9/clips-studio/commits/main)
 
 <a href="https://youtu.be/g1dMqrq-YaI"><img src="https://github.com/user-attachments/assets/2a1bdd85-723e-46d6-b74b-00579c71b6a7" alt="Clips Kitty turning an NBA broadcast into a 9:16 clip that follows the ball" width="100%"></a>
 
