@@ -45,30 +45,57 @@ _WINDOWS_FONTS = ("Arial", "Arial Black", "Impact", "Verdana", "Tahoma", "Trebuc
 
 def probe(path) -> dict:
     """A media file's picture size, frame rate (as a fraction) and length.
-    `video` is False for a file with no picture."""
+    `video` is False for a file with no picture. `read` is False when the
+    file could not be read at all (ffprobe missing or timed out, the file
+    locked or gone): that says nothing about whether it is a video.
+    `shown_width` and `shown_height` are the size the picture is shown at:
+    its pixels' own shape counted (a sample aspect ratio that is not 1:1,
+    as in anamorphic video), turned like `width` and `height`."""
     from core.binaries import ffprobe
 
-    info = {"video": False, "width": 0, "height": 0, "fps_num": 30, "fps_den": 1, "seconds": 0.0}
+    info = {"video": False, "read": True, "width": 0, "height": 0, "shown_width": 0, "shown_height": 0,
+            "fps_num": 30, "fps_den": 1, "seconds": 0.0}
     try:
         done = subprocess.run(
             [ffprobe(), "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=width,height,r_frame_rate:stream_side_data=rotation:format=duration",
+             "-show_entries",
+             "stream=width,height,r_frame_rate,sample_aspect_ratio:stream_side_data=rotation:format=duration",
              "-of", "json", str(path)],
             capture_output=True, text=True, timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         data = json.loads(done.stdout or "{}")
     except (OSError, ValueError, subprocess.SubprocessError):
+        info["read"] = False
         return info
+    if done.returncode != 0 and not data.get("streams"):
+        # ffprobe refused it: a file that isn't media, or one it could not
+        # open. Only the second is "could not read".
+        try:
+            with open(path, "rb") as f:
+                f.read(1)
+        except OSError:
+            info["read"] = False
     streams = data.get("streams") or []
     if streams:
         stream = streams[0]
         width, height = int(stream.get("width") or 0), int(stream.get("height") or 0)
+        shown_width = width
+        num, _, den = str(stream.get("sample_aspect_ratio") or "").partition(":")
+        try:
+            num, den = int(num), int(den)
+            if num > 0 and den > 0 and 0.1 <= num / den <= 10:
+                shown_width = max(1, round(width * num / den))
+        except ValueError:
+            pass
+        shown_height = height
         for side in stream.get("side_data_list") or ():
             try:
                 if abs(int(side.get("rotation", 0))) % 180 == 90:
                     width, height = height, width       # shown turned on its side
+                    shown_width, shown_height = shown_height, shown_width
             except (TypeError, ValueError):
                 pass
-        info.update(video=width > 0 and height > 0, width=width, height=height)
+        info.update(video=width > 0 and height > 0, width=width, height=height,
+                    shown_width=shown_width, shown_height=shown_height)
         num, _, den = str(stream.get("r_frame_rate") or "").partition("/")
         try:
             num, den = int(num), int(den or 1)

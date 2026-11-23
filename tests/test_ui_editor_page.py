@@ -83,7 +83,9 @@ def test_every_way_in_is_behind_the_status():
                      studio)
     assert re.search(r"onOpenInEditor=\{\s*editorFound \? \(\) => void openInEditor\(\{ kind: 'clip', clip_id: editingClip\.id \}\)",
                      studio)
-    assert "{editorFound && activeVideo && (" in studio and "t('Edit whole video')" in studio
+    # FL3: no "Edit whole video" on the Clip Editor page; a whole video is
+    # opened from the Editor page's own "Edit a whole video".
+    assert "Edit whole video" not in studio and "ShapeSelect" not in studio and "wholeShape" not in studio
     # The controls themselves draw nothing without their callback.
     assert "{onEdit && (" in _read(UI / "components" / "ClipCard.tsx")
     assert "{onOpenInEditor && (" in _read(UI / "components" / "ClipEditor.tsx")
@@ -152,7 +154,8 @@ def test_the_area_follows_size_place_and_scale():
 def test_keyboard_and_screen_reader():
     page = _read(PAGE)
     assert 'role="application"' in page
-    assert "tabIndex={0}" in page
+    # Reached by Tab, except behind a window of the app's own (F1 U-1).
+    assert "tabIndex={covered ? -1 : 0}" in page
     assert "aria-label={t('Editor. Press Enter to use it, Ctrl+F6 to come back.')}" in page
     assert "bridge?.focus()" in page
     assert 'aria-live="polite"' in page
@@ -199,15 +202,21 @@ def test_the_new_way_in_has_its_own_name():
 
 def test_notices_and_exports_reach_a_screen_reader():
     """UX round: the export notice sits in live regions that are always there
-    (status, or alert for a failure); an export is announced by quarters."""
+    (status, or alert for a failure); an export is announced by quarters.
+    In the strip the live regions are what shows the notice, so its words
+    are there once (F1 U-5), and each close button names its notice."""
     page = _read(PAGE)
-    assert page.count('role="status" className="sr-only"') == 1
-    assert page.count('role="alert" className="sr-only"') == 1
+    assert page.count('role="status" className="sr-only"') == 0
+    assert 'role="status" className="text-accent truncate empty:hidden"' in page
+    assert 'role="alert" className="text-amber-400 truncate empty:hidden"' in page
+    assert "aria-hidden=\"true\">{store.notice.text}" not in page
+    assert "aria-label={t('Dismiss')}" not in page
+    assert page.count("t('Dismiss: {notice}')") == 2
     assert 'role="status" className="text-sm text-accent empty:hidden"' in page
     assert 'role="alert" className="text-sm text-amber-400 empty:hidden"' in page
     assert "Math.floor(Math.max(0, exporting.fraction) * 4)) * 25" in page
     # The percent shown every poll is not itself a live region.
-    assert '<span className="ml-auto text-muted shrink-0">{status}</span>' in page
+    assert '<span className="text-muted">{status}</span>' in page
     lib = _read(UI / "lib" / "editor.ts")
     assert "t('The export did not finish.'), tooltip: answer.error || undefined, failure: true" in lib
 
@@ -264,3 +273,151 @@ def test_a_finished_build_is_opened_at_once_not_at_the_next_look():
     assert "await buildNews(1000)" in ready and "await sleep(1000)" not in ready
     event = lib[lib.index("export function onEditorProjectEvent("):lib.index("let newsWaiter")]
     assert "if (e.state && e.state !== 'building') newsWaiter?.()" in event
+
+
+# ---- FL3 (F1): the fixes he saw, plus Publish ---------------------------------------------------
+
+
+def _project_view(page: str) -> str:
+    view = page[page.index("function ProjectView("):]
+    return view[:view.index("\nexport default function Editor(")]
+
+
+def test_an_open_goes_straight_to_the_project_not_the_lists():
+    """FL3 A: "Open in editor" shows the strip and the area while the
+    project is made and opened, never Recent projects first."""
+    page = _read(PAGE)
+    main = page[page.index("export default function Editor("):]
+    assert "store.shownId || store.opening || store.openError ? (" in main and "<ProjectLists />" in main
+    view = _project_view(page)
+    # The strip: the clip's name (or the plain words before it is known) and the bar.
+    strip = view[view.index("{store.opening && ("):view.index("{showNotes && (")]
+    assert "t('Getting “{name}” ready…')" in strip and "t('Getting the project ready…')" in strip
+    assert "Math.round(store.opening.progress * 100)" in strip and "bg-accent" in strip
+    # The area says "Opening the editor…" from the start (whatever an earlier
+    # editor said), or after a failed open the way back (F1 F-1).
+    assert re.search(r"if \(!store\.shownId\) \{[^}]*message =\s*store\.openError && !store\.opening", view)
+    assert "{t('Opening the editor…')}" in view and "(!store.shownId || !rt.visible) &&" in view
+    # The strip shows the new project only: no name, "Saved" or Publish of
+    # the one before (F1 F-1, U-2; the behaviour runs in test_ui_editor_open.py).
+    assert "{store.shownId && (\n          <span className=\"font-medium truncate" in view
+    assert "if (!rt.running || !store.shownId) return ''" in page
+    assert re.search(r"!store\.shownId && !store\.opening && store\.openError && \(\s*<span role=\"alert\"", view)
+    # Nothing is shown in the area before the project is.
+    assert "const wanted = !!store.shownId && holds === 0" in view
+    # "Projects" during an open stops it and shows the lists.
+    lib = _read(UI / "lib" / "editor.ts")
+    close = lib[lib.index("export async function closeEditorProject("):]
+    close = close[:close.index("\n}\n")]
+    assert "++openToken" in close and "opening: null" in close and "shownId: null" in close
+    # "Clip approvals (n)" only with a project shown: during an open App.tsx
+    # draws the cards themselves and the button would do nothing.
+    assert re.search(r"\{store\.shownId && approvals > 0 && \(", view)
+    # A failed open ends with no project and its reason, said in the strip.
+    assert lib.count("set({ opening: null, openError: openErrorText(e) })") >= 2
+    lists = page[page.index("function ProjectLists("):page.index("function stateText(")]
+    # The lists' own "Getting ready" card could no longer show: gone.
+    assert "{store.openError}" not in lists and "store.opening &&" not in lists
+
+
+def test_a_whole_video_starts_in_its_own_shape():
+    """FL3 B: "Same as the video" first and the default in both ways to
+    start a project; the other four shapes stay."""
+    page = _read(PAGE)
+    shapes = page[page.index("export const SHAPES"):page.index("export function ShapeSelect(")]
+    assert re.findall(r"value: '([^']+)'", shapes) == ["source", "16:9", "9:16", "1:1", "4:5"]
+    assert "t('Same as the video')" in page
+    assert "useState<EditorShape>('source')" in page and page.count("useState<EditorShape>('16:9')") == 0
+    assert "shape: videoShape" in page and "shape: fileShape" in page
+    api = _read(UI / "lib" / "api.ts")
+    assert "export type EditorShape = 'source' | '16:9' | '9:16' | '1:1' | '4:5'" in api
+
+
+def test_publish_is_the_clips_pages_one_clip_window():
+    """FL3 C (review fix S1): one Publish window, two ways in. The Editor
+    page's Publish opens PublishAllDialog for that one clip, through the
+    provider the Clips page uses, and hides the editor while it is open."""
+    page = _read(PAGE)
+    view = _project_view(page)
+    assert re.search(r"<PublishAllDialog\s+clips=\{\[publishClip\]\}\s+provider=\{publishSetup\.provider\}", view)
+    assert "returnFocus={publishButton}" in view
+    assert "useEditorCover(publishClip !== null)" in view
+    # Off stays reachable by Tab (its reason is read out), the click ignored (F1 U-6).
+    assert "{publish !== 'none' && (" in view and "aria-disabled={publishOff !== null}" in view
+    assert " disabled={publishOff" not in view and "if (publishOff !== null) return" in view
+    for words in ("Export first: Publish sends the clip in your Library.",
+                  "Wait for the export to finish."):
+        assert f"t('{words}')" in view, words
+    # On under the Clips page's rule: whether or not a provider is set up;
+    # the window says what is (F1 U-4, bb F-2).
+    assert "set up WoopSocial or Upload-Post" not in view and "const publishOff = exportWhy" in view
+    assert "Your last export was saved next to this clip, not as its video" in view
+    # Read again before it opens: the clip may have changed meanwhile.
+    opener = view[view.index("const openPublish = async"):]
+    opener = opener[:opener.index("\n  }\n")]
+    assert "await rereadShownProject(id)" in opener and "publishState(now.project) !== 'ready'" in opener
+    # A lookup that fails says so in the strip, in words that fit: a read error
+    # is not "no longer in the Library", and a gone clip's project is read again.
+    assert "t('Clips Kitty could not read the clip. Try again in a moment.'), failure: true" in opener
+    gone = opener[opener.index("t('This clip is no longer in the Library.'), failure: true"):]
+    assert "await rereadShownProject(id)" in gone
+    # Publish sits with the project's state at the right of the strip (mockup 03):
+    # one ml-auto group, not two ml-auto items splitting the space.
+    strip = view[view.index("{/* Publish and the project's state"):]
+    strip = strip[:strip.index("{/* An export's start")]
+    assert strip.count("ml-auto") == 1 and "{status}" in strip and "{t('Publish')}" in strip
+    assert view.count("ml-auto") == 1
+    # The Clips page and the Editor page read the same setup: WoopSocial first.
+    setup = _read(UI / "lib" / "publishSetup.ts")
+    assert "provider: wsReady ? 'woopsocial' : 'uploadpost'" in setup
+    assert "readPublishSetup()" in _read(UI / "pages" / "ClipStudio.tsx") and "readPublishSetup()" in view
+    # An export taken in is read into the shown project, so Publish follows it.
+    lib = _read(UI / "lib" / "editor.ts")
+    exported = lib[lib.index("bridge.onExport((answer) => {"):]
+    assert "rereadShownProject(" in exported[:exported.index("bridge.getState()")]
+    # The page's own overlay over the editor's area is on k2-editor.md's list.
+    assert "PublishAllDialog" in _read(ROOT / "docs" / "editor-suite" / "api" / "k2-editor.md")
+
+
+def test_publish_is_on_only_once_the_clips_video_is_the_edit(tmp_path):
+    from test_ui_editor_fl2 import _opening
+
+    got = _opening(tmp_path, """
+      const s = m.publishState
+      const clip = {id: 5, video_id: 'v'}
+      const replaced = {result: 'replaced_clip'}
+      return [
+        s(null),
+        s({kind: 'video', exports: [replaced]}),
+        s({kind: 'file'}),
+        s({kind: 'clip', clip, clip_gone: true, exports: [replaced]}),
+        s({kind: 'clip', clip}),
+        s({kind: 'clip', clip, exports: []}),
+        s({kind: 'clip', clip, exports: [replaced]}),
+        s({kind: 'clip', clip, clip_changed: true, exports: [replaced]}),
+        s({kind: 'clip', clip, clip_changed: true, exports: [replaced, {result: 'kept_beside'}]}),
+        s({kind: 'clip', clip, exports: [{result: 'kept_beside'}, replaced]}),
+      ]""")
+    assert got == ["none", "none", "none", "none", "export_first", "export_first", "ready", "clip_changed",
+                   "kept_beside", "ready"]
+
+
+def test_f1_regression_round_page_rules():
+    """review-f1-final 4, 5 and 7 in the page's code."""
+    page = _read(PAGE)
+    # 4: entering the page again clears an old failed open (lib keeps it while
+    # a project is shown or opening; tests/test_ui_editor_open.py runs it).
+    router = page[page.index("export default function Editor("):]
+    assert "clearOpenError()" in router[:router.index("return store.shownId")]
+    # 5: "Same as the video" is told by the video's own size kept beside the
+    # named shape, never by the shape alone.
+    label = page[page.index("export function shapeLabel("):]
+    label = label[:label.index("\n}\n")]
+    assert "project.source_size" in label and "t('Same as the video')" in label
+    assert "{shapeLabel(p)}" in page
+    assert "source_size?: [number, number] | null" in _read(UI / "lib" / "api.ts")
+    # 7: the Publish window's backdrop does not close it while it publishes.
+    dialog = _read(UI / "components" / "PublishAllDialog.tsx")
+    backdrop = dialog[dialog.index('role="dialog"'):]
+    backdrop = backdrop[:backdrop.index("<div")]
+    assert "onClick={onClose}" not in backdrop and "if (!busy) onClose()" in backdrop

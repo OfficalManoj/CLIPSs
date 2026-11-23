@@ -745,9 +745,14 @@ export async function confirmQuitWhileExporting(parent: BrowserWindow | null): P
  *  `waitMs`. Never kills it: one whose host window is gone saves and leaves
  *  by itself. */
 export function closeEditor(waitMs = 10000): Promise<void> {
-  const target = ed
-  if (!target) return Promise.resolve()
-  return serial(() => closeNow(target, waitMs))
+  // Which editor is read inside the chain, not before it: a start sent just
+  // before (a show or a prepare in its first moments, before it has set
+  // `ed`) has finished by then, so "Projects" during an open closes the
+  // editor that open started instead of nothing (FL3).
+  return serial(async () => {
+    const target = ed
+    if (target) await closeNow(target, waitMs)
+  })
 }
 
 // ---- set up -----------------------------------------------------------------

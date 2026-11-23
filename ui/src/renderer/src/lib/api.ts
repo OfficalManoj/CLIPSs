@@ -1205,6 +1205,9 @@ export interface EditorProject {
   created_at: string
   last_opened_at: string
   shape?: string
+  /** "Same as the video": the video's own picture size, kept beside the
+   *  named shape (a hand-picked shape has none). */
+  source_size?: [number, number] | null
   clip?: { id: number; video_id: string } | null
   video_id?: string | null
   notes?: string[]
@@ -1232,7 +1235,8 @@ export interface EditorTakeIn {
   error?: string
 }
 
-export type EditorShape = '16:9' | '9:16' | '1:1' | '4:5'
+/** 'source' is "Same as the video": the video's own picture size (FL3). */
+export type EditorShape = 'source' | '16:9' | '9:16' | '1:1' | '4:5'
 
 export type EditorOpenRequest =
   | { kind: 'clip'; clip_id: number; fresh?: boolean }

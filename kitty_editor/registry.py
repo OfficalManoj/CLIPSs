@@ -248,18 +248,34 @@ def find_for_clip(data_dir, clip_id) -> dict | None:
     return mine[0] if mine else None
 
 
-def find_for_video(data_dir, video_id: str, shape: str) -> dict | None:
-    """The newest whole-video project of this video in this shape, or None."""
+def canvas_of(manifest: dict) -> tuple[int, int] | None:
+    """A whole-video or file project's canvas size: the video's own (FL3,
+    "Same as the video": `source_size`) or its shape's fixed one. None for
+    a shape that is neither."""
+    size = manifest.get("source_size")
+    if isinstance(size, list) and len(size) == 2 and all(type(v) is int and v > 0 for v in size):
+        return size[0], size[1]
+    return SHAPES.get(manifest.get("shape"))
+
+
+def _sized(manifest: dict, shape: str, size) -> bool:
+    return manifest.get("shape") == shape and (size is None or canvas_of(manifest) == tuple(size))
+
+
+def find_for_video(data_dir, video_id: str, shape: str, size=None) -> dict | None:
+    """The newest whole-video project of this video in this shape (and at
+    this canvas size, when one is given), or None."""
     mine = [m for m in list_all(data_dir)
-            if m.get("kind") == "video" and m.get("video_id") == video_id and m.get("shape") == shape]
+            if m.get("kind") == "video" and m.get("video_id") == video_id and _sized(m, shape, size)]
     mine.sort(key=lambda m: str(m.get("created_at") or ""), reverse=True)
     return mine[0] if mine else None
 
 
-def find_for_file(data_dir, source_file, shape: str) -> dict | None:
-    """The newest project of this file from the PC in this shape, or None."""
+def find_for_file(data_dir, source_file, shape: str, size=None) -> dict | None:
+    """The newest project of this file from the PC in this shape (and at
+    this canvas size, when one is given), or None."""
     mine = [m for m in list_all(data_dir)
-            if m.get("kind") == "file" and m.get("shape") == shape and same_path(m.get("source_file"), source_file)]
+            if m.get("kind") == "file" and _sized(m, shape, size) and same_path(m.get("source_file"), source_file)]
     mine.sort(key=lambda m: str(m.get("created_at") or ""), reverse=True)
     return mine[0] if mine else None
 

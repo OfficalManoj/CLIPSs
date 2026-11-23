@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "Clips Kitty editor suite",
-  "updated": "2026-11-22",
+  "updated": "2026-11-23",
   "about": "Machine-readable tracker for the editor suite. STATUS.md is the readable view of this file; when they disagree, this file wins. Acceptance criteria are copied from the plan's Proof column; step 0 also carries the checks from the plan's section on keeping plain auto-clipping identical. depends_on is read from the plan's text (which earlier step's output a step uses): the plan gives the run order, not a dependency list.",
   "now": "1",
   "stop_after_phase": 2,
@@ -2733,6 +2733,60 @@
           "routed_to": "eng-ck",
           "status": "fixed",
           "summary": "The UX check left the test editor's settings file with a resized remembered layout (width 1056, height 785, changed panel ratios). Fixed: layout set back to the editor's default (none; prefs.rs SavedLayout), every other key kept (keybinds empty, hostKeybinds the table); backed up first. No preview zoom is kept in that file. A project opened afterwards showed the default layout"
+        }
+      ]
+    },
+    {
+      "id": "FL3",
+      "title": "The fixes the owner saw, plus Publish (plan step F1)",
+      "size": "M",
+      "scope": "From the owner's FL2 click-through: \"Open in editor\" goes straight to the clip (no Recent projects first); \"Edit whole video\" off the Clip Editor page, and a whole video or a file starts in its own shape (\"Same as the video\"); a Publish button in the Editor page's strip that opens the Clips page's one-clip publish window (review fix S1). The captions on one lane come from the T0 editor build 45149430261",
+      "closes": [],
+      "depends_on": [
+        "FL2"
+      ],
+      "status": "in_progress",
+      "user_visible": true,
+      "acceptance": [
+        "Open in editor on a clip shows the strip with the clip's name and progress and \"Opening the editor...\" at once; Recent projects never appears; \"Projects\" during an open stops it and shows the list; a failed open goes back to the list with its reason; the sidebar Editor with nothing open shows the list",
+        "The Clip Editor page has no \"Edit whole video\"; the Editor page's two ways to start offer \"Same as the video\" first and as the default, then 16:9, 9:16, 1:1 and 4:5",
+        "With no shape or \"source\" the engine probes the source and uses its own size (even); a 1080x1920 video opens at 1080x1920 and a 1920x1080 one at 1920x1080; every named shape works as before",
+        "Publish shows for clip projects whose clip exists; it is on only after an export replaced the clip's video, off with \"Export first: Publish sends the clip in your Library.\" before that, and off with its reason when the export was kept beside a changed clip; it opens the Clips page's one-clip PublishAllDialog (WoopSocial first, then Upload-Post) and hides the editor while open",
+        "No engine change for Publish; plain auto-clipping and Quick edit unchanged"
+      ],
+      "files": [
+        "server/kitty_editor_api.py",
+        "ui/src/renderer/src/pages/Editor.tsx",
+        "ui/src/renderer/src/pages/ClipStudio.tsx",
+        "ui/src/renderer/src/lib/api.ts",
+        "ui/src/renderer/src/lib/editor.ts",
+        "ui/src/renderer/src/lib/editorOpening.ts",
+        "ui/src/renderer/src/lib/publishSetup.ts",
+        "tests/test_kitty_editor_routes.py",
+        "tests/test_ui_editor_page.py",
+        "kitty_editor/build.py",
+        "kitty_editor/registry.py",
+        "ui/src/main/editor.ts",
+        "tests/test_ui_editor_open.py"
+      ],
+      "notes": [
+        "Plan: the 2026-11-23 editor plan, step F1 (PLAN-DRAFT.md \"F1. The fixes he saw, plus Publish\"); evidence diag-editor.md A and C, inv-parity.md 4 and 6, verify-code.md",
+        "Contract: docs/editor-suite/api/k2-editor.md, section FL3",
+        "Publish sends the clip as last exported: the page cannot tell edits made after that export until KL (live edits)",
+        "k2-editor.md corrected: the weekly Concat check needs no KITTY_SYNC_TOKEN since fork commit 8c1a5c2b (PATCHES.md section 8)",
+        "The plan's \"YouTubePanel when direct upload is on\" moved to KC, where YouTube upload goes inside the one Publish window; until then, with only YouTube direct upload set up, the editor's Publish asks for WoopSocial or Upload-Post",
+        "Open choice for the lead or the owner: with no provider set up the editor shows Publish off with a setup tooltip, the Clips page hides it",
+        "The editor stack's strings, FL3's included, are English only (t() with English fallback) until the locale pass at K3",
+        "\"Same as the video\" uses the size as shown (sample aspect ratio counted), scaled down to fit 1080 on the short side and 3840 on the long side, each side even; a project is reused only at the same shape and canvas size",
+        "Fix round 1 (fix:f1-r1): Publish beside Saved at the right; approvals button only with a project shown; no hidden editor left after Projects during an open; Publish lookup failures said in the strip; a probe that could not read the file is a 503 \"could not read\", not \"doesn't look like a video\""
+      ],
+      "results": [
+        {
+          "date": "2026-11-23",
+          "agent": "Engineering (Clips Kitty)",
+          "check": "Static checks and tests (no desktop run in this task)",
+          "outcome": "pass",
+          "evidence": "ruff and compileall clean on the changed Python; the CI light suite (PYTHONUTF8=1) has the same 3 failures as the baseline before any change (test_plugin_docs 1, test_plugin_sdk_new 2); tests/test_kitty_editor_routes.py passes with FastAPI (system Python; the light venv skips it); npm run typecheck and npm run build pass"
         }
       ]
     }

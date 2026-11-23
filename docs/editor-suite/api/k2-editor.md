@@ -110,7 +110,7 @@ All need the `X-Clips-Kitty-Session` header and an Origin that is the app's own 
 - `id` must be 32 lowercase hex characters; anything else is 404 before a file is touched.
 - 409, 503 and the 500 of a failed take-in carry `{"detail": {"message", "reason"}}` (`message` only for the 500); the others carry a plain sentence in `detail`.
 - An unknown key in a body is refused by FastAPI itself with **422**, as everywhere in the app; a key that does not belong to the `kind` (a `shape` for a clip) is 400.
-- `shape` is `16:9` (the default), `9:16`, `1:1` or `4:5`: 1920x1080, 1080x1920, 1080x1080, 1080x1350.
+- `shape` is `16:9`, `9:16`, `1:1` or `4:5`: 1920x1080, 1080x1920, 1080x1080, 1080x1350. **FL3:** or `source` (also when it is left out; it was `16:9` before FL3): the video's picture size as shown, probed with `build.probe` (rotation and the sample aspect ratio counted: `shown_width`, `shown_height`), scaled down with its shape kept to at most 1080 on the short side and 3840 on the long side (`source_canvas`, never scaled up), each side even. The project is kept under the shape named the way a clip project's is (`9:16`, or `1440x1080` for none of the four) and its size in the manifest's `source_size` (`registry.canvas_of`). A project is found again only at the same shape and canvas size (`find_for_video` / `find_for_file` with `size`): on a 1080x1920 video "Same as the video" and `9:16` are one project; on a 720x1280 one they are two. A probe that could not read the file at all (`read` false: ffprobe missing or timed out, the file locked) answers 503 "could not read the video's file" (the page: "Clips Kitty could not read the video's file. Try again in a moment."); 400 "that file doesn't look like a video" is kept for a file read that has no picture.
 
 `Project` is the manifest plus:
 
@@ -389,7 +389,8 @@ The editor is a native child window above the page. One gate, `lib/editorCover.t
 | the page's own questions (delete a project, "This clip was changed in Quick edit…") | native message boxes (`window.confirm`, `editor.ask`) |
 | export notices, project notes | in the strip |
 | `title` tooltips, the Alt menu, native dialogs, notifications | windows of their own, above the editor |
-| dialogs of other pages (`RemakeDialog`, `PublishAllDialog`, the "Edit whole video" popover, ...) | cannot overlap: the editor is hidden on other pages |
+| the page's own Publish window (`PublishAllDialog` for the shown clip, FL3) | holds the cover while open (`useEditorCover(publishClip !== null)` in `pages/Editor.tsx`) |
+| dialogs of other pages (`RemakeDialog`, the Clips page's `PublishAllDialog`, ...) | cannot overlap: the editor is hidden on other pages |
 
 `tests/test_ui_editor_page.py` reads every component `App.tsx` imports and fails on one that draws a fixed overlay, a portal or a `<dialog>` without a rule here.
 
@@ -400,7 +401,7 @@ The editor is a native child window above the page. One gate, `lib/editorCover.t
 | a Library clip card (Clip Editor page) | "Open in editor" (on hover, beside Publish), tooltip "Open this clip in the editor" | `{kind: "clip", clip_id}` |
 | Quick edit's panel (`ClipEditor.tsx`) | "Open in editor" beside "Edit this clip" | the same |
 | Quick edit's full page (`EditorModal.tsx`) | "Open in editor" in its header | the same |
-| a Library video (Clip Editor page's toolbar) | "Edit whole video", then a shape and "Open" in a small popover | `{kind: "video", video_id, shape}` |
+| ~~a Library video (Clip Editor page's toolbar)~~ | removed in FL3: a whole video is opened from the Editor page | |
 | the Editor page | a recent row; "Edit a whole video"; "Edit a file from your PC" | by id; video; file |
 
 The new ways in say "Open in editor" (UX round: a plain "Edit" beside "Edit this clip", and in the header next to "Editing — <clip>", read as the same thing). Today's clip editor is unchanged; renaming its button "Quick edit" waits for the owner's OK, so the app's own words call it by the page it is on, "the Clip Editor" ("This clip was changed in the Clip Editor …"); "Quick edit" stays only in these docs and in code comments.
@@ -431,7 +432,7 @@ After an export: `replaced_clip` "Saved as this clip's video."; `kept_beside` "T
 
 1. **The page switches at once** and shows a project's making there, rather than waiting where the request was made: a clip's project takes about 90 s to make (the base render), and the page is where its progress and any refusal are said.
 2. **The page's state lives in a module** (`lib/editor.ts`), not in `App.tsx`'s React state: the same effect (it survives page switches), and a project being made keeps being made while the person is elsewhere.
-3. **"Edit whole video" starts at 16:9.** The Library has no picture size for a video, so the "9:16 when taller than wide" default could not be read; the shape is chosen in the popover.
+3. **"Edit whole video" starts at 16:9.** The Library has no picture size for a video, so the "9:16 when taller than wide" default could not be read; the shape is chosen in the popover. *Replaced in FL3:* the engine probes the video, and "Same as the video" is the default.
 4. **`focused` is part of `onState`**, so the page can move focus to "Projects" after Ctrl+F6 (told apart from a click in the app by the click itself).
 5. **`blur()` asks the editor fresh** whether it has the keys (the last poll can be half a second old), so a quick click in the app after one in the editor still gives the keys back.
 6. **The engine's session secret is removed from the editor's environment** (the editor never needs it).
@@ -528,7 +529,7 @@ One line each; the records are in `state.json` (K1 and K2 `defects`).
 - Concat v0.2.12 (995b2054) merged into `kitty/embed` (merge 1a74a02a; the branch at 4d70ba5a with the PATCHES.md records). The editor build is Actions run **44855595570**, built at 1fa05725 ("Clips Kitty Editor 0.2.12, based on Concat 0.2.12").
 - Effort: about 1 hour, of it 41.5 minutes the Actions build; 52 upstream commits new to the fork, 25 files changed on both sides, 2 conflicts of one hunk each (`platform.rs`, `studio/edit.rs`), built on the first try. The details are in the fork's PATCHES.md, "Updating from Concat".
 - Later fork commits on `kitty/embed`: F6 **b21a33d5** (words still being typed in a field are committed before `host.close` or a project switch), cd09d2d8 (a test fix) and X1 **0bac504c** (`hostKeybinds`, below). FL2 was checked with editor build **44879315991**, built at 0bac504c.
-- A weekly upstream check (`.github/workflows/upstream-check.yml` on `kitty/embed`) syncs the fork's `main` with Concat's and opens an "Update to Concat vX" pull request for a new release. Two owner steps are open: the schedule only fires from the default branch, and a `KITTY_SYNC_TOKEN` secret is needed when upstream commits touch workflow files.
+- A weekly upstream check (`.github/workflows/upstream-check.yml` on `kitty/embed`) syncs the fork's `main` with Concat's and opens an "Update to Concat vX" pull request for a new release. Two owner steps are open: the schedule only fires from the default branch, and a `KITTY_SYNC_TOKEN` secret is needed when upstream commits touch workflow files. **Corrected 2026-11-23:** since fork commit 8c1a5c2b the check needs no `KITTY_SYNC_TOKEN` and no secret at all. It runs from `kitty/embed`, now the fork's default branch, with a read-only token; it merges Concat's newest release in the runner only, builds a clean merge through `build-windows.yml` (`concat_tag`), ends red when an update is waiting, and pushes nothing (the fork's PATCHES.md, section 8). The kept merge is made on the owner's PC.
 
 ### Ctrl shortcuts (C1, ED31)
 
@@ -606,3 +607,46 @@ Checked in the desktop app on the owner's second monitor with editor build 44879
 - `tests/test_ui_editor_fl2.py`: the shortcut table against Concat v0.2.12's action table and reserved chords, the settings file's place, the merge into a real file under Node (a fresh file, a file with other settings and the person's chords, a second start, a newer table, an unreadable file), the main process writing it before the spawn; the bar and the sheet's line under Node; the prepare, unprepare and retell wiring.
 - `tests/test_ui_editor_fl2_ux.py` (UX fix round): the keys' return under Node (the editor had them, an app control had them, a press wins, a give back that never lands, a hidden editor), the main-process wiring, Ctrl+F6 both ways, and D3. `tests/test_ui_editor_fl2.py` covers D2's writer (a fresh file, other settings and the person's chords, a table 1 file cleaned, an older table's entry, a table chord set again, the host's defaults, an unreadable file, the cleaning rule).
 - `tests/test_kitty_editor_fl2.py`: the record read race (a refused read tried again, an unreadable one still damaged, two threads reading beside a writer), full-frame and Vertical Live bases from small FFmpeg videos, a face-safe clip left to the full render, a crop that never moves.
+
+## FL3 (step F1, 2026-11-23): the fixes the owner saw, plus Publish
+
+From his click-through of FL2: "when i open the editor it opens projects first", "i need a publish button", "the clip editor doesnt make sense with the edit whole video and it says 16:9 when its already 9:16". The captions on one lane come from the T0 editor build (45149430261), not from this step's code.
+
+### Open straight to the clip (A)
+
+- `pages/Editor.tsx` shows the project view while a project is being opened (`store.opening`), not only once one is shown (`shownId`). Before, the Projects screen stayed up for the whole build and the editor's start (about 1.3 s for a project made before, 4 to 12 s for a new one).
+- The strip shows "Getting "<name>" ready… n%" (or "Getting the project ready… n%" until the engine has named the project) and a small bar; the area says "Opening the editor…" until the editor shows. What the editor said of an earlier run (could not start, closed unexpectedly) is not shown before a project is.
+- "← Projects" during an open stops it (`openToken`) and shows the lists. An open that fails goes back to the lists with its reason, as before. The sidebar's "Editor" with nothing shown or opening still shows the lists.
+
+### A whole video in its own shape (B)
+
+- The Clip Editor page no longer has "Edit whole video" (its popover, its state and its `ShapeSelect` import are gone). A whole video is opened from the Editor page's "Edit a whole video".
+- "Edit a whole video" and "Edit a file from your PC" offer "Same as the video" first and as the default, then 16:9, 9:16, 1:1 and 4:5 (`EditorShape` gains `source`).
+- The engine: `shape` `source` or none probes the source before `registry.find_for_video` / `find_for_file` (above, under the routes). A 1080x1920 video opens at 1080x1920 with no bars; 16:9 picked by hand is its own project with bars, as before.
+
+### Publish (C, review fix S1: one window, two ways in)
+
+- A "Publish" button in the strip of a clip project whose clip is still in the Library. It opens the Clips page's own one-clip window (`PublishAllDialog` with that one clip) through the same provider: WoopSocial when it is set up, else Upload-Post (`lib/publishSetup.ts`, which the Clips page now uses too).
+- It is on only when the project's last export was taken in as the clip's video (`replaced_clip`) and the clip has not changed since (`lib/editorOpening.ts`, `publishState`). Off, with the reason in its tooltip: no export yet ("Export first: Publish sends the clip in your Library."), the last export kept beside a changed clip, the clip changed after the export, an export running, or no publishing set up.
+- The shown project is read again when an export is taken in (`rereadShownProject`, from `onExport`) and again just before the window opens. The editor is hidden while the window is open (the cover rule, table above).
+- No engine change. It publishes the clip as last exported: edits made after that export are not in it until the next export (a real fix needs KL, live edits).
+- When the clip cannot be read for the window, the strip says so (a failure notice): "Clips Kitty could not read the clip. Try again in a moment." when the Library could not be read, or "This clip is no longer in the Library." after which the project is read again and the button goes.
+- Publish is on under the Clips page's rule (F1 desktop fix, U-4): once the export replaced the clip, whether or not a provider is set up; the provider is read when it is clicked and the window handles "nothing set up" as it does from the Clips page. Off is `aria-disabled` (still reached by Tab, the click ignored). The window keeps the keyboard inside it, Escape is Cancel, and focus goes back to Publish (`lib/useDialogFocus.ts`, shared with Make clips again).
+- An open that starts while a project is shown saves and closes that project the way "Projects" does (asked first while it exports; two opens at once share one question), so nothing of it (editor, name, notices, Publish) stays on screen. An open of the shown project itself (its id, its clip, or a video or file the engine answers with it) only shows the page: no close, no restart, no question. Export answers show in the strip only for the shown project. Entering the page again clears an earlier failed open. A failed open says why in the strip (role alert) and the area offers "Projects". "Projects" during a first open stops the open on the page only: the engine still makes the project and it stays in Recent projects.
+- Not built here: the plan's "YouTubePanel when direct upload is on". It moved to KC, where YouTube upload goes inside the one Publish window.
+- Publish and "Saved" sit together at the right of the strip (mockup 03). "Clip approvals (n)" shows only with a project shown: during an open the cards themselves are up.
+
+### Stopping an open (fix round 1)
+
+- `lib/editor.ts` `openReady` reads the show options first, checks the open's token, then calls `show()` at once. A `show()` that returns after the open was stopped, with nothing shown or being opened on the page, is followed by `close()`.
+- `main/editor.ts` `closeEditor` reads which editor to close inside its call chain (`serial`), so a close sent while a start is in its first moments (before it has set `ed`) closes the editor that start made.
+
+### Strings (FL3)
+
+- Every new string goes through `t()` with its English fallback. Like the rest of the editor stack they have no locale entries yet: English only until the locale pass at K3.
+
+### Tests (FL3)
+
+- `tests/test_ui_editor_page.py`: the open goes to the project view; the strip, the area and "Projects" during an open; "Same as the video" first and the default; no "Edit whole video" on the Clip Editor page; Publish's window, provider, cover and words; `publishState` under Node.
+- `tests/test_kitty_editor_routes.py`: a whole video with no shape or `source` opens at its own size and is found again by the same shape and size; 16:9 by hand is its own project; an odd size is kept and made even; a file from the PC in its own size; a 720x1280 video's 9:16 by hand is its own 1080x1920 project; a 4K and an anamorphic source; a failed source-shaped build made again keeps its size; a probe that could not read the file is a 503, not "doesn't look like a video".
+- `tests/test_ui_editor_open.py`: `lib/editor.ts` run under Node with a fake bridge and `editorApi`: an open shows the project; "Projects" while the show options are read stops it before `show()`; a `show()` that returns after a stop is followed by `close()`; one that another open took over is not closed.

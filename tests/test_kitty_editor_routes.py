@@ -399,7 +399,7 @@ def test_a_bad_request_to_open_is_refused(env, body, status):
 
 
 def test_a_whole_video_is_opened_in_the_shape_chosen(env):
-    r = env.post("/editor/projects/open", {"kind": "video", "video_id": "vid1"})
+    r = env.post("/editor/projects/open", {"kind": "video", "video_id": "vid1", "shape": "16:9"})
     assert r.status_code == 200 and r.json()["created"] is True
     project = env.ready(r.json()["project"]["id"])
     source = (env.data_dir / "downloads" / "vid1.mp4").resolve()
@@ -431,6 +431,164 @@ def test_a_whole_video_is_opened_in_the_shape_chosen(env):
     assert env.get(f"/editor/projects/{project['id']}").json()["media_missing"] is (not linked)
     r = env.post("/editor/projects/open", {"kind": "video", "video_id": "vid1", "shape": "16:9"})
     assert r.status_code == 404 and "isn't in Clips Kitty any more" in r.json()["detail"]
+
+
+def test_a_whole_video_starts_in_its_own_shape(env, monkeypatch):
+    """FL3: with no shape, or "source" ("Same as the video"), a whole video
+    and a file from the PC start at the video's own picture size, so a 9:16
+    video is never put in a 16:9 frame. Each side is made even."""
+    from kitty_editor import build
+
+    r = env.post("/editor/projects/open", {"kind": "video", "video_id": "vid1"})
+    assert r.status_code == 200 and r.json()["created"] is True
+    tall = env.ready(r.json()["project"]["id"])
+    assert tall["shape"] == "9:16"                                         # PROBED is 1080x1920
+    assert tall["canvas"] == {"width": 1080, "height": 1920, "fps_num": 30, "fps_den": 1}
+    assert [(c["start"], c["framing"]) for c in saved(tall)["clips"]] == [(0.0, "fit")]
+    for again in ({"kind": "video", "video_id": "vid1", "shape": "source"},
+                  {"kind": "video", "video_id": "vid1", "shape": "9:16"}):  # the same shape: the same project
+        same = env.post("/editor/projects/open", again).json()
+        assert same["created"] is False and same["project"]["id"] == tall["id"]
+    wide = env.open({"kind": "video", "video_id": "vid1", "shape": "16:9"})  # picked by hand: its own project
+    assert wide["id"] != tall["id"] and (wide["canvas"]["width"], wide["canvas"]["height"]) == (1920, 1080)
+
+    # A size that is none of the four shapes, with an odd side: kept, made even.
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "width": 1441, "height": 1080})
+    odd = env.open({"kind": "video", "video_id": "vid1", "shape": "source"})
+    assert odd["shape"] == "1440x1080" and (odd["canvas"]["width"], odd["canvas"]["height"]) == (1440, 1080)
+    assert odd["id"] not in (tall["id"], wide["id"])
+
+    # A small wide file from the PC: its own size, not 1920x1080.
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "width": 1280, "height": 720})
+    picked = env.tmp / "phone.mp4"
+    picked.write_bytes(b"a video")
+    own = env.open({"kind": "file", "path": str(picked)})
+    assert own["shape"] == "16:9" and (own["canvas"]["width"], own["canvas"]["height"]) == (1280, 720)
+
+
+def test_source_canvas_keeps_the_size_and_makes_each_side_even():
+    pytest.importorskip("fastapi")
+    from server.kitty_editor_api import source_canvas
+
+    assert source_canvas(1080, 1920) == (1080, 1920)
+    assert source_canvas(720, 1280) == (720, 1280)                  # never scaled up
+    assert source_canvas(1919, 1081) == (1918, 1080)
+    assert source_canvas(1, 1) == (2, 2)
+    # Scaled down, its shape kept: 1080 on the short side, 3840 on the long side at most.
+    assert source_canvas(3840, 2160) == (1920, 1080)
+    assert source_canvas(2160, 3840) == (1080, 1920)
+    assert source_canvas(4096, 2160) == (2048, 1080)
+    assert source_canvas(8000, 1000) == (3840, 480)
+
+
+def test_the_same_shape_at_another_size_is_its_own_project(env, monkeypatch):
+    """Fix round 1: a project is reused only at the same shape AND canvas
+    size. On a 720x1280 video, "Same as the video" (720x1280) and 9:16 by
+    hand (1080x1920) are two projects; each is found again by itself."""
+    from kitty_editor import build
+
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "width": 720, "height": 1280})
+    own = env.open({"kind": "video", "video_id": "vid1"})
+    assert own["shape"] == "9:16" and (own["canvas"]["width"], own["canvas"]["height"]) == (720, 1280)
+    picked = env.open({"kind": "video", "video_id": "vid1", "shape": "9:16"})
+    assert picked["id"] != own["id"] and (picked["canvas"]["width"], picked["canvas"]["height"]) == (1080, 1920)
+    for body, wanted in (({"kind": "video", "video_id": "vid1", "shape": "source"}, own["id"]),
+                         ({"kind": "video", "video_id": "vid1", "shape": "9:16"}, picked["id"])):
+        again = env.post("/editor/projects/open", body).json()
+        assert again["created"] is False and again["project"]["id"] == wanted, body
+    # The list tells them apart: "Same as the video" keeps the video's own
+    # size beside its named shape, one picked by hand has none (F1 N-2).
+    listed = {p["id"]: p for p in env.get("/editor/projects").json()["projects"]}
+    assert listed[own["id"]]["source_size"] == [720, 1280]
+    assert not listed[picked["id"]].get("source_size")
+
+    # A 4K file and an anamorphic one (pixels not square): the size as shown, capped.
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "width": 3840, "height": 2160,
+                                                       "shown_width": 3840, "shown_height": 2160})
+    big = env.tmp / "big.mp4"
+    big.write_bytes(b"a 4K video")
+    four_k = env.open({"kind": "file", "path": str(big)})
+    assert four_k["shape"] == "16:9" and (four_k["canvas"]["width"], four_k["canvas"]["height"]) == (1920, 1080)
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "width": 720, "height": 480,
+                                                       "shown_width": 853, "shown_height": 480})
+    dv = env.tmp / "dv.mp4"
+    dv.write_bytes(b"an anamorphic video")
+    wide = env.open({"kind": "file", "path": str(dv)})
+    assert (wide["canvas"]["width"], wide["canvas"]["height"]) == (852, 480)
+
+
+def test_a_failed_source_shaped_project_is_made_again_at_its_own_size(env, monkeypatch):
+    from kitty_editor import build
+
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "width": 720, "height": 1280})
+    monkeypatch.setenv("FAKE_KITTY_EDITOR_FAIL", "media_import")
+    failed = env.open({"kind": "video", "video_id": "vid1"}, want="failed")
+    monkeypatch.delenv("FAKE_KITTY_EDITOR_FAIL")
+    r = env.post("/editor/projects/open", {"kind": "video", "video_id": "vid1"})
+    assert r.status_code == 200 and r.json()["created"] is False and r.json()["project"]["id"] == failed["id"]
+    rebuilt = env.ready(failed["id"])
+    assert (rebuilt["canvas"]["width"], rebuilt["canvas"]["height"]) == (720, 1280)
+
+
+def test_a_probe_that_could_not_read_the_file_says_so_not_that_it_is_no_video(env, monkeypatch):
+    """A Library video locked by a download, or ffprobe timing out, is not
+    "a file that doesn't look like a video": 503 "could not read". A file
+    read that has no picture keeps the 400."""
+    from kitty_editor import build
+
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "video": False, "read": False})
+    r = env.post("/editor/projects/open", {"kind": "video", "video_id": "vid1"})
+    assert r.status_code == 503 and r.json()["detail"] == "could not read the video's file"
+    picked = env.tmp / "locked.mp4"
+    picked.write_bytes(b"a video")
+    r = env.post("/editor/projects/open", {"kind": "file", "path": str(picked)})
+    assert r.status_code == 503 and r.json()["detail"] == "could not read the video's file"
+    monkeypatch.setattr(build, "probe", lambda path: {**PROBED, "video": False, "read": True})
+    r = env.post("/editor/projects/open", {"kind": "video", "video_id": "vid1"})
+    assert r.status_code == 400 and r.json()["detail"] == "that file doesn't look like a video"
+    assert env.get("/editor/projects").json() == {"projects": []}
+
+
+def test_probe_reads_the_shown_size_and_says_when_it_could_not_read(tmp_path, monkeypatch):
+    import subprocess
+    from types import SimpleNamespace
+
+    import core.binaries
+    from kitty_editor import build
+
+    monkeypatch.setattr(core.binaries, "ffprobe", lambda: "ffprobe")
+    media = tmp_path / "v.mp4"
+    media.write_bytes(b"x")
+
+    def answer(stream, code=0):
+        out = json.dumps({"streams": [stream] if stream else [], "format": {"duration": "4.0"}})
+        return lambda *a, **k: SimpleNamespace(stdout=out, returncode=code)
+
+    monkeypatch.setattr(build.subprocess, "run", answer({"width": 720, "height": 480, "r_frame_rate": "30000/1001",
+                                                          "sample_aspect_ratio": "32:27"}))
+    info = build.probe(media)
+    assert info["read"] and info["video"] and (info["width"], info["height"]) == (720, 480)
+    assert (info["shown_width"], info["shown_height"]) == (853, 480)
+    monkeypatch.setattr(build.subprocess, "run", answer({"width": 1920, "height": 1080, "sample_aspect_ratio": "1:1",
+                                                          "side_data_list": [{"rotation": -90}]}))
+    info = build.probe(media)
+    assert (info["width"], info["height"], info["shown_width"], info["shown_height"]) == (1080, 1920, 1080, 1920)
+    monkeypatch.setattr(build.subprocess, "run", answer({"width": 1280, "height": 720, "sample_aspect_ratio": "0:1"}))
+    assert (build.probe(media)["shown_width"], build.probe(media)["shown_height"]) == (1280, 720)
+
+    def times_out(*a, **k):
+        raise subprocess.TimeoutExpired("ffprobe", 60)
+
+    monkeypatch.setattr(build.subprocess, "run", times_out)
+    info = build.probe(media)
+    assert info["read"] is False and info["video"] is False
+    # ffprobe refused a file it could open: "not a video", read.
+    monkeypatch.setattr(build.subprocess, "run", answer(None, code=1))
+    info = build.probe(media)
+    assert info["read"] is True and info["video"] is False
+    # ... and one it could not open at all: not read.
+    info = build.probe(tmp_path / "gone.mp4")
+    assert info["read"] is False
 
 
 def test_a_file_from_the_pc_is_opened_in_place_with_no_ai_run(env):
@@ -615,7 +773,7 @@ def test_a_whole_videos_export_goes_to_the_export_folder(env):
 
 
 def test_an_export_is_named_by_a_plain_file_name_in_the_projects_own_out_folder(env):
-    project = env.open({"kind": "video", "video_id": "vid1"})
+    project = env.open({"kind": "video", "video_id": "vid1", "shape": "16:9"})
     other = env.open({"kind": "video", "video_id": "vid1", "shape": "9:16"})
     env.export(other, "theirs.mp4")
     for name in ("../kitty.json", "..\\..\\state.db", f"../../{other['id']}/out/theirs.mp4", "C:\\x.mp4",

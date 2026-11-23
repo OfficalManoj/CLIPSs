@@ -9,13 +9,9 @@ import {
   type SettingsPatch
 } from '../lib/remake'
 import type { RemakePreview } from '../lib/types'
+import { useDialogFocus } from '../lib/useDialogFocus'
 import QueueItemSettings from './queue/QueueItemSettings'
 import { seedOptions } from './queue/AddVideos'
-
-/** What Tab can reach inside the dialog. */
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
-  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /** Make clips again (#190): one video's clips made again with other
  *  settings, without adding the video again.
@@ -44,8 +40,6 @@ export default function RemakeDialog({
   const [preview, setPreview] = useState<RemakePreview | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const close = useRef(onClose)
-  close.current = onClose
 
   useEffect(() => {
     let current = true
@@ -61,42 +55,8 @@ export default function RemakeDialog({
   // The keyboard starts in the dialog, Tab and Shift+Tab stay in it, and
   // Escape leaves it. Closed any way, the keyboard goes back to what opened
   // it (the Library's Make clips again… button), so a keyboard user keeps
-  // their place.
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    box.current?.focus()
-    const key = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        close.current()
-        return
-      }
-      if (e.key !== 'Tab' || !box.current) return
-      const inside = Array.from(box.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-        (el) => el.getClientRects().length > 0
-      )
-      const active = document.activeElement
-      if (inside.length === 0) {
-        e.preventDefault()
-        box.current.focus()
-        return
-      }
-      const first = inside[0]
-      const last = inside[inside.length - 1]
-      const lost = !(active instanceof Node) || !box.current.contains(active)
-      if (e.shiftKey && (lost || active === first || active === box.current)) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && (lost || active === last)) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    window.addEventListener('keydown', key)
-    return () => {
-      window.removeEventListener('keydown', key)
-      if (opener && opener.isConnected && !(opener as HTMLButtonElement).disabled) opener.focus()
-    }
-  }, [])
+  // their place (lib/useDialogFocus.ts, shared with the Publish window).
+  useDialogFocus(box, onClose)
 
   // Read once, when the preview comes: the panel keeps its own state after.
   const start = useMemo(() => (preview ? remakeStart(preview, seedOptions) : null), [preview])

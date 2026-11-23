@@ -274,7 +274,8 @@ If you don't see **Editor** in the menu on the left, your copy of Clips Kitty do
 
 1. Go to **Clip Editor** and pick a video.
 2. Point at a clip and click **Open in editor** (next to **Publish**). You can also click a clip and then **Open in editor**, next to **Edit this clip** in the clip's panel.
-3. The **Editor** page opens. The first time, Clips Kitty gets the clip ready, which takes a few seconds for most clips and up to a minute or two for some (gaming, sport or letterboxed clips); you see how far it is. After that it opens straight away.
+3. The **Editor** page opens straight on your clip: the bar at the top shows the clip's name and how far it is, and the page says **Opening the editor…** until the editor appears. The first time, Clips Kitty gets the clip ready, which takes a few seconds for most clips and up to a minute or two for some (gaming, sport or letterboxed clips). After that it opens straight away. Changed your mind? Click **← Projects**: it stops opening the clip. A clip that was being got ready for the first time is still made, and it stays in **Recent projects** for next time.
+4. Opening another clip while one is open saves and closes the first one, the same as **← Projects**. Opening the clip that is already open just shows it again, as you left it. If the new clip can't be opened, the bar says why, and **← Projects** takes you back.
 
 In the editor:
 
@@ -296,10 +297,21 @@ The Export window says under the name where your video will go: **Replaces this 
 
 No end card is added to what you export from the editor.
 
+### Publish
+
+When a clip's export is saved as the clip's video, click **Publish** at the top of the Editor page. It opens the same **Publish this clip** window as the clip's **Publish** on the Clip Editor page, so you pick your platforms and send it the same way. The editor steps aside while the window is open.
+
+- **Publish** sends the clip in your Library, so it turns on after you **Export**. Before that, point at it to read **Export first: Publish sends the clip in your Library.**
+- It sends the clip as you last exported it. Export again after more changes.
+- If the clip was changed in the Clip Editor meanwhile, your export is saved next to the clip instead, and **Publish** stays off: point at it to read why.
+- Publish is there for clips. It works the same as on the Clip Editor page: the window opens even with nothing set up yet. To send the clip, set up WoopSocial or Upload-Post in Settings.
+- In the window, **Esc** is **Cancel**, and **Tab** stays inside it.
+
 ### Edit a whole video or a file from your PC
 
-- **A whole video:** in **Clip Editor**, pick the video and click **Edit whole video**, choose a shape (16:9 wide, 9:16 tall, 1:1 square, 4:5 portrait) and click **Open**. The Editor page offers the same under **Edit a whole video**.
-- **A file from your PC:** on the **Editor** page, choose a shape under **Edit a file from your PC** and click **Choose a file…**. No AI runs and nothing is added to your Library.
+- **A whole video:** on the **Editor** page, under **Edit a whole video**, pick the video and click **Open**.
+- **A file from your PC:** on the **Editor** page, under **Edit a file from your PC**, click **Choose a file…**. No AI runs and nothing is added to your Library.
+- Both start in **Same as the video**: a tall 9:16 video stays tall, a wide one stays wide, with no bars. A 4K video starts at the same size as the other shapes (1080 pixels on its short side), its shape kept. To make it another shape, pick **16:9** (wide), **9:16** (tall), **1:1** (square) or **4:5** before you open it. Each shape is its own project.
 
 Your projects are listed under **Recent projects** on the Editor page. Click one to open it again, or **✕** to delete it (videos you exported from it stay).
 
