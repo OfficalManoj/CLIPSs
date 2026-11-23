@@ -20,6 +20,7 @@
 [![Open source](https://img.shields.io/badge/open%20source-yes-brightgreen)](https://github.com/ColinGPT9/clips-studio)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 [![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)](docs/DOCKER.md)
+[![ColinGPT9/clips-studio MCP server](https://glama.ai/mcp/servers/ColinGPT9/clips-studio/badges/score.svg)](https://glama.ai/mcp/servers/ColinGPT9/clips-studio)
 
 <a href="https://youtu.be/BVlAzSWb-d8"><img src="docs/demo/clips-kitty-gta6-setup-guide.gif" alt="Watch the Clips Kitty setup guide on YouTube: turn a gaming stream into a captioned vertical clip" width="100%"></a>
 
