@@ -256,23 +256,16 @@ def test_every_longform_mode_in_the_dropdown_can_be_asked_for():
     assert modes == ["short_clips", "clips_140", "highlights", "edited_stream"]
 
 
-def test_a_caption_font_is_matched_however_it_was_typed():
-    assert mcp._caption_style({"font": "impact"})["font"] == "Impact"
-    assert mcp._caption_style({"font": "comic sans"})["font"] == "Comic Sans MS"
+def test_a_caption_look_is_matched_however_it_was_typed():
+    assert mcp._caption_style({"preset": "IMPACT"})["preset"] == "concat.impact"
+    assert mcp._caption_style({"preset": "concat.comic"})["preset"] == "concat.comic"
 
 
-def test_a_font_that_is_not_installed_is_refused_with_the_list():
-    # An unknown font renders as something else without complaining, so every
+def test_a_look_the_app_does_not_have_is_refused_with_the_list():
+    # An unknown look renders as something else without complaining, so every
     # clip of the stream would be wrong and nothing would say why.
-    with pytest.raises(ValueError, match="Impact"):
-        mcp._caption_style({"font": "Papyrus"})
-
-
-def test_colour_words_work_as_well_as_hex():
-    assert mcp._caption_style({"color": "yellow"})["color"] == "#FFE600"
-    assert mcp._caption_style({"color": "#ff0000"})["color"] == "#FF0000"
-    with pytest.raises(ValueError, match="not a colour"):
-        mcp._caption_style({"highlight_color": "chartreuse"})
+    with pytest.raises(ValueError, match=r"concat.impact"):
+        mcp._caption_style({"preset": "Papyrus"})
 
 
 def test_centre_means_middle():
@@ -282,16 +275,13 @@ def test_centre_means_middle():
         mcp._caption_style({"position": "diagonal"})
 
 
-def test_sizes_are_clamped_rather_than_refused():
-    # "make them huge" is a real request; it should land at the top of the
-    # range instead of failing.
-    assert mcp._caption_style({"font_size": 900})["font_size"] == 160
+def test_words_per_caption_are_clamped_rather_than_refused():
     assert mcp._caption_style({"words_per_caption": 99})["words_per_caption"] == 6
 
 
 def test_what_was_not_asked_for_is_left_alone():
     # Anything sent here overrides the user's saved style, so silence matters.
-    assert mcp._caption_style({"uppercase": False}) == {"uppercase": False}
+    assert mcp._caption_style({"size": "large"}) == {"size": "large"}
 
 
 def test_a_caption_request_reaches_the_job(monkeypatch):
@@ -300,9 +290,8 @@ def test_a_caption_request_reaches_the_job(monkeypatch):
                         or {"job_id": 7})
     mcp.handle(_request(35, "tools/call", {"name": "queue_video", "arguments": {
         "url": "https://youtu.be/x",
-        "caption_style": {"position": "top", "highlight": True, "highlight_color": "gold"}}}))
-    assert sent["body"]["caption_style"] == {
-        "position": "top", "highlight": True, "highlight_color": "#FFD700"}
+        "caption_style": {"position": "top", "preset": "Comic", "size": "small"}}}))
+    assert sent["body"]["caption_style"] == {"position": "top", "preset": "concat.comic", "size": "small"}
 
 
 def test_gaming_reaches_the_engine(monkeypatch):

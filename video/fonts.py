@@ -1,9 +1,12 @@
 """The caption fonts that ship with the app (assets/fonts/).
 
-Twelve static TTF files under the SIL Open Font License 1.1, each with its
-OFL.txt, listed in assets/fonts/manifest.json with the family name libass
-matches, the weight, the sha256 and the writing systems the font covers in
-full. Standard library only: server/mcp.py and the /fonts routes read it too.
+Clips Kitty Editor's own fonts, byte for byte (scripts/sync_editor_presets.py
+copies them from our Concat fork), each with its licence file beside it,
+listed in assets/fonts/manifest.json with the family name libass matches
+(`family`, name ID 1), the family the editor's presets name (`typographic`),
+the weight, the size factor libass uses (`ass_scale`), the sha256 and the
+writing systems the font covers in full. Standard library only:
+server/mcp.py and the /fonts routes read it too.
 
 A Windows font is found by libass among the installed fonts. A bundled one is
 not installed anywhere, so the render that burns it copies its files into a
@@ -148,6 +151,38 @@ def covers(family: str, letters: str) -> bool | None:
     return all(ord(c) in have for c in letters)
 
 
+def ass_scale(family: str) -> float:
+    """(usWinAscent + usWinDescent) / unitsPerEm of the family's files: libass
+    sizes a font so that its Fontsize spans that height, so a Fontsize is the
+    em times this. 1.0 when the manifest does not say."""
+    scales = [float(e["ass_scale"]) for e in _entries(family) if isinstance(e.get("ass_scale"), (int, float))]
+    return scales[0] if scales else 1.0
+
+
+def typographic_families() -> list[str]:
+    """The families the editor's presets name (Montserrat, not Montserrat
+    Black), in the manifest's order."""
+    return list(dict.fromkeys(str(e.get("typographic") or e["family"]) for e in _loaded()[1]))
+
+
+def face(typographic: str, weight: float = 400, italic: bool = False) -> dict | None:
+    """The manifest entry of the file a preset's family and weight are drawn
+    with: the nearest weight (a tie goes to the heavier), an italic file when
+    one is asked for and the family has it. None for a family the app does
+    not have."""
+    wanted = str(typographic or "").strip().casefold()
+    entries = [e for e in _loaded()[1] if str(e.get("typographic") or e["family"]).casefold() == wanted]
+    if not entries:
+        return None
+    styled = [e for e in entries if bool(e.get("italic")) == bool(italic)] or entries
+
+    def score(e: dict) -> tuple[float, int]:
+        w = int(e.get("weight") or 400)
+        return abs(w - float(weight)), -w
+
+    return min(styled, key=score)
+
+
 def weight_for(family: str) -> int | None:
     """The family's weight (400 regular, 700 bold, 800 extra bold, 900 black)."""
     weights = [int(e["weight"]) for e in _entries(family) if isinstance(e.get("weight"), int)]
@@ -266,16 +301,24 @@ def release(ass_dir: Path) -> None:
 
 
 def listing() -> list[dict]:
-    """The bundled families for the UI: name, weight, scripts and file names
-    (the /fonts routes serve them)."""
+    """The bundled families for the UI, as the editor's presets name them:
+    each file with its weight and whether it is italic, so a preview draws
+    every preset with the very file the render burns (the /fonts routes
+    serve them)."""
     out = []
-    for family in families():
+    for family in typographic_families():
+        entries = [e for e in _loaded()[1] if str(e.get("typographic") or e["family"]) == family]
+        scripts: list[str] = []
+        for e in entries:
+            scripts += [s for s in e.get("scripts") or () if s not in scripts]
         out.append({
             "family": family,
-            "weight": weight_for(family),
-            "scripts": scripts_for(family),
-            "files": [Path(e["file"]).name for e in _entries(family)],
-            "licence": "OFL-1.1",
+            "weight": max(int(e.get("weight") or 400) for e in entries),
+            "scripts": scripts,
+            "files": [Path(e["file"]).name for e in entries],
+            "faces": [{"file": Path(e["file"]).name, "weight": int(e.get("weight") or 400),
+                       "italic": bool(e.get("italic"))} for e in entries],
+            "licence": entries[0].get("licence") or "OFL-1.1",
         })
     return out
 

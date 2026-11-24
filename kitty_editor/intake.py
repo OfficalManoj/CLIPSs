@@ -171,7 +171,7 @@ def _answer(entry: dict, again: bool, clip_id=None) -> dict:
     return out
 
 
-def edited_captions(project_dir, record: dict) -> list[dict] | None:
+def edited_captions(project_dir, record: dict, timeline_id=None) -> list[dict] | None:
     """The clip's caption lines with the words now on the editor's titles
     (step KC), from the project's saved file: each line the project was
     given (`record`, build.caption_record) is found again as the one text
@@ -181,7 +181,10 @@ def edited_captions(project_dir, record: dict) -> list[dict] | None:
 
     None when any line is not found exactly once that way (moved, trimmed,
     split, cut or deleted in the editor, or a duplicate) or the file can't
-    be read: the clip then keeps its lines."""
+    be read: the clip then keeps its lines.
+
+    `timeline_id` is the clip's own tab (step KF: a project may also have
+    language tabs); without it, the tab that was active when it was saved."""
     try:
         project = json.loads((Path(project_dir) / "concat.json").read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
@@ -189,8 +192,9 @@ def edited_captions(project_dir, record: dict) -> list[dict] | None:
     if not isinstance(project, dict):
         return None
     items = project.get("clips")
+    wanted = timeline_id or project.get("activeTimelineId")
     for timeline in project.get("timelines") or ():
-        if isinstance(timeline, dict) and timeline.get("id") == project.get("activeTimelineId"):
+        if isinstance(timeline, dict) and timeline.get("id") == wanted:
             items = timeline.get("clips")
     texts = []
     for item in items or ():
@@ -256,7 +260,7 @@ def follow_captions(db, row, manifest: dict) -> str | None:
         record = captions.get("follow")
         if not isinstance(record, dict):
             return None
-        lines = edited_captions(manifest.get("project_dir") or "", record)
+        lines = edited_captions(manifest.get("project_dir") or "", record, manifest.get("source_timeline"))
         if not lines:
             return "kept"           # not found, or every title emptied: never "followed" with no lines
         opts = json.loads(row["render_opts"]) if row["render_opts"] else {}
@@ -341,7 +345,7 @@ def captions_moved(db, found: dict) -> dict:
 
 
 def take_in(data_dir, project_id: str, file, *, folder=None, open_db, publish=None, clip_lock=None,
-            wait: bool | float = False) -> dict:
+            wait: bool | float = False, timeline=None) -> dict:
     """Take the export `file` (a name in the project's out/) in. `folder`
     is the person's export folder (used only when there is no clip to
     re-point); `open_db` gives a StateDB to use and close; `publish` sends
@@ -350,6 +354,11 @@ def take_in(data_dir, project_id: str, file, *, folder=None, open_db, publish=No
     `wait`: False tries the project's lock once, True waits for it, a
     number waits that many seconds; Busy when it is not had. An export
     taken in meanwhile (by recover) is then answered as it was recorded.
+
+    `timeline`: the id of the tab the export was made from, as the editor
+    reports it (step KF). A language tab's export, or one of a project with
+    language tabs whose tab is not known, never becomes the clip's video: it
+    goes to the export folder as "<name> (<Language>)".
 
     Raises BadName, registry.NotFound, NoSuchExport, Busy, BadFolder or
     Failed; whatever it raises, the clip and its file are as they were."""
@@ -368,12 +377,14 @@ def take_in(data_dir, project_id: str, file, *, folder=None, open_db, publish=No
     if not held:
         raise Busy(project_id)
     try:
-        return _take_in(data_dir, project_id, name, folder, open_db, publish or (lambda event: None), clip_lock)
+        return _take_in(data_dir, project_id, name, folder, open_db, publish or (lambda event: None), clip_lock,
+                        timeline)
     finally:
         lock.release()
 
 
-def _take_in(data_dir: Path, project_id: str, name: str, folder, open_db, publish, clip_lock) -> dict:
+def _take_in(data_dir: Path, project_id: str, name: str, folder, open_db, publish, clip_lock,
+             timeline=None) -> dict:
     manifest = registry.load(data_dir, project_id)
     out = registry.folder(data_dir, project_id) / "out"
     source = _in_out(out, name)
@@ -392,6 +403,10 @@ def _take_in(data_dir: Path, project_id: str, name: str, folder, open_db, publis
     exports = registry.exports_folder(data_dir)
     count = len(manifest.get("exports") or []) + 1
     clip = manifest.get("clip") if manifest.get("kind") == "clip" else None
+    tabs = manifest.get("languages") or {}
+    language = tabs.get(str(timeline)) if timeline else None
+    if tabs and (not timeline or language):
+        clip = None         # a language tab's export (or one whose tab isn't known): to the folder
 
     if isinstance(clip, dict) and clip.get("id") is not None:
         if clip_lock is None:
@@ -459,6 +474,11 @@ def _take_in(data_dir: Path, project_id: str, name: str, folder, open_db, publis
     plain = registry.safe_name(f"{manifest.get('export_name') or manifest.get('name') or 'Video'}", "Video")
     typed = registry.safe_name(Path(name).stem, "")
     stem = typed if typed and typed != plain else f"{plain} - {date.today().isoformat()}"
+    if language:
+        from multilingual.languages import english_name
+
+        tongue = english_name(language)
+        stem = typed if typed and typed != plain and typed.endswith(f"({tongue})") else f"{typed or plain} ({tongue})"
     try:
         where.mkdir(parents=True, exist_ok=True)
         target = registry.unique_target(where, stem, suffix)

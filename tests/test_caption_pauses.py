@@ -13,8 +13,7 @@ stretched across a silence hid the pause altogether.
   turns, too short to stand alone) never holds a caption up through a pause:
   alone before one it is on screen for ALONE_SECONDS.
 - On every path that makes lines from the transcript: plain, with the second
-  speaker's turns, a clip whose start or end moved, and the ASS file with
-  the word highlight or karaoke.
+  speaker's turns, a clip whose start or end moved, and the ASS file.
 - Lines a person saved keep their own times.
 - A transcript with no pause that long and no word that long gives exactly
   the lines it always gave, and so does text without word timings.
@@ -481,35 +480,15 @@ def test_a_word_of_no_length_before_a_pause_in_the_seconds_a_moved_clip_gains():
     ]
 
 
-# ---- the word highlight and karaoke stay in step ----------------------------------------
+# ---- the ASS file stays in step -------------------------------------------------------
 
 STRETCHED = _words((0.0, 0.3, "well"), (0.3, 3.3, "honestly"), (3.3, 3.7, "it"), (3.7, 4.1, "was"), (4.1, 4.5, "fine"))
 
 
-def test_the_word_highlight_follows_the_new_lines(tmp_path):
-    path = build_captions(_segments(STRETCHED), _clip(0.0, 5.0), tmp_path / "hl.ass", style={"highlight": True})
+def test_the_burned_captions_follow_the_new_lines(tmp_path):
+    path = build_captions(_segments(STRETCHED), _clip(0.0, 5.0), tmp_path / "c.ass")
     plain = [(a, b, re.sub(r"\{[^}]*\}", "", text)) for a, b, text in _events(path)]
-    lit = [re.findall(r"\\1c&H[0-9A-F]+&\}([A-Z]+)\{", text) for _, _, text in _events(path)]
 
-    # One event per word, each word lit from when it starts to be said, by
-    # the transcript's own timings: "honestly" until its caption ends (the
-    # cap), not for the 3 s it is written as lasting.
-    assert plain == [
-        ("0:00:00.00", "0:00:00.30", "WELL HONESTLY"), ("0:00:00.30", "0:00:01.50", "WELL HONESTLY"),
-        ("0:00:03.30", "0:00:03.70", "IT WAS FINE"), ("0:00:03.70", "0:00:04.10", "IT WAS FINE"),
-        ("0:00:04.10", "0:00:04.50", "IT WAS FINE"),
-    ]
-    assert lit == [["WELL"], ["HONESTLY"], ["IT"], ["WAS"], ["FINE"]]
-
-
-def test_karaoke_fills_each_word_inside_its_own_caption(tmp_path):
-    path = build_captions(_segments(STRETCHED), _clip(0.0, 5.0), tmp_path / "k.ass", style={"animation": "karaoke"})
-    events = _events(path)
-
-    assert [(a, b) for a, b, _ in events] == [("0:00:00.00", "0:00:01.50"), ("0:00:03.30", "0:00:04.50")]
-    # In hundredths from the caption's start: "well" 30, "honestly" the 120
-    # the caption has left; then 40 each.
-    assert [re.findall(r"\\kf?(\d+)\}", text) for _, _, text in events] == [["30", "120"], ["40", "40", "40"]]
-    for a, b, text in events:
-        length = round((float(b.split(":")[-1]) - float(a.split(":")[-1])) * 100)
-        assert sum(int(n) for n in re.findall(r"\\kf?(\d+)\}", text)) == length
+    # "honestly" ends its caption at the cap, not after the 3 s it is written
+    # as lasting, and the quiet part has no caption.
+    assert plain == [("0:00:00.00", "0:00:01.50", "well honestly"), ("0:00:03.30", "0:00:04.50", "it was fine")]

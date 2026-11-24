@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from core import modes
-from video import audio_library, captions, export_presets, filters
+from video import audio_library, captions, export_presets, filters, fonts
 from video_editor.project import model, ops, store
 from video_editor.project.env import AppEnv
 
@@ -45,13 +45,13 @@ def test_the_speed_and_volume_limits_are_the_plans():
 
 def test_fonts_come_from_the_caption_font_registry():
     env = _env()
-    for font in captions.FONTS:
+    for font in ("Arial", "Impact", *fonts.families(), *fonts.typographic_families()):
         assert env.font(font.upper()) == font
-    for bad in ("", "Comic Sans Nope", None, "../Arial"):
+    for bad in ("", "Comic Sans Nope", None, "../Arial", "Poppins ExtraBold"):
         assert env.font(bad) is None
     doc = ops.apply(model.new_project(), [{"op": "add_text", "content": "Hi", "start_us": 0, "duration_us": S,
-                                           "font": captions.BUNDLED_FONTS[0].lower()}], env).document
-    assert doc["tracks"][1]["items"][0]["text"]["font"] == captions.BUNDLED_FONTS[0]
+                                           "font": "montserrat black"}], env).document
+    assert doc["tracks"][1]["items"][0]["text"]["font"] == "Montserrat Black"
 
 
 def test_filters_and_gaming_layouts_go_through_the_apps_own_checks():
@@ -69,15 +69,15 @@ def test_filters_and_gaming_layouts_go_through_the_apps_own_checks():
 
 def test_a_caption_style_takes_only_what_the_captions_read():
     env = _env()
-    style = {"font": "impact", "font_size": 96, "position": "top", "animation": captions.ANIMATIONS[1],
-             "safe_zone": captions.SAFE_ZONE_CHOICES[1], "uppercase": True, "color": "#FFCC00"}
-    assert env.caption_style(style) == {**style, "font": "Impact"}
-    for bad in ({"font": "Nope"}, {"font_size": 500}, {"font_size": "big"}, {"position": "left"},
-                {"animation": "explode"}, {"safe_zone": "moon"}, {"uppercase": 1}, {"color": "red"},
-                {"not_a_key": 1}):
+    style = {"preset": "concat.impact", "size": "large", "position": "top", "words_per_caption": 2,
+             "safe_zone": captions.SAFE_ZONE_CHOICES[1], "second_speaker": True, "second_speaker_color": "#FFCC00"}
+    assert env.caption_style(style) == style
+    for bad in ({"preset": "Nope"}, {"size": "huge"}, {"words_per_caption": "big"}, {"position": "left"},
+                {"safe_zone": "moon"}, {"second_speaker": 1}, {"second_speaker_color": "red"},
+                {"font": "Impact"}, {"animation": "pop"}, {"not_a_key": 1}):
         with pytest.raises(ValueError):
             env.caption_style(bad)
-    assert set(captions.DEFAULT_STYLE) >= set(style)
+    assert set(captions.DEFAULT_STYLE) == set(style)
 
 
 def test_an_export_preset_must_be_one_this_pc_can_encode():

@@ -484,7 +484,9 @@ export async function openEditorProject(id: string): Promise<void> {
 export async function ensureEditorShown(): Promise<void> {
   const bridge = window.studio?.editor
   const id = store.shownId
-  if (!bridge || !id) return
+  // Not while language tabs are being added: the editor is away on purpose
+  // and is shown again when they are in (makeLanguageTabs).
+  if (!bridge || !id || addingTabs) return
   set({ runtime: { ...store.runtime, error: '', ended: '' } })
   // Read again: the clip may have been deleted since (FL2 F4).
   const project = await editorApi.project(id).catch(() => store.project)
@@ -617,4 +619,68 @@ export function noteAppPointer(why: 'pointer' | 'focus' = 'pointer'): void {
 /** Whether the keys left the editor because of a click in the app. */
 export function appPointerRecent(): boolean {
   return Date.now() - appPointerAt < 1500
+}
+
+let addingTabs = false
+
+function tabsErrorText(e: unknown): string {
+  if (e instanceof EditorRouteError && e.message) return t(e.message)
+  return t('The language tabs could not be added. Your project is as it was.')
+}
+
+/** Other languages (KF): translate (and dub) the shown project's captions
+ *  into new tabs of the same project. The work runs as an engine job while
+ *  the editor stays usable; when it is done the editor saves and closes the
+ *  project, the tabs are added, and it is shown again on the first new tab.
+ *  A project not on screen then gets its tabs when it is next opened.
+ *  `onStep` hears what is happening, in plain words; resolves with the
+ *  failure's sentence, or '' when the tabs are in (or wait for the next open). */
+export async function makeLanguageTabs(
+  projectId: string,
+  body: { languages: string[]; dub: boolean; voices?: Record<string, string> },
+  onStep: (text: string) => void = () => undefined
+): Promise<string> {
+  // The job reads the project as saved: give the autosave a moment.
+  for (let i = 0; i < 25 && store.shownId === projectId && store.runtime.dirty; i++) await sleep(200)
+  let jobId: number
+  try {
+    jobId = (await editorApi.makeLanguages(projectId, body)).job_id
+  } catch (e) {
+    return tabsErrorText(e)
+  }
+  onStep(t('Translating. You can keep editing.'))
+  for (;;) {
+    await sleep(2000)
+    const job = (await editorApi.jobs().catch(() => [])).find((j) => j.id === jobId)
+    if (!job || job.status === 'queued' || job.status === 'running') continue
+    if (job.status !== 'done') return job.error || t('The translation did not finish.')
+    break
+  }
+  if (store.shownId !== projectId) return ''
+  onStep(t('The editor reopens with the new tabs in a few seconds.'))
+  const bridge = window.studio?.editor
+  addingTabs = true
+  let failed = ''
+  try {
+    await bridge?.close()
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await editorApi.applyLanguages(projectId)
+        break
+      } catch (e) {
+        // The window lets go of the project's lock as it leaves.
+        if (e instanceof EditorRouteError && e.status === 409 && attempt < 10) {
+          await sleep(500)
+          continue
+        }
+        failed = tabsErrorText(e)
+        break
+      }
+    }
+  } finally {
+    addingTabs = false
+  }
+  if (store.shownId === projectId) await ensureEditorShown()
+  if (failed) showEditorNotice({ text: failed, failure: true })
+  return failed
 }

@@ -325,26 +325,23 @@ def test_mutes_split_the_pieces_and_speed_shortens_the_program():
     assert all(p["muted"] for p in plan({"edit": {"mute_all": True}})["pieces"])
 
 
-def test_the_caption_style_is_carried_as_far_as_the_editors_text_goes():
-    style = {"color": "#FFE600", "font": "Arial", "font_size": 96, "uppercase": True, "position": "top"}
-    made = plan({"caption_style": style})
+def test_the_caption_style_is_the_editors_own_preset():
+    made = plan({"caption_style": {"preset": "concat.comic", "size": "large", "position": "top"}})
     look = made["captions"][0]["style"]
-    assert look["color"] == "#ffe600" and look["textCase"] == "upper" and look["fontFamily"] == "Arial"
-    assert look["fontSize"] == round(96 / 1920, 5) and look["strokeWidth"] > 0 and look["strokeColor"] == "#000000"
+    assert look["fontFamily"] == "Bangers" and look["color"] == "#ffe14a" and look["strokeColor"] == "#111111"
+    assert look["fontSize"] == 0.065 and look["strokeWidth"] == 0.014 and look["shadow"] is True
     assert made["captions"][0]["offsetY"] == -0.35
     assert plan({"caption_style": {"position": "middle"}})["captions"][0]["offsetY"] == 0.0
-    assert plan({"caption_style": {"uppercase": False}})["captions"][0]["style"]["textCase"] == "original"
+    # An old saved style is its nearest preset.
+    assert plan({"caption_style": {"font": "Anton", "font_size": 96}})["captions"][0]["style"]["fontFamily"] == "Anton"
     # A safe zone moves the row clear of the app's own buttons (portrait only).
     zoned = plan({"caption_style": {"position": "bottom", "safe_zone": "tiktok"}})["captions"][0]["offsetY"]
     assert 0.0 < zoned < 0.35
 
 
-def test_what_is_not_carried_is_said_plainly():
-    assert "captions_plain" in plan({"caption_style": {"highlight": True}})["notes"]
-    assert "captions_plain" in plan({"caption_style": {"animation": "pop"}})["notes"]
-    assert "font_default" in plan({"caption_style": {"font": "A Font Nobody Has"}})["notes"]
-    assert "fontFamily" not in plan({"caption_style": {"font": "A Font Nobody Has"}})["captions"][0]["style"]
-    assert plan({"caption_style": {"highlight": True}}, lines=[])["notes"] == ["framing_baked"]    # no captions: no note
+def test_nothing_is_left_behind_so_nothing_is_said():
+    for style in ({"highlight": True}, {"animation": "pop"}, {"font": "A Font Nobody Has"}):
+        assert plan({"caption_style": style})["notes"] == ["framing_baked"]
     off = plan({}, captions=False)
     assert off["captions"] == [] and off["notes"] == ["framing_baked"]
 

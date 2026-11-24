@@ -311,10 +311,10 @@ function ProjectView({
   const [publishSetup, setPublishSetup] = useState<PublishSetup | null>(null)
   const [publishClip, setPublishClip] = useState<Clip | null>(null)
   useEditorCover(publishClip !== null)
-  // Other languages (KC): subtitles and dubbing for the shown clip, in a
+  // Other languages (KF): language tabs for the shown clip's project, in a
   // window of its own; the editor is hidden while it is open.
-  const [languagesClip, setLanguagesClip] = useState<Clip | null>(null)
-  useEditorCover(languagesClip !== null)
+  const [languagesOpen, setLanguagesOpen] = useState(false)
+  useEditorCover(languagesOpen)
   const area = useRef<HTMLDivElement>(null)
   const projectsButton = useRef<HTMLButtonElement>(null)
   const publishButton = useRef<HTMLButtonElement>(null)
@@ -483,31 +483,10 @@ function ProjectView({
     await rereadShownProject(id)
   }
 
-  // Other languages (KC): there for a clip project whose clip is there
-  // (as Publish is), and on without an export first: it works from the
-  // clip's caption lines, which an export updates from the editor's words.
-  const openLanguages = async (): Promise<void> => {
-    const id = shownProject?.id
-    const clipId = shownProject?.clip?.id
-    const videoId = shownProject?.clip?.video_id
-    if (!id || clipId === undefined || !videoId) return
-    let clips: Clip[]
-    try {
-      clips = await api.clips(videoId)
-    } catch {
-      if (editorStore().shownId === id) {
-        showEditorNotice({ text: t('Clips Kitty could not read the clip. Try again in a moment.'), failure: true })
-      }
-      return
-    }
-    if (editorStore().shownId !== id) return
-    const clip = clips.find((c) => c.id === clipId)
-    if (clip) {
-      setLanguagesClip(clip)
-      return
-    }
-    showEditorNotice({ text: t('This clip is no longer in the Library.'), failure: true })
-    await rereadShownProject(id)
+  // Other languages (KF): there for a clip project whose clip is there (as
+  // Publish is). Each language becomes a tab of this project.
+  const openLanguages = (): void => {
+    if (shownProject?.id) setLanguagesOpen(true)
   }
 
   const notes = noteSentences(store.project?.notes)
@@ -653,9 +632,9 @@ function ProjectView({
               ref={languagesButton}
               type="button"
               className="px-2 py-0.5 rounded-md bg-raised hover:bg-raised/70"
-              onClick={() => void openLanguages()}
+              onClick={openLanguages}
               title={t(
-                'Subtitles and dubbing in other languages for this clip: translate, review, style and export. Export your edits first, so the subtitles use the caption words you typed here.'
+                'Make a tab in this project for each language, with the captions translated and, if you want, the voice dubbed. Edit and export each tab like the rest of the editor.'
               )}
             >
               {t('Other languages…')}
@@ -722,10 +701,12 @@ function ProjectView({
           returnFocus={publishButton}
         />
       )}
-      {languagesClip && (
+      {languagesOpen && shownProject && (
         <OtherLanguagesDialog
-          clip={languagesClip}
-          onClose={() => setLanguagesClip(null)}
+          projectId={shownProject.id}
+          name={shownProject.name}
+          clipId={shownProject.clip?.id}
+          onClose={() => setLanguagesOpen(false)}
           returnFocus={languagesButton}
         />
       )}

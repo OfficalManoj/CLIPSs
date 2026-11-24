@@ -16,6 +16,10 @@ from video_editor.project.ops import Env
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COLOUR = re.compile(r"#[0-9A-Fa-f]{6}")
+# Fonts every Windows has, for text items and watermarks (captions use the
+# editor's presets and fonts only).
+_WINDOWS_FONTS = ("Arial", "Arial Black", "Impact", "Verdana", "Tahoma", "Trebuchet MS", "Segoe UI",
+                  "Georgia", "Comic Sans MS", "Courier New")
 
 
 class AppEnv(Env):
@@ -121,42 +125,41 @@ class AppEnv(Env):
         return modes.clean_gaming(settings)
 
     def font(self, name: str) -> str | None:
-        from video import captions
+        """A text item's or watermark's font: one of the app's own (the
+        editor's fonts, video/fonts.py) or one every Windows has."""
+        from video import fonts
 
         wanted = str(name or "").strip().casefold()
-        return next((f for f in captions.FONTS if f.casefold() == wanted), None) if wanted else None
+        known = (*_WINDOWS_FONTS, *fonts.families(), *fonts.typographic_families())
+        return next((f for f in known if f.casefold() == wanted), None) if wanted else None
 
     def caption_style(self, style: dict) -> dict:
         """A caption style with only the keys the captions read
-        (video/captions.py DEFAULT_STYLE), each checked."""
-        from video import captions
+        (video/caption_presets.py DEFAULT), each checked."""
+        from video import caption_presets as cp
 
         out = {}
         for key, value in style.items():
-            if key not in captions.DEFAULT_STYLE:
-                raise ValueError(f"has no {str(key)[:40]!r}. It takes {', '.join(captions.DEFAULT_STYLE)}")
-            default = captions.DEFAULT_STYLE[key]
-            if key == "font":
-                found = self.font(value) if isinstance(value, str) else None
-                if found is None:
-                    raise ValueError(f"font {str(value)[:60]!r} is not one of the caption fonts")
-                value = found
+            if key not in cp.DEFAULT:
+                raise ValueError(f"has no {str(key)[:40]!r}. It takes {', '.join(cp.DEFAULT)}")
+            if key == "preset":
+                if value not in cp.ids():
+                    raise ValueError(f"preset {str(value)[:60]!r} is not one of the editor's text presets")
+            elif key == "size":
+                if value not in cp.SIZES:
+                    raise ValueError("size must be small, medium or large")
             elif key == "position":
-                if value not in ("bottom", "middle", "top"):
+                if value not in cp.PLACES:
                     raise ValueError("position must be bottom, middle or top")
-            elif key == "animation":
-                if value not in captions.ANIMATIONS:
-                    raise ValueError(f"animation must be one of {', '.join(captions.ANIMATIONS)}")
             elif key == "safe_zone":
-                if value not in captions.SAFE_ZONE_CHOICES:
-                    raise ValueError(f"safe_zone must be one of {', '.join(captions.SAFE_ZONE_CHOICES)}")
-            elif isinstance(default, bool):
+                if value not in cp.SAFE_ZONE_CHOICES:
+                    raise ValueError(f"safe_zone must be one of {', '.join(cp.SAFE_ZONE_CHOICES)}")
+            elif key == "second_speaker":
                 if not isinstance(value, bool):
                     raise ValueError(f"{key} must be true or false")
-            elif isinstance(default, int):
-                lo, hi = (20, 200) if key == "font_size" else (1, 10)
-                if type(value) is not int or not lo <= value <= hi:
-                    raise ValueError(f"{key} must be a whole number from {lo} to {hi}")
+            elif key == "words_per_caption":
+                if type(value) is not int or not 1 <= value <= 10:
+                    raise ValueError(f"{key} must be a whole number from 1 to 10")
             elif not isinstance(value, str) or not _COLOUR.fullmatch(value):
                 raise ValueError(f"{key} must be a colour as #RRGGBB")
             out[key] = value

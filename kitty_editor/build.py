@@ -23,24 +23,21 @@ from pathlib import Path
 from kitty_editor import automation
 
 MIN_PIECE = 1 / 30          # a piece shorter than this is not worth a cut
-CAPTION_OUTLINE = 7 / 1920  # today's black caption outline, as a share of the frame's height
+CAPTION_OUTLINE = 7 / 1920  # the hook title's black outline, as a share of the frame's height
 CAPTION_ROWS = {"bottom": 0.35, "middle": 0.0, "top": -0.35}
 HOOK_ROW = -0.35
 MUSIC_COPIES = 200          # the most times a short music file is repeated
 
 # What the editor has no equivalent for, said plainly (k2-editor.md).
 NOTE_FRAMING = "framing_baked"
-NOTE_CAPTIONS = "captions_plain"
-NOTE_FONT = "font_default"
+NOTE_CAPTIONS = "captions_plain"   # no longer made (old manifests)
+NOTE_FONT = "font_default"         # no longer made (old manifests)
 NOTE_DUCK = "music_duck"
 NOTE_SOURCE = "source_missing"
 NOTE_EXPORT = "from_export"
 NOTE_WATERMARK = "watermark_still"
 NOTE_MUSIC_GONE = "music_missing"
 
-# Fonts every Windows has, for when the app's own list can't be loaded.
-_WINDOWS_FONTS = ("Arial", "Arial Black", "Impact", "Verdana", "Tahoma", "Trebuchet MS", "Georgia",
-                  "Times New Roman", "Courier New", "Comic Sans MS", "Segoe UI")
 
 
 def probe(path) -> dict:
@@ -294,33 +291,10 @@ def time_share(elapsed: float, estimate: float) -> float:
     return 0.9 + 0.09 * (1 - math.exp(-(share - 1.0)))
 
 
-def _windows_fonts() -> tuple[str, ...]:
-    try:
-        from video.captions import WINDOWS_FONTS
-
-        return tuple(WINDOWS_FONTS)
-    except Exception:
-        return _WINDOWS_FONTS
-
-
 def _default_style() -> dict:
-    try:
-        from video.captions import DEFAULT_STYLE
+    from video.caption_presets import DEFAULT
 
-        return dict(DEFAULT_STYLE)
-    except Exception:
-        return {"font": "Arial", "font_size": 84, "color": "#FFFFFF", "position": "bottom", "uppercase": True,
-                "highlight": False, "second_speaker": False, "second_speaker_color": "#5CE1FF",
-                "animation": "none", "safe_zone": "off"}
-
-
-def _safe_zones() -> dict:
-    try:
-        from video.captions import SAFE_ZONES
-
-        return dict(SAFE_ZONES)
-    except Exception:
-        return {}
+    return dict(DEFAULT)
 
 
 def _hex(value, fallback: str) -> str:
@@ -330,41 +304,21 @@ def _hex(value, fallback: str) -> str:
     return fallback
 
 
-def caption_look(style: dict | None, canvas: tuple[int, int]) -> tuple[dict, float, list[str]]:
+def caption_look(style: dict | None, canvas: tuple[int, int],
+                 language: str = "en") -> tuple[dict, float, list[str]]:
     """A clip's caption style as the editor's text style, the row it sits on
     (a share of the frame's height from the centre, down is positive), and
-    the notes for what is not carried."""
-    full = {**_default_style(), **(style or {})}
-    notes: list[str] = []
-    try:
-        size = max(12.0, min(400.0, float(full.get("font_size") or 84)))
-    except (TypeError, ValueError):
-        size = 84.0
-    look = {
-        "color": _hex(full.get("color"), "#ffffff"),
-        "fontSize": round(size / 1920, 5),
-        "strokeWidth": round(CAPTION_OUTLINE, 5),
-        "strokeColor": "#000000",
-        "textCase": "upper" if full.get("uppercase") else "original",
-    }
-    font = str(full.get("font") or "")
-    if font and font in _windows_fonts():
-        look["fontFamily"] = font
-    elif font:
-        notes.append(NOTE_FONT)
-    if full.get("highlight") or str(full.get("animation") or "none") != "none":
-        notes.append(NOTE_CAPTIONS)
+    the notes for what is not carried (none: a caption style is one of the
+    editor's own presets, burned with the same look,
+    video/caption_presets.py)."""
+    from video.caption_presets import look as preset_look
 
-    position = full.get("position") if full.get("position") in CAPTION_ROWS else "bottom"
-    row = CAPTION_ROWS[position]
-    zone = _safe_zones().get(full.get("safe_zone")) if canvas[1] > canvas[0] else None
-    if zone and position != "middle":
-        # Clear of the app's own buttons and text, as the burned caption is:
-        # the zone's edge, a little air, and half a line of text.
-        edge = (zone["bottom"] if position == "bottom" else zone["top"]) + 20 + size
-        inside = 0.5 - edge / 1920
-        row = min(row, inside) if position == "bottom" else max(row, -inside)
-    return look, round(row, 4), notes
+    seen = preset_look(style, canvas, language)
+    row = seen.pop("offsetY")
+    keep = ("fontFamily", "fontSize", "fontWeight", "italic", "color", "opacity", "strokeWidth", "strokeColor",
+            "shadow", "background", "backgroundRadius", "backgroundPaddingX", "backgroundPaddingY",
+            "lineHeight", "tracking", "maxWidth")
+    return {k: seen[k] for k in keep if k in seen}, row, []
 
 
 def program_lines(lines, edit, length: float) -> list[dict]:

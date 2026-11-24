@@ -436,6 +436,8 @@ def test_a_translate_job_never_makes_files_it_was_not_asked_about(env, tmp_path,
         def __init__(self):
             self.config = {"paths": {"data_dir": str(env.data_dir)}, "llm": {"backend": "ollama/none"}}
 
+        _translation_llm = jobs.Worker._translation_llm      # the model, set up past the question
+
     def no_ai(_cfg):
         raise AssertionError("no AI is set up for a job that stops")
 

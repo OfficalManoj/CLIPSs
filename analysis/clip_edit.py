@@ -162,33 +162,24 @@ def _apply(
 
 
 def _clean_caption_style(style: dict) -> dict:
+    """The AI's caption style, kept to what the renderer knows: one of the
+    editor's presets, its size and place, words per caption and a safe
+    zone (video/caption_presets.py). Anything else is dropped."""
+    from video import caption_presets
+
     out: dict = {}
-    if _is_number(style.get("font_size")):
-        out["font_size"] = int(max(40, min(140, float(style["font_size"]))))
-    color = style.get("color")
-    if isinstance(color, str) and re.fullmatch(r"#?[0-9a-fA-F]{6}", color.strip()):
-        out["color"] = "#" + color.strip().lstrip("#").upper()
-    if isinstance(style.get("position"), str) and style["position"] in _POSITIONS:
-        out["position"] = style["position"]
-    font = style.get("font")
-    if isinstance(font, str):
-        from video.captions import FONTS
-
-        match = next((f for f in FONTS if f.lower() == font.strip().lower()), None)
+    chosen = style.get("preset")
+    if isinstance(chosen, str):
+        match = next((i for i in caption_presets.ids() if i.lower() == chosen.strip().lower()), None)
         if match:
-            out["font"] = match
-    if _is_number(style.get("words_per_caption")):
-        out["words_per_caption"] = int(max(1, min(6, float(style["words_per_caption"]))))
-    if isinstance(style.get("uppercase"), bool):
-        out["uppercase"] = style["uppercase"]
-    # How captions come on screen, and an app's buttons to keep clear of. A
-    # value the renderer does not know is dropped, as an unknown font is.
-    from video.captions import ANIMATIONS, SAFE_ZONE_CHOICES
-
-    for key, allowed in (("animation", ANIMATIONS), ("safe_zone", SAFE_ZONE_CHOICES)):
+            out["preset"] = match
+    for key, allowed in (("size", caption_presets.SIZES), ("position", _POSITIONS),
+                         ("safe_zone", caption_presets.SAFE_ZONE_CHOICES)):
         value = style.get(key)
         if isinstance(value, str) and value.strip().lower() in allowed:
             out[key] = value.strip().lower()
+    if _is_number(style.get("words_per_caption")):
+        out["words_per_caption"] = int(max(1, min(6, float(style["words_per_caption"]))))
     return out
 
 

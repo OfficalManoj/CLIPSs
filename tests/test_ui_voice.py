@@ -77,7 +77,7 @@ def test_the_window_never_talks_to_a_voice_app_itself():
     for port in ("17493", "3900"):
         assert port not in card
         assert port not in _source("lib/api.ts")
-        assert port not in _source("components/MultilingualExport.tsx")
+        assert port not in _source("components/editor/OtherLanguagesDialog.tsx")
 
 
 def test_every_engine_has_a_tooltip_and_its_name_goes_through_t():
@@ -159,36 +159,25 @@ def test_the_app_may_play_sound_from_the_engine():
 # ---- the dubbing dialog --------------------------------------------------------------------------
 
 def test_the_old_install_hint_is_gone():
-    dialog = _source("components/MultilingualExport.tsx")
+    dialog = _source("components/editor/OtherLanguagesDialog.tsx")
     assert "pip install" not in dialog
     assert "piper-tts" not in dialog
 
 
 def test_the_dialog_shows_the_engines_line_when_the_voice_app_is_closed():
-    dialog = _flat(_source("components/MultilingualExport.tsx"))
+    dialog = _flat(_source("components/editor/OtherLanguagesDialog.tsx"))
     assert "[c]: { voices: r.voices, default: r.default, message: r.message ?? '' }" in dialog
-    # Once for a closed app, and one line for each language the open app has
-    # no voice for.
-    assert "new Set(picked.map((c) => voiceList[c]?.message)" in dialog
-    assert "{voiceMessages.map((m) => ( <p key={m} className=\"text-xs text-warn\"> {t(m)} </p> ))}" in dialog
+    # The line beside the language's voice picker (KF).
+    assert "{voiceList[c]?.message && <span className=\"text-warn\">{t(voiceList[c].message)}</span>}" in dialog
 
 
 def test_the_dialog_preselects_the_default_and_sends_only_a_picked_voice():
-    dialog = _flat(_source("components/MultilingualExport.tsx"))
-    assert "const shownVoice = (c: string): string => pickedVoice(c) || voiceList[c]?.default || ''" in dialog
+    dialog = _flat(_source("components/editor/OtherLanguagesDialog.tsx"))
+    assert "return mine || got?.default || ''" in dialog
     assert "value={shownVoice(c)}" in dialog
-    # A dub with nothing picked sends no voice, as it always did: the engine
-    # uses the default then.
-    assert ("voices: Object.fromEntries(picked.map((c) => [c, pickedVoice(c)]).filter(([, v]) => v))"
-            in dialog)
+    # Only a voice that is shown is sent; none: the engine uses the default.
+    assert "if (shownVoice(c)) voices[c] = shownVoice(c)" in dialog
     assert "voices: voiceFor," not in dialog
-
-
-def test_the_download_note_shows_only_for_a_voice_that_downloads():
-    dialog = _flat(_source("components/MultilingualExport.tsx"))
-    assert "?.engine === 'piper'" in dialog
-    assert ("{downloadsVoice && ( <p className=\"text-muted/70\"> "
-            "{t('The first play downloads that voice (~60 MB), so it can take a moment.')}") in dialog
 
 
 # ---- the setup wizard ----------------------------------------------------------------------------
