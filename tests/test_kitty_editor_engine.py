@@ -419,6 +419,27 @@ def test_a_clips_project_is_built_saved_and_closed(tmp_path, fake_editor, monkey
     assert (home / "build.log").is_file()
 
 
+def test_a_dragged_caption_is_put_at_the_same_spot_in_the_editor(tmp_path, fake_editor, monkeypatch):
+    from video import caption_presets as cp
+
+    assert "offsetX" not in plan({"caption_style": {"position": "top"}})["captions"][0]
+    style = {"x": 0.3, "y": 0.4}
+    made = plan({"caption_style": style})
+    burned = cp.resolve(style)
+    assert round(1080 * (0.5 + made["captions"][0]["offsetX"])) == burned["x"]
+    monkeypatch.setenv("FAKE_KITTY_EDITOR_SECONDS", "45.4")
+    home = tmp_path / "project"
+    (home / "media").mkdir(parents=True)
+    base = home / "media" / "base.mp4"
+    base.write_bytes(b"x")
+    canvas = {"width": 1080, "height": 1920, "fps_num": 30, "fps_den": 1}
+    with build.open_session(fake_editor, home, [base.parent]) as session:
+        project_dir = build.apply_clip_plan(session, home, "Dragged", canvas, base, made)
+    texts = [c for c in saved(project_dir)["clips"] if c["kind"] == "text"]
+    assert texts and all(c["offsetX"] == made["captions"][0]["offsetX"] for c in texts)
+    assert all(round(1920 * (0.5 + c["offsetY"])) == burned["y"] for c in texts)
+
+
 def test_speed_is_put_on_every_piece_and_the_lane_closes_up(tmp_path, fake_editor, monkeypatch):
     monkeypatch.setenv("FAKE_KITTY_EDITOR_SECONDS", "45.4")
     home = tmp_path / "project"

@@ -12,6 +12,11 @@ the frame's centre):
      "words_per_caption": 3, "second_speaker": false,
      "second_speaker_color": "#5CE1FF", "safe_zone": "tiktok"}
 
+A caption dragged on the preview also has "x" and "y": where the block's
+centre is, as shares of the frame's width and height (0 to 1). "y" takes
+the place of the named row, "x" of the centre. Without them the caption
+sits where the named place puts it, as it always did.
+
 resolve() turns one into what the ASS file needs, so the burned caption is the
 editor's: the same font file, the same em, outline, shadow, plate and place.
 normalize() reads any saved style, an old one too (font, font_size, colour,
@@ -57,6 +62,9 @@ SAFE_ZONES = {
     "shorts": {"top": 250, "bottom": 350, "right": 190},
 }
 SAFE_ZONE_CHOICES = ("off", *SAFE_ZONES)
+# A dragged caption's centre (shares of the frame, 0 to 1); optional, not in DEFAULT.
+POSITION_KEYS = ("x", "y")
+MIN_WIDTH = 0.4         # share of the frame's width a dragged caption's lines wrap at, at the least
 SAFE_CLEARANCE = 20     # px@1920 between a caption and the app's own text
 INK_SPREAD = 9          # px@1080 the outline and shadow reach past the letters, at the sides
 SIDE_MARGIN = 60        # px each side, as captions always had
@@ -172,7 +180,18 @@ def normalize(style) -> dict:
     out["second_speaker_color"] = _hex6(style.get("second_speaker_color")) or DEFAULT["second_speaker_color"]
     if style.get("safe_zone") in SAFE_ZONE_CHOICES and not (old and style["safe_zone"] == "off"):
         out["safe_zone"] = style["safe_zone"]   # an old style with no zone ended at 1480 too: TikTok's
+    for key in POSITION_KEYS:
+        share = fraction(style.get(key))
+        if share is not None:
+            out[key] = share
     return out
+
+
+def fraction(value) -> float | None:
+    """A dragged position's x or y: a number held to 0..1 (4 places), else None."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return round(max(0.0, min(1.0, float(value))), 4)
 
 
 def font_for_language(family: str, language: str) -> str:
@@ -205,6 +224,13 @@ def _offset(style: dict, em: float, canvas: tuple[int, int]) -> float:
     position = style.get("position") if style.get("position") in PLACES else "bottom"
     offset = PLACES[position]
     zone = SAFE_ZONES.get(style.get("safe_zone")) if canvas[1] > canvas[0] else None
+    if style.get("y") is not None:
+        # Dragged: where it was put, held inside the frame and clear of the
+        # app's top and bottom bars when a zone is on.
+        top, bottom = (zone["top"], zone["bottom"]) if zone else (0, 0)
+        above = 0.5 - (top + SAFE_CLEARANCE) / 1920 - 0.6 * em
+        below = 0.5 - (bottom + SAFE_CLEARANCE) / 1920 - 0.6 * em
+        return round(max(-above, min(below, style["y"] - 0.5)), 4)
     if zone and position != "middle":
         edge = zone["bottom"] if position == "bottom" else zone["top"]
         inside = 0.5 - (edge + SAFE_CLEARANCE) / 1920 - 0.6 * em
@@ -221,6 +247,26 @@ def _spread(base: dict, em: float, h: int) -> float:
     return stroke + (SHADOW_X * em * h if base.get("shadow") else 0.0)
 
 
+def _across(style: dict, canvas: tuple[int, int], spread: float) -> tuple[float, float]:
+    """A dragged caption's column: its centre as a share of the frame's
+    width from the middle, and the width its lines wrap at (a share of the
+    frame's width), so the block stays inside the frame and left of an
+    app's buttons when a zone is on (portrait). Held at least MIN_WIDTH
+    wide: a caption dragged to an edge stops where that width still fits."""
+    w = canvas[0]
+    zone = SAFE_ZONES.get(style.get("safe_zone")) if canvas[1] > canvas[0] else None
+    left = SIDE_MARGIN * w / 1080 + spread
+    right = w - max(SIDE_MARGIN, zone["right"] if zone else 0) * w / 1080 - spread
+    least = MIN_WIDTH * w / 2
+    if right - left < 2 * least:
+        centre = (left + right) / 2
+    else:
+        centre = max(left + least, min(right - least, style["x"] * w))
+    centre = round(centre)
+    half = math.floor(min(centre - left, right - centre))
+    return round(centre / w - 0.5, 5), round(2 * half / w, 5)
+
+
 def side_margin(style: dict, canvas: tuple[int, int], spread: float | None = None) -> int:
     """MarginL and MarginR: clear of an app's column of buttons with a safe
     zone (portrait), with room for the ink past the letters (`spread` px, the
@@ -235,20 +281,25 @@ def side_margin(style: dict, canvas: tuple[int, int], spread: float | None = Non
 def look(style, canvas: tuple[int, int] = (1080, 1920), language: str = "en") -> dict:
     """The caption's look in the editor's terms: the preset's resolved style
     (family through font_for_language) at the sheet's size and place.
-    fontSize and offsetY are shares of the frame's height, maxWidth of its
-    width (the wrap width libass gets from the margins)."""
+    fontSize and offsetY are shares of the frame's height, offsetX and
+    maxWidth of its width (the wrap width libass gets from the margins)."""
     style = normalize(style)
     chosen = preset(style["preset"]) or preset(DEFAULT_PRESET) or {"style": {}}
     base = dict(chosen["style"])
     em = SIZES[style["size"]]
     family = font_for_language(str(base.get("fontFamily") or "Hanken Grotesk"), language)
-    margin = side_margin(style, canvas, _spread(base, em, canvas[1]))
+    if style.get("x") is not None:
+        column, wide = _across(style, canvas, _spread(base, em, canvas[1]))
+    else:
+        margin = side_margin(style, canvas, _spread(base, em, canvas[1]))
+        column, wide = 0.0, round((canvas[0] - 2 * margin) / canvas[0], 5)
     return {
         **base,
         "fontFamily": family,
         "fontSize": em,
+        "offsetX": column,
         "offsetY": _offset(style, em, canvas),
-        "maxWidth": round((canvas[0] - 2 * margin) / canvas[0], 5),
+        "maxWidth": wide,
         "maxHeight": 0.0,
     }
 
@@ -291,7 +342,7 @@ def resolve(style, canvas: tuple[int, int] = (1080, 1920), language: str = "en")
         "primary": _ass_colour(seen.get("color") or "#ffffff", round(255 * float(seen.get("opacity", 1.0)))),
         "spacing": round(float(seen.get("tracking") or 0.0) * h, 2),
         "margin": round((w - seen["maxWidth"] * w) / 2),
-        "x": round(w / 2),
+        "x": round(w * (0.5 + seen["offsetX"])),
         "y": round(h * (0.5 + seen["offsetY"])),
         "shadow": None,
         "back": "&H00000000",

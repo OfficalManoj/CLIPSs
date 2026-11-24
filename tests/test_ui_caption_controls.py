@@ -100,3 +100,16 @@ def test_csp_gains_only_font_src():
     assert csp == CSP_BEFORE + "; font-src 'self' http://127.0.0.1:8765"
     dev = (ROOT / "ui" / "vite.config.mts").read_text(encoding="utf-8")
     assert "font-src 'self' http://127.0.0.1:8765" in dev
+
+
+def test_the_preview_drags_with_the_layout_editors_snapping():
+    # A dragged caption's narrowest lines are the renderer's.
+    assert float(re.search(r"const MIN_WIDTH = ([\d.]+)", LOOK).group(1)) == cp.MIN_WIDTH
+    # Snapping and guides come from the Gaming layout editor's helper, Alt
+    # places freely, and the chosen app's own buttons show over the frame.
+    assert "dragLayer(" in CONTROLS and "e.altKey ? null : targets()" in CONTROLS
+    assert "<PlatformOverlay platform={style.safe_zone} />" in CONTROLS
+    for key in ("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "e.shiftKey"):
+        assert key in CONTROLS, key
+    assert "t('Reset position')" in CONTROLS and "aria-label={t('Captions." in CONTROLS
+    assert "\u2014" not in CONTROLS                                          # no em dashes

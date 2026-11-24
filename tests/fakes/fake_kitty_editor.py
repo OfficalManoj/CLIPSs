@@ -202,6 +202,16 @@ def tool(name: str, args: dict):
                 "duration": float(args.get("duration") or 4.0), "offsetY": args.get("offsetY"), "style": style}
         p["clips"].append(clip)
         return summary(p, clip["id"])
+    if name == "edit_apply":
+        command = args.get("command") or {}
+        for one in command.get("commands") or () if command.get("op") == "batch" else (command,):
+            if one.get("op") != "setClipTransform":
+                raise ValueError(f"The stand-in has no edit called {one.get('op')}.")
+            clip = clip_of(p, one.get("clipId"))
+            for field in ("scale", "offsetX", "offsetY", "rotation"):
+                if clip is not None and one.get(field) is not None:
+                    clip[field] = one[field]
+        return summary(p)
     clip = clip_of(p, args.get("clipId"))
     if clip is None:
         return summary(p)                   # the editor leaves an unknown clip alone

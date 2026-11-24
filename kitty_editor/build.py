@@ -321,6 +321,15 @@ def caption_look(style: dict | None, canvas: tuple[int, int],
     return {k: seen[k] for k in keep if k in seen}, row, []
 
 
+def caption_column(style: dict | None, canvas: tuple[int, int], language: str = "en") -> float:
+    """Where a dragged caption's titles sit across the frame, as a share of
+    its width from the centre (0.0 for a caption that was not dragged): the
+    burned caption's own column (video/caption_presets.py look)."""
+    from video.caption_presets import look as preset_look
+
+    return float(preset_look(style, canvas, language)["offsetX"])
+
+
 def program_lines(lines, edit, length: float) -> list[dict]:
     """Caption lines counted from the clip's start, as they fall in the
     program: through the kept ranges and the speed (a line cut away is
@@ -398,8 +407,9 @@ def plan_clip(*, opts: dict, window: float, base_seconds: float, lines, canvas: 
 
     Gives {"pieces": [{"in", "out", "muted"}] (seconds of the base, in
     order), "speed", "volume", "fade_in", "fade_out", "length" (the
-    program's), "captions": [{"style", "offsetY", "lines"}], "hook",
-    "music", "watermark_text", "watermark_image", "notes"}."""
+    program's), "captions": [{"style", "offsetY", "lines"}] (and "offsetX"
+    for a dragged caption), "hook", "music", "watermark_text",
+    "watermark_image", "notes"}."""
     from video_editor.timeline import EditList
 
     edit = EditList.from_dict(opts.get("edit"), duration=window) if isinstance(opts.get("edit"), dict) else None
@@ -427,6 +437,7 @@ def plan_clip(*, opts: dict, window: float, base_seconds: float, lines, canvas: 
     style = opts.get("caption_style") or default_style
     if captions:
         look, row, look_notes = caption_look(style, canvas)
+        column = caption_column(style, canvas)
         placed = program_lines(lines, edit, length)
         if placed:
             notes += look_notes
@@ -439,6 +450,7 @@ def plan_clip(*, opts: dict, window: float, base_seconds: float, lines, canvas: 
                     groups.append({
                         "style": {**look, **({"color": _hex(colour, "#5ce1ff")} if colour else {})},
                         "offsetY": row,
+                        **({"offsetX": column} if column else {}),
                         "lines": [{k: line[k] for k in ("start", "end", "text")} for line in chosen],
                     })
 
@@ -594,7 +606,17 @@ def apply_clip_plan(session, home: Path, name: str, canvas: dict, base: Path, pl
 
     for group in plan["captions"]:
         lines = [{**line, "end": min(line["end"], length)} for line in group["lines"] if line["start"] < length - 0.05]
-        if lines:
+        if lines and group.get("offsetX"):
+            # A dragged caption: captions_add places titles in the middle
+            # only, so its new titles are moved across as one undoable step.
+            before = {c.get("id") for c in _timeline(result).get("clips") or ()}
+            result = session.tool("captions_add", path=path, captions=lines, offsetY=group["offsetY"],
+                                  style=group["style"])
+            made = [c["id"] for c in _timeline(result).get("clips") or () if c.get("id") not in before]
+            if made:
+                result = session.tool("edit_apply", path=path, command={"op": "batch", "commands": [
+                    {"op": "setClipTransform", "clipId": clip, "offsetX": group["offsetX"]} for clip in made]})
+        elif lines:
             session.tool("captions_add", path=path, captions=lines, offsetY=group["offsetY"], style=group["style"])
     if plan["hook"]:
         session.tool("title_add", path=path, start=0.0, duration=plan["hook"]["seconds"], offsetY=HOOK_ROW,

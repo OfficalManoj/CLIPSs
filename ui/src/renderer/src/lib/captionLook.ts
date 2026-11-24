@@ -12,14 +12,16 @@
  *  - Size and place: the editor's Captions sheet (Small 0.04, Medium 0.05,
  *    Large 0.065 of the frame's height; Bottom 0.35, Middle 0, Top -0.35 from
  *    its centre), moved clear of an app's buttons with a safe zone, as
- *    video/caption_presets.py _offset does. The safe zones come from
+ *    video/caption_presets.py _offset does. A dragged caption (x, y) sits
+ *    where it was put, held inside the frame and the zone, its lines
+ *    wrapping narrower near an edge (caption_presets.py _across). The safe zones come from
  *    gaming/layouts.json (lib/gamingLayouts.ts), which
  *    video/caption_presets.py SAFE_ZONES equals (tests keep both the same). */
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { api, API_BASE } from './api'
 import { LAYOUTS } from './gamingLayouts'
-import type { BundledFont, CaptionPreset, CaptionStyle, PresetLook } from './types'
+import type { BundledFont, CaptionPreset, CaptionSpot, CaptionStyle, PresetLook } from './types'
 
 let fonts: BundledFont[] = []
 let fontsLoading: Promise<BundledFont[]> | null = null
@@ -125,28 +127,57 @@ const SAFE_CLEARANCE = 20 // video/caption_presets.py SAFE_CLEARANCE
 const INK_SPREAD = 9 // video/caption_presets.py INK_SPREAD
 const SIDE_MARGIN = 60 // video/caption_presets.py SIDE_MARGIN
 
-/** A caption's em and where its block's centre sits on a w x h frame, as
- *  shares of the height (offset from the centre, down is positive), and the
- *  side margin in that frame's pixels: video/caption_presets.py look(). */
+const MIN_WIDTH = 0.4 // video/caption_presets.py MIN_WIDTH
+
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+
+/** How far a preset's ink reaches past its letters at the sides, in px on
+ *  a frame h tall: video/caption_presets.py _spread. */
+function inkSpread(look: PresetLook, em: number, h: number): number {
+  if (look.background) return (look.backgroundPaddingY || 0) * h
+  return ((look.strokeWidth || 0) * h) / 2 + (look.shadow ? 0.05 * em * h : 0)
+}
+
+/** A caption's em and where its block's centre sits on a w x h frame: the
+ *  offset down from the centre as a share of the height, the column across
+ *  from the centre as a share of the width (0 unless dragged), and the
+ *  margin each side of that column in the frame's pixels (the lines wrap
+ *  at w - 2 * side): video/caption_presets.py look(). `look` is the
+ *  preset's, for how far its ink reaches (a dragged caption only). */
 export function captionPlace(
-  style: Pick<CaptionStyle, 'size' | 'position' | 'safe_zone'>,
+  style: Pick<CaptionStyle, 'size' | 'position' | 'safe_zone'> & CaptionSpot,
   w: number,
-  h: number
-): { em: number; offset: number; side: number } {
+  h: number,
+  look?: PresetLook
+): { em: number; offset: number; column: number; side: number } {
   const em = CAPTION_SIZES[style.size ?? 'medium'] ?? CAPTION_SIZES.medium
   const position = style.position === 'top' || style.position === 'middle' ? style.position : 'bottom'
   let offset = PLACES[position]
   let side = SIDE_MARGIN
+  let column = 0
   const zone = h > w ? safeZoneArea(style.safe_zone) : null
-  if (zone) {
-    if (position !== 'middle') {
-      const edge = position === 'bottom' ? zone.bottom : zone.top
-      const inside = 0.5 - (edge + SAFE_CLEARANCE) / 1920 - 0.6 * em
-      offset = position === 'bottom' ? Math.min(offset, inside) : Math.max(offset, -inside)
-    }
+  if (typeof style.y === 'number') {
+    const above = 0.5 - ((zone?.top ?? 0) + SAFE_CLEARANCE) / 1920 - 0.6 * em
+    const below = 0.5 - ((zone?.bottom ?? 0) + SAFE_CLEARANCE) / 1920 - 0.6 * em
+    offset = clamp(style.y - 0.5, -above, below)
+  } else if (zone && position !== 'middle') {
+    const edge = position === 'bottom' ? zone.bottom : zone.top
+    const inside = 0.5 - (edge + SAFE_CLEARANCE) / 1920 - 0.6 * em
+    offset = position === 'bottom' ? Math.min(offset, inside) : Math.max(offset, -inside)
+  }
+  if (typeof style.x === 'number') {
+    const spread = look ? inkSpread(look, em, h) : (INK_SPREAD * w) / 1080
+    const left = (SIDE_MARGIN * w) / 1080 + spread
+    const right = w - (Math.max(SIDE_MARGIN, zone?.right ?? 0) * w) / 1080 - spread
+    const least = (MIN_WIDTH * w) / 2
+    const centre = Math.round(right - left < 2 * least ? (left + right) / 2 : clamp(style.x * w, left + least, right - least))
+    const half = Math.floor(Math.min(centre - left, right - centre))
+    column = centre / w - 0.5
+    side = w / 2 - half
+  } else if (zone) {
     side = Math.round(((Math.max(SIDE_MARGIN, zone.right) + INK_SPREAD) * w) / 1080)
   }
-  return { em, offset, side }
+  return { em, offset, column, side }
 }
 
 /** A preset drawn in CSS at `emPx` pixels to the em, `h` the frame's height

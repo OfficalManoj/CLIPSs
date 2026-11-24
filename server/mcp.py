@@ -149,6 +149,13 @@ def _caption_style(raw: dict) -> dict:
     if raw.get("words_per_caption") is not None:
         style["words_per_caption"] = max(1, min(6, int(raw["words_per_caption"])))
 
+    for key in ("x", "y"):
+        if raw.get(key) is not None:
+            value = raw[key]
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+                raise ValueError(f"Caption {key} {value!r} is not a number from 0 to 1.")
+            style[key] = round(float(value), 4)
+
     if raw.get("safe_zone") is not None:
         zone = str(raw["safe_zone"]).strip().casefold()
         zone = {"none": "off", "youtube": "shorts", "instagram": "reels"}.get(zone, zone)
@@ -1070,6 +1077,20 @@ TOOLS: list[dict] = [
                         "size": {"type": "string", "enum": list(CAPTION_SIZES),
                                  "description": "medium is the default."},
                         "position": {"type": "string", "enum": list(CAPTION_POSITIONS)},
+                        "x": {
+                            "type": "number", "minimum": 0, "maximum": 1,
+                            "description": (
+                                "Where the captions' centre sits across the frame, 0 (left edge) to "
+                                "1 (right edge). Leave out for the middle."
+                            ),
+                        },
+                        "y": {
+                            "type": "number", "minimum": 0, "maximum": 1,
+                            "description": (
+                                "Where the captions' centre sits down the frame, 0 (top) to 1 (bottom). "
+                                "Takes the place of position. Kept clear of the safe zone."
+                            ),
+                        },
                         "words_per_caption": {
                             "type": "integer",
                             "description": "1-6 words on screen at once. 3 is default.",

@@ -298,6 +298,17 @@ def _caption_safe_zones(h, _mp):
             cutter.cut_clip(source, PADDED, h.root / f"{name}.mp4", ass_path=ass, normalize=True, final=True)
 
 
+def _caption_dragged(h, _mp):
+    """A caption dragged on the preview: placed with pos at its spot, the margins
+    around it; under TikTok's buttons it is moved just clear of them."""
+    source = h.source()
+    for name, style in (("dragged", {"x": 0.3, "y": 0.42, "safe_zone": "off"}),
+                        ("under-buttons", {"x": 0.92, "y": 0.97, "safe_zone": "tiktok"})):
+        h.step(name)
+        ass = build_captions(SEGMENTS, WINDOW, h.root / f"{name}.ass", style=style)
+        cutter.cut_clip(source, PADDED, h.root / f"{name}.mp4", ass_path=ass, normalize=True, final=True)
+
+
 LIGHT = {
     "cut_clip_bundled_font": (
         "Editor suite step KF: captions in the editor's presets (Impact; Block, Large), their fonts staged into "
@@ -306,6 +317,10 @@ LIGHT = {
     "caption_safe_zones": (
         "Editor suite step 3: TikTok, Reels and Shorts safe zones, bottom and top: the captions' margins.",
         _caption_safe_zones),
+    "caption_dragged": (
+        "Editor suite step KD: captions dragged on the preview (x, y): placed at their spot with the margins "
+        "around it, and moved just clear of TikTok's buttons when dragged under them.",
+        _caption_dragged),
     "cut_clip_staging": (
         "video/cutter.py: the staging cut a vertical render crops from. No loudness pass, plain +faststart.",
         _cut_clip_staging),
@@ -427,7 +442,7 @@ def test_a_vertical_render_matches_its_snapshot(case, monkeypatch, tmp_path, upd
 PIPELINE_CASES = (
     "plain", "captions", "word_highlight", "keep_range_cuts", "speed", "music", "hook",
     "text_watermark", "image_watermark", "filter_adjust", "letterbox", "center_crop",
-    "landscape", "vertical_live", "gaming_layout",
+    "landscape", "vertical_live", "gaming_layout", "gaming_layout_captions_dragged",
 )
 
 
