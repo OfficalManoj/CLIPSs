@@ -298,24 +298,25 @@ def test_a_refused_operation_names_itself_and_changes_nothing(env):
 
 def test_the_operations_ask_the_real_app(env):
     """Through the real environment (video_editor/project/env.py): a library
-    video by its id, a free track by its id, the caption fonts, the filters
-    and what this PC can encode."""
+    video by its id, a free track by its id, the app's fonts, the editor's
+    caption presets, the filters and what this PC can encode."""
     pytest.importorskip("numpy")
-    from video import audio_library, captions, filters
+    from video import audio_library, caption_presets, filters, fonts
 
     made = _with_clips(env)
     pid = made["id"]
     tracks = audio_library.items()
     track = tracks[0] if tracks else None
-    font = captions.FONTS[0]
+    font = fonts.families()[0]
+    preset = caption_presets.ids()[-1]
     wanted = [{"op": "add_text", "content": "Hi", "start_us": 0, "duration_us": S, "font": font.lower()},
               {"op": "set_export_preset", "preset": {"kind": "custom", "resolution": "720p"}},
-              {"op": "set_captions", "style": {"font": font, "font_size": 80}}]
+              {"op": "set_captions", "style": {"preset": preset, "size": "large"}}]
     r = env.ops(pid, 1, *wanted)
     assert r.status_code == 200, r.text
     doc = r.json()["document"]
     assert doc["tracks"][1]["items"][0]["text"]["font"] == font
-    assert doc["export"]["preset"]["resolution"] == "720p" and doc["captions"]["style"]["font"] == font
+    assert doc["export"]["preset"]["resolution"] == "720p" and doc["captions"]["style"]["preset"] == preset
     name = next(n for n in ("vibrant", "mono", "warm", "cinematic") if filters.is_valid(n))
     assert env.ops(pid, 2, {"op": "set_item_props", "item_id": "i2", "color": {"filter": name}}).status_code == 200
     for bad, field in (({"op": "set_export_preset", "preset": {"kind": "custom", "codec": "av1"}}, "preset"),

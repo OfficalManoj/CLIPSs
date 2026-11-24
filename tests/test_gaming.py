@@ -306,7 +306,7 @@ def test_whole_clip_real_encode_keeps_duration_captions_and_portrait(tmp_path, m
     result = json.loads(probe.stdout)
     assert result["streams"][0]["width"] == 1080 and result["streams"][0]["height"] == 1920
     assert abs(float(result["format"]["duration"]) - duration) < 0.15
-    assert burned and "SYNTHETIC" in burned[0] and json.loads(saved)["whole"] is True
+    assert burned and "Synthetic caption" in burned[0] and json.loads(saved)["whole"] is True
     assert json.loads(saved)["gaming"]["used_preset"] == "blurred"
 
 
@@ -618,7 +618,8 @@ def test_a_failed_webcam_search_still_lets_every_clip_render(monkeypatch, tmp_pa
 def test_a_rerun_records_the_split_its_new_file_was_rendered_with(db, tmp_path):
     """A re-run keeps a clip's title and description, but its split must be
     the one the new file has, or the editor starts from a stale one (measured:
-    a clip kept a padded webcam box its file no longer had)."""
+    a clip kept a padded webcam box its file no longer had). Its caption
+    style too: the one the new file was burned with (step KF)."""
     import json
 
     from analysis.metadata import ClipMetadata
@@ -638,7 +639,7 @@ def test_a_rerun_records_the_split_its_new_file_was_rendered_with(db, tmp_path):
     row = db.conn.execute("SELECT title, render_opts FROM clips WHERE video_id = 'v'").fetchone()
     opts = json.loads(row["render_opts"])
     assert row["title"] == "Kept title"
-    assert opts["gaming"] == new["gaming"] and opts["caption_style"] == {"font": "Arial"}
+    assert opts["gaming"] == new["gaming"] and "caption_style" not in opts      # burned in the default
 
 
 # ---- the layout editor's starting webcam ------------------------------------------------

@@ -37,10 +37,17 @@ def test_the_list_names_every_bundled_family_and_its_file(client):
     r = client.get("/fonts")
     assert r.status_code == 200
     listed = {f["family"]: f for f in r.json()["fonts"]}
-    assert list(listed) == [e["family"] for e in MANIFEST["files"]]
+    # One entry per family as the editor's presets name it (step KF), each
+    # with every face file the family ships.
+    families = list(dict.fromkeys(e.get("typographic") or e["family"] for e in MANIFEST["files"]))
+    assert list(listed) == families
+    assert sorted(f for e in listed.values() for f in e["files"]) == sorted(
+        Path(e["file"]).name for e in MANIFEST["files"])
     anton = listed["Anton"]
     assert anton == {"family": "Anton", "weight": 400, "scripts": ["latin", "latin-ext", "vietnamese"],
-                     "files": ["Anton-Regular.ttf"], "urls": ["/fonts/Anton-Regular.ttf"], "licence": "OFL-1.1"}
+                     "files": ["Anton-Regular.ttf"],
+                     "faces": [{"file": "Anton-Regular.ttf", "weight": 400, "italic": False}],
+                     "urls": ["/fonts/Anton-Regular.ttf"], "licence": "OFL-1.1"}
 
 
 def test_a_listed_file_is_served_as_it_ships_with_a_long_cache(client):

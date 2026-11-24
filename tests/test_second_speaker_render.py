@@ -14,6 +14,7 @@ The listening itself is tests/test_voice_turns.py; here it is stood in for.
 
 import importlib
 import json
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,11 +23,13 @@ import pytest
 
 from core import modes
 from core.models import ClipCandidate, Segment
+from video.caption_presets import normalize
 
 SECOND = "&HFFE15C&"      # the default second colour, #5CE1FF, as ASS writes it
 CLIP = ClipCandidate(start=10.0, end=20.0, score=80)
 TURNS = [[2.0, 4.0, 1], [7.0, 8.0, 1]]
 ON = {"second_speaker": True}
+SAVED_ON = normalize(ON)    # a clip's row keeps the style in the editor's one shape (step KF)
 
 
 def _segments() -> list[Segment]:
@@ -112,8 +115,14 @@ def _render(pipeline, monkeypatch, tmp_path, style=None, opts=None, source=None,
     return burned["ass"], json.loads(opts_json) if opts_json else {}
 
 
+_PLACE = re.compile(r"\\an\d\\pos\([^)]*\)(?:\\xshad[-\d.]+\\yshad[-\d.]+)?")
+
+
 def _events(ass: str) -> list[str]:
-    return [line.split(",,", 2)[-1] for line in ass.splitlines() if line.startswith("Dialogue:")]
+    """Each caption's text with its colour tag, without the placement every
+    caption carries (the editor's position and shadow, step KF)."""
+    events = [line.split(",,", 2)[-1] for line in ass.splitlines() if line.startswith("Dialogue:")]
+    return [_PLACE.sub("", e, count=1).replace("{}", "", 1) for e in events]
 
 
 # ---- off ----------------------------------------------------------------------------
@@ -153,29 +162,31 @@ def test_a_saved_post_style_is_ignored_and_the_second_colour_still_burns(pipelin
                          opts={"caption_style": {**ON, "post_style": "highlights", "card_position": "top"}})
 
     assert heard.calls == 1 and saved["speaker_turns"] == TURNS
-    assert saved["caption_style"] == ON
-    assert f"{{\\1c{SECOND}}}W24 W25 W26" in _events(ass)
+    assert saved["caption_style"] == SAVED_ON
+    assert f"{{\\1c{SECOND}}}w24 w25 w26" in _events(ass)
 
 
 def test_a_clip_saved_with_the_highlights_post_style_renders_in_its_own_style(pipeline, monkeypatch, tmp_path):
     """A clip saved with the removed Highlights post style (its post style
     and card position in the caption style, its title card's words in the
-    options) renders with the person's own caption style, gets no title
-    card pass, and is saved without any of it."""
+    options) renders with the person's own caption style (its font's
+    nearest editor preset, step KF), gets no title card pass, and is saved
+    without any of it."""
     own = {"font": "Georgia", "uppercase": False, "position": "bottom"}
     saved_opts = {"caption_style": {**own, "post_style": "highlights", "card_position": "top"},
                   "headline": "LOGO THREE", "subline": "HE CALLED GAME", "crop": "track"}
 
     ass, saved = _render(pipeline, monkeypatch, tmp_path, opts=saved_opts)
 
-    # The person's own look: their font and lower case, not Impact in capitals.
-    assert ",Georgia," in ass and "Impact" not in ass
+    # The person's own look: Georgia's nearest preset (Editorial) in lower
+    # case, not Impact in capitals.
+    assert ",DM Serif Display," in ass and "Impact" not in ass
     assert _events(ass)[0] == "w20 w21 w22"
     # One encode wrote the clip (stood in for above): no card was laid over it.
     assert (tmp_path / "clips" / "clip_00010-00020.mp4").read_bytes() == b"clip"
     assert not list((tmp_path / "clips").glob("*.png"))
     # Saved without the post style, the card position or the card's words.
-    assert saved == {"caption_style": own, "crop": "track", "vertical_live": True}
+    assert saved == {"caption_style": normalize(own), "crop": "track", "vertical_live": True}
 
 
 # ---- on -----------------------------------------------------------------------------
@@ -186,10 +197,10 @@ def test_the_other_speakers_lines_burn_in_the_second_colour_and_the_turns_are_sa
     ass, saved = _render(pipeline, monkeypatch, tmp_path, ON)
 
     assert heard.calls == 1 and saved["speaker_turns"] == TURNS
-    assert saved["caption_style"] == ON
+    assert saved["caption_style"] == SAVED_ON
     # Lines end where the speaker changes: w23 alone, then theirs.
     assert _events(ass)[:5] == [
-        "W20 W21 W22", "W23", f"{{\\1c{SECOND}}}W24 W25 W26", f"{{\\1c{SECOND}}}W27", "W28 W29 W30",
+        "w20 w21 w22", "w23", f"{{\\1c{SECOND}}}w24 w25 w26", f"{{\\1c{SECOND}}}w27", "w28 w29 w30",
     ]
 
 
@@ -206,7 +217,7 @@ def test_lines_the_user_saved_keep_their_words_and_take_the_colour(pipeline, mon
 
     ass, saved = _render(pipeline, monkeypatch, tmp_path, ON, opts={"caption_lines": lines})
 
-    assert _events(ass) == ["WHAT WAS SAID", f"{{\\1c{SECOND}}}AND THE ANSWER", "BACK TO ME"]
+    assert _events(ass) == ["what was said", f"{{\\1c{SECOND}}}and the answer", "back to me"]
     assert saved["caption_lines"] == lines          # as the user saved them
 
 
@@ -215,7 +226,7 @@ def test_the_turns_follow_a_line_through_a_cut(pipeline, monkeypatch, tmp_path, 
     second earlier in the clip, and is still theirs."""
     ass, _ = _render(pipeline, monkeypatch, tmp_path, ON, opts={"edit": {"keep": [[0.0, 1.0], [2.0, 10.0]]}})
 
-    theirs = [line for line in ass.splitlines() if f"{{\\1c{SECOND}}}W24 W25 W26" in line]
+    theirs = [line for line in ass.splitlines() if _events(line) == [f"{{\\1c{SECOND}}}w24 w25 w26"]]
     assert len(theirs) == 1 and theirs[0].startswith("Dialogue: 0,0:00:01.00,0:00:02.50,")
 
 
@@ -261,7 +272,7 @@ def test_a_piece_sent_by_another_pc_uses_the_turns_that_came_with_it(pipeline, m
 
     ass, saved = _render(pipeline, monkeypatch, tmp_path, ON, opts={"speaker_turns": TURNS}, source=piece)
     assert heard.calls == 0 and saved["speaker_turns"] == TURNS
-    assert f"{{\\1c{SECOND}}}W24 W25 W26" in _events(ass)
+    assert f"{{\\1c{SECOND}}}w24 w25 w26" in _events(ass)
 
     ass, saved = _render(pipeline, monkeypatch, tmp_path, ON, source=piece)      # none came: plain
     assert heard.calls == 0 and "speaker_turns" not in saved and "\\1c" not in ass
@@ -293,7 +304,7 @@ def test_a_hand_fix_colours_a_clip_the_render_heard_nobody_else_in(pipeline, mon
     ass, saved = _render(pipeline, monkeypatch, tmp_path, ON, opts={"speaker_edits": fix})
 
     assert _events(ass)[:5] == [
-        "W20 W21 W22", "W23", f"{{\\1c{SECOND}}}W24 W25 W26", f"{{\\1c{SECOND}}}W27", "W28 W29 W30",
+        "w20 w21 w22", "w23", f"{{\\1c{SECOND}}}w24 w25 w26", f"{{\\1c{SECOND}}}w27", "w28 w29 w30",
     ]
     assert saved["speaker_edits"] == fix and "speaker_turns" not in saved     # heard: nobody
 
@@ -305,8 +316,8 @@ def test_a_hand_fix_overrules_what_was_heard_and_what_was_heard_is_saved_as_hear
     ass, saved = _render(pipeline, monkeypatch, tmp_path, ON, opts={"speaker_edits": fix})
 
     assert _events(ass)[:6] == [
-        "W20 W21 W22", "W23 W24 W25", f"{{\\1c{SECOND}}}W26 W27", "W28 W29",
-        f"{{\\1c{SECOND}}}W30 W31", "W32 W33",
+        "w20 w21 w22", "w23 w24 w25", f"{{\\1c{SECOND}}}w26 w27", "w28 w29",
+        f"{{\\1c{SECOND}}}w30 w31", "w32 w33",
     ]
     assert saved["speaker_turns"] == TURNS and saved["speaker_edits"] == fix
 
@@ -329,7 +340,7 @@ def test_a_mark_left_on_a_saved_line_colours_nothing_when_nobody_else_is_heard(
 
     ass, _ = _render(pipeline, monkeypatch, tmp_path, ON, opts={"caption_lines": lines})
 
-    assert _events(ass) == ["WHAT WAS SAID", "AND THE ANSWER"]
+    assert _events(ass) == ["what was said", "and the answer"]
 
 
 def test_lines_the_editor_sends_with_a_fix_burn_as_the_editor_showed_them(pipeline, monkeypatch, tmp_path, heard):
@@ -350,7 +361,7 @@ def test_lines_the_editor_sends_with_a_fix_burn_as_the_editor_showed_them(pipeli
     ass, _ = _render(pipeline, monkeypatch, tmp_path, ON, opts={"caption_lines": sent, "speaker_edits": fix},
                      segments=_gapped())
 
-    theirs = [f"{{\\1c{SECOND}}}W30", f"{{\\1c{SECOND}}}W34 W35"]
+    theirs = [f"{{\\1c{SECOND}}}w30", f"{{\\1c{SECOND}}}w34 w35"]
     assert _events(ass)[4:6] == theirs
     assert [e for e in _events(ass) if "\\1c" in e] == theirs
 
@@ -363,7 +374,7 @@ def test_a_hand_fix_marks_saved_lines_whole(pipeline, monkeypatch, tmp_path, hea
     ass, _ = _render(pipeline, monkeypatch, tmp_path, ON,
                      opts={"caption_lines": lines, "speaker_edits": [[2.0, 4.0, 1]]})
 
-    assert _events(ass) == ["WHAT WAS SAID", f"{{\\1c{SECOND}}}AND THE ANSWER"]
+    assert _events(ass) == ["what was said", f"{{\\1c{SECOND}}}and the answer"]
 
 
 # ---- what the clip keeps ------------------------------------------------------------

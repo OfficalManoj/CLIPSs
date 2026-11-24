@@ -145,7 +145,10 @@ def saved(project) -> dict:
 ROUTES = [("get", "/editor/status"), ("get", "/editor/launch"), ("get", "/editor/projects"),
           ("post", "/editor/projects/open"), ("get", "/editor/projects/" + "0" * 32),
           ("post", "/editor/projects/" + "0" * 32 + "/open"), ("delete", "/editor/projects/" + "0" * 32),
-          ("post", "/editor/projects/" + "0" * 32 + "/exports")]
+          ("post", "/editor/projects/" + "0" * 32 + "/exports"),
+          ("get", "/editor/projects/" + "0" * 32 + "/languages"),
+          ("post", "/editor/projects/" + "0" * 32 + "/languages"),
+          ("post", "/editor/projects/" + "0" * 32 + "/languages/apply")]
 
 
 @pytest.mark.parametrize("method, path", ROUTES)
@@ -180,7 +183,9 @@ def test_the_served_editor_routes_are_exactly_these_and_all_internal(env):
     mine = {("GET", "/editor/status"), ("GET", "/editor/launch"), ("GET", "/editor/projects"),
             ("POST", "/editor/projects/open"), ("GET", "/editor/projects/{project_id}"),
             ("POST", "/editor/projects/{project_id}/open"), ("DELETE", "/editor/projects/{project_id}"),
-            ("POST", "/editor/projects/{project_id}/exports")}
+            ("POST", "/editor/projects/{project_id}/exports"),
+            ("GET", "/editor/projects/{project_id}/languages"), ("POST", "/editor/projects/{project_id}/languages"),
+            ("POST", "/editor/projects/{project_id}/languages/apply")}
     assert {route for route in served if route[1].startswith("/editor/")} == mine
     for route in mine:
         assert st.label(*route) == st.INTERNAL
@@ -254,7 +259,7 @@ def test_a_clip_is_opened_as_a_project_and_the_same_one_every_time_after(env):
     assert Path(project["export_dir"]) == home / "out" and project["export_name"] == "My clip part 1"
     assert project["canvas"] == {"width": 1080, "height": 1920, "fps_num": 30, "fps_den": 1}
     assert project["shape"] == "9:16" and project["progress"] == 1.0
-    assert project["notes"] == ["framing_baked", "captions_plain"]
+    assert project["notes"] == ["framing_baked"]        # captions in the editor's style, as editable text (KF)
     clip_file = env.row(clip_id)["path"]
     assert project["clip"]["id"] == clip_id and project["clip"]["file"] == clip_file
     assert project["clip"]["file_stamp"] == [os.stat(clip_file).st_size, os.stat(clip_file).st_mtime_ns]

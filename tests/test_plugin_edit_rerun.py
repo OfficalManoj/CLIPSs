@@ -51,6 +51,14 @@ LOOK = {"caption_style": {"font": "Georgia"}, "filter": "warm", "watermark": {"t
 # job's config, never as the clip's options.
 STYLED = {"caption_style": {"font": "Georgia"}}
 SOCCER = {"sport": {"name": "soccer"}}
+
+
+def _without_captions(opts: dict) -> dict:
+    """A row's options after a run that burned the default caption style:
+    the row carries the burned style, so a saved one is dropped (step KF)."""
+    return {k: v for k, v in opts.items() if k != "caption_style"}
+
+
 # Two of the creator's own cuts.
 E = {"keep": [[0, 12], [14, 20]], "fade_out": 0.3}
 E2 = {"keep": [[0, 8]], "speed": 1.5}
@@ -241,12 +249,13 @@ def test_a_clip_nobody_edited_is_made_as_the_job_says(rerun):
 def test_a_rerun_drops_the_removed_highlights_post_style_from_a_clip(rerun):
     """A clip saved with the Highlights post style (#125, removed): made
     again, its row keeps its own look without the post style, the card
-    position or the card's words."""
+    position or the card's words, and carries the caption style its file
+    was burned with (the job's)."""
     old = {**LOOK, "caption_style": {"font": "Georgia", "post_style": "highlights", "card_position": "top"},
            "headline": "OLD", "subline": "QUARKBLOOM"}
     got = rerun(_found(), rows=[(100.0, 120.0, old)])
     assert dict(got.renders)[(100.0, 120.0)] is None
-    assert got.rows[(100.0, 120.0)]["render_opts"] == LOOK
+    assert got.rows[(100.0, 120.0)]["render_opts"] == _without_captions(LOOK)
 
 
 # ---- what a clip the creator edited gets ----------------------------------------------------
@@ -266,20 +275,22 @@ def test_a_rerun_makes_a_clip_the_creator_edited_with_their_choices(rerun):
 
 def test_a_soccer_rerun_keeps_the_jobs_sport_framing_and_look(rerun):
     """Only what a person set on the clip alone reaches a match's file: the
-    sport, Vertical Live, the split and the look are the job's."""
+    sport, Vertical Live, the split and the look are the job's. The row
+    carries the caption style the file was burned with (step KF)."""
     saved = {**LOOK, "edit": E, "crop": "bias_left", "sport": "soccer", "vertical_live": True, "gaming": SETUP}
     got = rerun(_found(), rows=[(100.0, 120.0, saved)], **SOCCER)
     renders = dict(got.renders)
     assert renders[(100.0, 120.0)] == {"edit": E, "crop": "bias_left"}
     assert [renders[(s, s + 20.0)] for s in (10.0, 200.0, 300.0)] == [None] * 3
-    assert got.rows[(100.0, 120.0)]["render_opts"] == saved
+    assert got.rows[(100.0, 120.0)]["render_opts"] == _without_captions(saved)
     assert f"{EDITED_LINE} {SPORTS_NOTE}" in got.out
 
 
 def test_a_soccer_rerun_gives_edited_clips_the_jobs_look_and_keeps_theirs(rerun):
     """In a match, an edited clip's file gets the job's caption style,
-    colours and branding. The clip keeps the creator's saved ones: a run
-    never replaces them."""
+    colours and branding. The clip keeps the creator's saved colours and
+    branding; its caption style becomes the one its file was burned with,
+    so the editor opens it as it looks (step KF)."""
     a = {**LOOK, "edit": E}
     b = {**LOOK, "edit": E2, "caption_style": {"font": "Verdana"}}
     got = rerun(_found(), rows=[(100.0, 120.0, a), (200.0, 220.0, b)], **SOCCER, **STYLED)
@@ -287,7 +298,7 @@ def test_a_soccer_rerun_gives_edited_clips_the_jobs_look_and_keeps_theirs(rerun)
     assert renders[(100.0, 120.0)] == {"edit": E}
     assert renders[(200.0, 220.0)] == {"edit": E2}
     assert got.rows[(100.0, 120.0)]["render_opts"] == a
-    assert got.rows[(200.0, 220.0)]["render_opts"] == b
+    assert got.rows[(200.0, 220.0)]["render_opts"] == {**b, **STYLED}
     assert f"2 clip(s) you edited are made again with your edits {SPORTS_NOTE}" in got.out
 
 
@@ -582,14 +593,15 @@ def test_a_longform_rerun_makes_an_edited_16x9_clip_with_its_edits(monkeypatch, 
 
 def test_a_longform_match_keeps_an_edited_clips_look_and_made_length(monkeypatch, tmp_path):
     """A match's 16:9 clip the creator edited is made with their cut in the
-    job's look, keeps the look saved on it, and reaches the reels with the
-    length its edit keeps."""
+    job's look, keeps the look saved on it (but the caption style its file
+    was burned with, step KF), and reaches the reels with the length its
+    edit keeps."""
     asked = _match_with_reels(monkeypatch)
     saved = {"profile": "short_clips", "edit": E, "caption_style": {"font": "Georgia"}}
     got = _longform(monkeypatch, tmp_path, saved, **SOCCER)
     assert got.renders == {_lf(s): {"profile": "short_clips", **({"edit": E} if s == 100.0 else {})}
                            for s in STARTS}
-    assert got.saved == saved
+    assert got.saved == _without_captions(saved)
     assert asked == [{_lf(s)[0]: 18.0 if s == 100.0 else 20.0 for s in STARTS}]
 
 

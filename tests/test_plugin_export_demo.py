@@ -82,7 +82,7 @@ def test_a_plugin_exports_playable_video_with_timed_captions_and_history(tmp_pat
                    check=True, capture_output=True, timeout=30)
     captions = Path(clip["captions"]).read_text(encoding="utf-8")
     assert "Dialogue:" in captions
-    assert "EXAMPLE" in captions
+    assert "example" in captions          # as said: the editor's presets keep the case (step KF)
     assert "PlayResX: 640" in captions
     # The source is a constant dark color: bright pixels at caption time
     # demonstrate that the ASS was actually burned into the exported video.
