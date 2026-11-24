@@ -1597,6 +1597,9 @@ def _render_files(
     ass_path = None
     # Per-clip style wins; otherwise the job/config default chosen at generate time.
     caption_style = _plain_caption_style(opts.get("caption_style") or config["clips"].get("caption_style"))
+    if opts.get("gaming") and isinstance(opts["gaming"], dict) and opts["gaming"].get("caption_y") is not None:
+        caption_style = dict(caption_style or {})
+        caption_style["caption_y"] = opts["gaming"]["caption_y"]
     # Where someone other than the main speaker talks, when the caption style
     # asks for them in a second colour (#126). Empty for every other clip.
     turns: list = []

@@ -60,11 +60,13 @@ export default function LiveTextOverlay({
   const lineColor = st && line?.speaker && st.second_speaker ? st.second_speaker_color : st?.color
   const capSize = st ? Math.max(40, Math.min(140, st.font_size)) * s : 0
   const capPos: React.CSSProperties =
-    st?.position === 'top'
-      ? { top: 140 * s }
-      : st?.position === 'middle'
-        ? { top: '50%', transform: 'translateY(-50%)' }
-        : { bottom: 440 * s }
+    st?.caption_y !== undefined
+      ? { top: `${st.caption_y * 100}%`, transform: 'translateY(-50%)' }
+      : st?.position === 'top'
+        ? { top: 140 * s }
+        : st?.position === 'middle'
+          ? { top: '50%', transform: 'translateY(-50%)' }
+          : { bottom: 440 * s }
 
   // Frosted strip over text that's ALREADY burned into the preview file, so
   // the old caption/hook doesn't ghost through behind the pending one.
@@ -72,11 +74,13 @@ export default function LiveTextOverlay({
   const maskBand = (position: string, fontSizeAss: number, marginAss: number): JSX.Element => {
     const size = Math.max(40, Math.min(140, fontSizeAss)) * s
     const band: React.CSSProperties =
-      position === 'top'
-        ? { top: Math.max(0, marginAss * s - size * 0.35), height: size * 3 }
-        : position === 'middle'
-          ? { top: '50%', transform: 'translateY(-50%)', height: size * 3 }
-          : { bottom: Math.max(0, marginAss * s - size * 0.35), height: size * 3 }
+      st?.caption_y !== undefined
+        ? { top: `${st.caption_y * 100}%`, transform: 'translateY(-50%)', height: size * 3 }
+        : position === 'top'
+          ? { top: Math.max(0, marginAss * s - size * 0.35), height: size * 3 }
+          : position === 'middle'
+            ? { top: '50%', transform: 'translateY(-50%)', height: size * 3 }
+            : { bottom: Math.max(0, marginAss * s - size * 0.35), height: size * 3 }
     return (
       <div
         className="absolute inset-x-0"

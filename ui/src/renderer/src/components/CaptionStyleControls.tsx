@@ -3,16 +3,17 @@ import type { CaptionStyle } from '../lib/types'
 import { t } from '../lib/i18n'
 
 export const DEFAULT_CAPTION_STYLE: Required<CaptionStyle> = {
-  font: 'Arial',
+  font: 'Impact',
   font_size: 84,
   color: '#FFFFFF',
   position: 'bottom',
-  words_per_caption: 3,
+  words_per_caption: 2,
   uppercase: true,
-  highlight: false,
+  highlight: true,
   highlight_color: '#FFE600',
   second_speaker: false,
-  second_speaker_color: '#5CE1FF'
+  second_speaker_color: '#5CE1FF',
+  caption_y: 0.88
 }
 
 /** Fonts on every stock Windows install — matches video/captions.py FONTS. */

@@ -18,13 +18,13 @@ from pathlib import Path
 from core.models import ClipCandidate, Segment
 
 DEFAULT_STYLE = {
-    "font": "Arial",          # must be in FONTS (installed on stock Windows)
+    "font": "Impact",          # must be in FONTS (installed on stock Windows)
     "font_size": 84,          # at 1080x1920 playback resolution
     "color": "#FFFFFF",       # text colour (hex RGB)
     "position": "bottom",     # bottom | middle | top
-    "words_per_caption": 3,
+    "words_per_caption": 2,
     "uppercase": True,
-    "highlight": False,           # light up each word as it is spoken
+    "highlight": True,           # light up each word as it is spoken
     "highlight_color": "#FFE600",
     "second_speaker": False,      # another colour when it isn't the main speaker talking (#126)
     "second_speaker_color": "#5CE1FF",
@@ -81,7 +81,7 @@ def caption_font_for(language: str, chosen: str | None) -> str | None:
     return chosen
 
 # position -> (ASS numpad alignment, vertical margin)
-_POSITIONS = {"bottom": (2, 440), "middle": (5, 0), "top": (8, 140)}
+_POSITIONS = {"bottom": (2, 300), "middle": (5, 0), "top": (8, 140)}
 
 
 def build_caption_lines(
@@ -585,9 +585,15 @@ def _highlighted(
 
 
 def _header(opts: dict, canvas: tuple[int, int] = (1080, 1920)) -> str:
-    alignment, margin_v = _POSITIONS.get(opts["position"], _POSITIONS["bottom"])
-    color = _ass_color(opts["color"])
-    size = max(40, min(140, int(opts["font_size"])))
+    if opts.get("caption_y") is not None or opts.get("y_percent") is not None:
+        cy = float(opts.get("caption_y") if opts.get("caption_y") is not None else opts.get("y_percent"))
+        alignment = 2
+        raw_margin_v = max(20, min(1900, round((1.0 - cy) * 1920)))
+        margin_v = raw_margin_v
+    else:
+        alignment, margin_v = _POSITIONS.get(opts.get("position", "bottom"), _POSITIONS["bottom"])
+    color = _ass_color(opts.get("color", "#FFFFFF"))
+    size = max(40, min(140, int(opts.get("font_size", 84))))
     font = opts.get("font") if opts.get("font") in FONTS else "Arial"
     # Style values are calibrated for the 1920-tall Shorts canvas; scale
     # them to whatever frame this clip renders at (e.g. landscape 1080).
