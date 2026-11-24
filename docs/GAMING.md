@@ -175,15 +175,16 @@ next videos** keeps it for them, so their next videos (and a watched
 channel's) start from it. **Change layout…** in the Generate bar opens it
 again.
 
-The same editor is in the **clip editor** (Effects → Layout → **Gaming /
-Reaction** → *Change layout…*) to change one clip: shown in *Update preview*,
-saved on *Apply*. Processing the video again with Gaming / Reaction on keeps a
+Changing one clip's layout after it is made is not in the app right now: the
+old clip editor that had it is gone, and it comes back in Clips Kitty Editor in
+the coming gaming update. Until then a gaming clip opens in the editor with
+the layout the AI gave it. Processing the video again with Gaming / Reaction on keeps a
 clip you edited in its own layout. When that clip's split was found
 automatically or remembered for the creator, a webcam you set up for this run,
 or one remembered for the creator, reaches it too. A split you set up before an
 earlier run, a webcam you drew for that clip, or a split you turned off for it
 stays as it is, even with Gaming / Reaction off for the new run (a Sports job
-uses its own layout). Change it in the clip editor.
+uses its own layout).
 
 ## Who the streamer is, when it's found automatically
 
@@ -247,9 +248,9 @@ with a webcam drawn in the setup or remembered for the creator:
   the stream, is looked at instead (eight at most). Before, an opening hour
   of chatting could take three of the four, leave one vote for the webcam,
   and every game clip rendered without the streamer.
-- **Such a clip is saved as what it got**, so the clip editor shows its
-  standard framing and a re-render keeps it; **Gaming / Reaction** in its
-  Layout row switches it back.
+- **Such a clip is saved as what it got**, so a re-render keeps its
+  standard framing. Switching it back to Gaming / Reaction comes with the
+  coming gaming update of Clips Kitty Editor.
 - **Scoring is the same across the parts.** What is said counts as on any
   stream, and the game adds on top; what the picture shows only takes points
   off a quiet clip, so a Just Chatting clip with no gameplay isn't marked

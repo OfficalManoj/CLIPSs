@@ -12,25 +12,36 @@ were often broken in a way that only showed up on somebody else's machine.
 
 ### Added
 
+- **One editor, and "Clip Editor" is now "Clips".** Clips Kitty Editor is the only editor: the
+  old small editor (Edit this clip) is gone, and every Edit opens the clip in Clips Kitty Editor.
+  Subtitles and dubbing in 19 languages are under "Other languages…" at the top of the Editor
+  page, and the words you change on your captions there go to your translations once you export.
+  YouTube upload and your published links are in the Publish window. Publish and Publish all
+  are always on the Clips page; with no account connected, the window says how to connect one.
+  The Clips page's "Make clips again…" button is gone. A few of the old editor's
+  tools come back in later updates: gaming layouts, framing (Automatic, Letterbox and Center),
+  the word tools, Swap speakers, plugin suggestions, the free music picker with Duck under voice
+  and the AI edit chat. Sharpen is in the editor as the Sharpen effect. For now the Publish window sends a clip with its own title and
+  description to every platform, without a first comment.
 - **A full editor, inside Clips Kitty (when the editor is installed).** The new Editor page
   holds Clips Kitty Editor, a full timeline editor with tracks, captions, sound and export,
-  based on Concat. "Open in editor" on a clip opens that clip in it with the AI's framing kept, its
+  based on Concat. "Edit" on a clip opens that clip in it with the AI's framing kept, its
   cuts as pieces you can drag back, and its captions as text you can change. "Edit a whole
   video" on the Editor page opens a Library video whole, in its own shape or in 16:9, 9:16, 1:1 or 4:5, and you can open a file
   from your PC the same way with no AI run. When you export a clip there, it becomes that
   clip's video in the Library; a whole video or a file is saved to your export folder under
-  the name you give it in the Export window (it starts as "name - date"). If you changed the clip in Quick edit meanwhile, the export is saved next
+  the name you give it in the Export window (it starts as "name - date"). If the clip was changed meanwhile (made again, for example), the export is saved next
   to it instead and nothing is replaced. After that, anything that would make the clip
-  again from the AI's version (Apply in Quick edit, the chat edit, Export in other
-  languages) asks you first, and Make clips again and Storage clean-up leave it alone. No
+  again from the AI's version (Re-render in the clip's panel, burned-in subtitles and
+  dubbing in other languages) asks you first, and Make clips again and Storage clean-up leave it alone. No
   end card is added to what the editor exports. Without the editor installed, Clips Kitty
   looks and works as before.
-- **Publish from the editor, and the editor opens straight on your clip.** "Open in editor"
+- **Publish from the editor, and the editor opens straight on your clip.** "Edit"
   now goes straight to the clip with its name and progress at the top, instead of showing your
   projects first. A Publish button at the top of the Editor page opens the same publish window
-  as the clip's Publish on the Clip Editor page, once your export is saved as the clip's video.
+  as the clip's Publish on the Clips page, once your export is saved as the clip's video.
   A whole video or a file now starts in its own shape ("Same as the video"), so a 9:16 video
-  stays 9:16, and "Edit whole video" is no longer on the Clip Editor page.
+  stays 9:16, and "Edit whole video" is no longer on the Clips page.
 - **A built-in voice, and your own voice apps.** Clips Kitty now has its own voice for
   English, Spanish, French, Hindi, Italian and Portuguese. It runs on your PC with no
   account and no internet, and its voices may be used in videos that earn money. Dubbing
@@ -56,7 +67,7 @@ were often broken in a way that only showed up on somebody else's machine.
   Custom exports are made in the background, beside the processing queue rather than
   behind it, with a progress bar, Cancel, and the file's size and resolution when done.
 - **Make clips again** (#190). Clips made with settings you didn't want, such as 60+
-  second clips, can be made again from the Clip Editor with other settings, without
+  second clips, can be made again from the Clips page with other settings, without
   adding the video again. Clips you edited, published, scheduled, exported or starred,
   translated or exported in other languages, or sent to a campaign are kept exactly as
   they were, video file included, as are clips still being published or exported, 16:9
@@ -71,7 +82,7 @@ were often broken in a way that only showed up on somebody else's machine.
   replacing, the clips from before stay exactly as they were. If Clips Kitty is closed
   while it works, every clip it was keeping has its own video back the next time it
   starts. It waits while one of the video's clips is being published or exported.
-  When it's done, the Clip Editor and the queue say what changed, or that no new clips
+  When it's done, the Clips page and the queue say what changed, or that no new clips
   were found. A video made into one whole clip, like a watched channel's Twitch clips,
   shows that as a Whole video switch you can untick to let the AI pick moments instead.
 - **WoopSocial: make a smaller copy when a clip is over 100 MB** (off unless you tick
@@ -103,11 +114,10 @@ were often broken in a way that only showed up on somebody else's machine.
   learned memory keeps it, and left empty nothing changes. With cloud AI on your own key
   it is sent to that provider with the rest of the request, like what was learned.
 - **Free music** (#155). 8 music tracks (chill, upbeat, funny and tense) now come with
-  Clips Kitty, all about as loud as each other. Pick one in the Clip Editor's Effects tab to play it under a
-  clip; your own music file still works as before. The tracks are public domain (CC0):
-  free to use, also in monetised videos, with no credit needed. With Duck under voice on,
-  a free track dips a little while someone talks and stays in the clip, also when the
-  clip is loud from start to end.
+  Clips Kitty, all about as loud as each other, ready for Clips Kitty Editor: picking them
+  there, with Duck under voice (the music dips while someone talks), comes in a later
+  update. Until then, import any music file in the editor. The tracks are public domain
+  (CC0): free to use, also in monetised videos, with no credit needed.
 - **Free sound effects, ready for the new editor** (#155). 56 short sound effects
   (clicks, dings, hits, risers, zaps), also public domain (CC0), now come with Clips
   Kitty. Placing them on a clip arrives with the new editor.

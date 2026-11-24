@@ -220,11 +220,10 @@ ang mga callback. Sadyang maingat ito: kailangang talagang maulit ang isang catc
 bago ito bilangin, natutulog ang kaalamang hindi na nababanggit, at bawat ambag nito sa
 score ay dagdag lang, may limit, at puwedeng i-off.
 
-**Video editor.** Non-destructive: ang trim, mga cut sa loob, mute, mga naka-mute na salita,
-volume, fade, bilis, hook text, musika at watermark ay iniimbak bilang mga operasyon at
-inilalapat sa oras ng render. May AI edit chat din (*"gawin mong 5 segundo na mas mahaba"*,
-*"gost ang nakasulat sa caption, dapat ghost"*), kung saan nagmumungkahi ang model at
-ang na-validate na code ang naglalapat.
+**Video editor.** Binubuksan ng Clips Kitty Editor, na gawa sa open-source na Concat editor,
+ang bawat clip sa isang timeline: mga cut, mute, volume, fade, bilis, caption, musika, mga
+color look, title at mga larawan sa ibabaw ng video. Nandoon din ang subtitles at dubbing sa
+ibang wika. Babalik ang AI edit chat sa isang susunod na update.
 
 **Long-form na pagproseso.** Isang opsyonal na 16:9 na daan na gumagamit ng parehong
 pagsusuri: horizontal na clip, cut na kasinghaba ng pang-X/Twitter, isang best-of
@@ -285,7 +284,7 @@ GPU sa pamamagitan ng Ollama.
   Ayusin ang mali sa transcription linya kada linya bago mag-export. Kapag dalawang tao ang
   nag-uusap, puwedeng ibang kulay ang captions ng pangalawang nagsasalita, at ang maling
   natukoy nito ay puwedeng palitan nang mano-mano.
-- **AI edit chat**: ilarawan ang mali sa simpleng salita at ie-edit nito ulit.
+- **AI edit chat** (babalik sa isang susunod na update): ilarawan ang mali sa simpleng salita at ie-edit nito ulit.
 - **Ask Clips Kitty**: ang text box sa ibaba ng dashboard. Sabihin sa isang pangungusap
   ang gusto mo, gaya ng *"i-clip mo itong stream, siguraduhin mong kasama yung namatay ako
   sa boss, na may malaking dilaw na captions"*, at ipipila nito ang video, sasabihin sa
@@ -304,7 +303,7 @@ GPU sa pamamagitan ng Ollama.
 - **Watermark at branding profiles**: mga default kada creator na kusang inilalapat.
 - **Model manager**: palitan ang utak ng AI mula sa loob ng app; mag-download, magtanggal at
   magpalit ng model na may progress bar at walang terminal.
-- **Mag-publish sa YouTube mula sa editor**: title, description, tags, thumbnail, playlist,
+- **Mag-publish sa YouTube mula sa Publish window**: title, description, tags, thumbnail, playlist,
   audience at visibility, tapos Upload now o i-schedule. Opsyonal, naka-off bilang default,
   at gumagamit ng sarili mong Google API key.
 - **Feedback sa loob ng app**: bug report na may kusang nakolektang diagnostics, hindi
@@ -408,8 +407,8 @@ npm install
 npm run dev        # opens the Clips Kitty desktop app
 ```
 
-Kusang sinisimulan ng app ang sarili nitong Python engine. Mag-paste ng link sa **Clip
-Editor**, pindutin ang *Generate clips*, at panoorin nang live ang progress.
+Kusang sinisimulan ng app ang sarili nitong Python engine. Mag-paste ng link sa
+**Dashboard**, pindutin ang *Generate clips*, at panoorin nang live ang progress.
 
 Isang command lang para ikaw mismo ang mag-build ng installer. Tingnan ang
 [CONTRIBUTING.md](../../CONTRIBUTING.md#building-the-windows-installer).
@@ -599,11 +598,11 @@ May gusto kang wika na wala rito? [#61](https://github.com/ColinGPT9/clips-studi
 
 ## Mag-publish sa YouTube
 
-Naka-off bilang default. I-on ito sa **Settings → Publish to YouTube** at lalabas ang tab na
-**YouTube** sa editor: punan ang title, description, tags, thumbnail, playlist, audience at
-visibility, tapos pindutin ang **Upload now**. Ire-render ng Clips Kitty ang clip kung may
-edit kang hindi pa naka-save at diretsong ia-upload ito sa channel mo. Walang hakbang na
-export at walang hiwalay na page para sa pag-publish. Hindi mo na kailangang umalis sa editor.
+Naka-off bilang default. I-on ito sa **Settings → Publish to YouTube** at magkakaroon ng
+seksyong **YouTube (direct upload)** ang **Publish** window ng isang clip (sa Clips page o
+sa editor): punan ang title, description, tags, thumbnail, playlist, audience at visibility,
+tapos pindutin ang **Upload now**. Diretsong ia-upload ng Clips Kitty ang clip sa channel
+mo. Walang hakbang na export at walang hiwalay na page para sa pag-publish.
 
 Kung iiwan mo itong naka-off, walang magbabago kahit saan sa app.
 
@@ -684,12 +683,12 @@ Kusang kinikilala ng YouTube ang video bilang Short batay sa hugis at haba nito.
 
 ## Mag-publish sa lahat ng platform nang sabay-sabay
 
-Naka-off din bilang default. I-on ito sa **Settings → Publish through WoopSocial** at
-lalabas ang tab na **Publish** sa editor: piliin ang mga platform mo — o pindutin ang
-**Everywhere** (Lahat) — isulat nang isang beses ang title at description, at isang upload
-ang mapupunta nang sabay-sabay sa YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn,
-Pinterest at Bluesky. Ang **Publish all** sa Clip Editor ay gumagawa ng buong batch,
-nakahiwa-hiwalay para hindi sabay-sabay na lumapag ang isang dosenang clip sa iisang segundo.
+Naka-off din bilang default. I-on ito sa **Settings → Publish through WoopSocial** at sa
+**Publish** window ng isang clip (sa Clips page o sa editor), piliin ang mga platform mo — o
+pindutin ang **Everywhere** (Lahat) — at isang upload ang mapupunta nang sabay-sabay sa
+YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest at Bluesky. Ang
+**Publish all** sa Clips page ay gumagawa ng buong batch, nakahiwa-hiwalay para hindi
+sabay-sabay na lumapag ang isang dosenang clip sa iisang segundo.
 
 Ang isang ito ay **hindi local**. Ipinapadala ang clip at ang mga detalye nito sa isang
 publishing service, na siyang naghahatid ng mga ito at may hawak ng koneksyon sa mga social

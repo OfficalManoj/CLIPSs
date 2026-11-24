@@ -1,5 +1,4 @@
 {
-  "Clip Editor": "剪辑编辑器",
   "Creators": "创作者",
   "Models": "模型",
   "Settings": "设置",
@@ -105,7 +104,6 @@
   "Links / screenshots of that feature (optional)": "该功能的链接 / 截图（可选）",
   "Which part of the app is this about? (optional)": "这是关于应用哪个部分的？（可选）",
   "The app’s look & controls": "应用的外观与控件",
-  "The clip editor": "剪辑编辑器",
   "AI results (clips picked, captions, titles)": "AI 结果（挑出的片段、字幕、标题）",
   "Speed / freezes": "速度 / 卡顿",
   "YouTube videos": "YouTube 视频",

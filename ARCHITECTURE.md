@@ -637,18 +637,19 @@ the other speaker's take the second colour, and the turns are saved with the cli
 (`speaker_turns`) for the editor's preview. A clip with one voice, or one where it is
 not clear there are two, is captioned exactly as without the option.
 
-What it hears wrong is put right in the editor (**Fix speakers**, Captions tab). A fix
+What it hears wrong is put right by a fix (the old clip editor's **Fix speakers**, gone
+since step KC; Swap speakers comes back in Clips Kitty Editor's panel, step KP1). A fix
 is a statement, saved beside what was heard as `speaker_edits`: `[[start, end, 0 or 1],
 ...]` in clip seconds, 0 for the main speaker. `video/captions.py` `paint_turns` lays the
 statements over the heard turns at every render, later ones winning, and the result is
 captioned like any other turns; `speaker_turns` stays what was heard, so the editor can
 always go back to it. A clip whose caption text was saved keeps its lines, and
 `tag_lines` colours each one whole by who says the words in it, so there a fix switches
-a whole caption. The editor works out the same thing for its instant preview in
-`ui/src/renderer/src/lib/speakerTurns.ts`, on the same numbers (`clip_words`, which is
-also what `GET /clips/{id}/words` returns). What a click, a shift-click and Swap add to
-the list is worked out there too (`fixSpeakers`), and `tests/test_ui_speaker_turns_sync.py`
-runs that file under Node: against the Python, and clicked through word after word.
+a whole caption. A clip opened in Clips Kitty Editor gets its captions as the render
+burns them (a line ends where the speaker changes), so words retyped there and saved
+back as the clip's lines never put two speakers in one caption. The old clip editor's
+instant preview of all this (`lib/speakerTurns.ts` and its Node test) went with it in
+KC; the engine's `paint_turns` and `tag_lines` keep their own tests.
 
 ### 5.2 Gaming / Reaction layouts
 
@@ -940,7 +941,7 @@ or the filesystem directly: context isolation on, no node integration, everythin
 through the local API.
 
 Pages: **Dashboard** (system widgets, processed videos, live log), **Queue** (batch
-add, per-video settings, reorder/pause/retry, queue-wide time estimate), **Clip Editor**
+add, per-video settings, reorder/pause/retry, queue-wide time estimate), **Clips**
 (the core loop: paste a link, watch progress, review the results grid, open the editor),
 **Creators**, **Models**, and **Settings**.
 

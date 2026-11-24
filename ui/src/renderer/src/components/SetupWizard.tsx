@@ -403,7 +403,7 @@ export default function SetupWizard({ onClose }: { onClose: () => void }): JSX.E
               {pre?.ready ? (
                 <>
                   <p className="text-sm text-muted mt-3 leading-relaxed">
-                    Everything is installed. Paste a video link on the Clip Editor page and
+                    Everything is installed. Paste a video link on the Dashboard and
                     press <b>Generate clips</b>.
                   </p>
                   <p className="text-sm text-muted mt-3 leading-relaxed">

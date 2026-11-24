@@ -44,11 +44,17 @@ def test_the_editor_libs_say_nothing_without_t():
             raise AssertionError(f"lib/{name}: a sentence without t(): {match.group(0)}")
 
 
-def test_existing_labels_are_not_reworded():
+def test_the_clips_page_is_called_clips():
+    """KC (the owner's call): "Clip Editor" is now "Clips", in the sidebar
+    and the page's title; the guard against the label that blocked the
+    Store listing stays in the comment."""
     app = _read(APP)
-    assert "{ id: 'studio', label: 'Clip Editor', icon: '✂' }" in app
+    assert "{ id: 'studio', label: 'Clips', icon: '✂' }" in app
+    assert "Microsoft Store" in app and "never go back to that one" in app
+    assert "label: 'Clip Editor'" not in app
+    assert "<h2 className=\"text-2xl font-bold\">{t('Clips')}</h2>" in _read(UI / "pages" / "ClipStudio.tsx")
     assert "{ id: 'editor', label: 'Editor'" in app
-    # Placed right after Clip Editor.
+    # Placed right after Clips.
     assert app.index("id: 'editor'") > app.index("id: 'studio'")
     assert app.index("id: 'editor'") < app.index("id: 'creators'")
 
@@ -76,20 +82,45 @@ def test_clip_approvals_are_read_inside_their_provider():
     assert "usePendingApprovals()" in shell and "ClipUpdatesProvider" not in shell
 
 
-def test_every_way_in_is_behind_the_status():
+def test_every_edit_opens_the_editor_and_says_when_it_is_not_installed():
+    """KC: Quick edit is gone. The card's and the side panel's Edit open
+    Clips Kitty Editor; while it is not found they stay, off, with a tooltip
+    saying it isn't installed (they used to open Quick edit then)."""
     studio = _read(UI / "pages" / "ClipStudio.tsx")
-    assert "onEdit={editorFound ? () => void openInEditor({ kind: 'clip', clip_id: clip.id }) : undefined}" in studio
-    assert re.search(r"onOpenInEditor=\{\s*editorFound \? \(\) => void openInEditor\(\{ kind: 'clip', clip_id: current\.id \}\)",
-                     studio)
-    assert re.search(r"onOpenInEditor=\{\s*editorFound \? \(\) => void openInEditor\(\{ kind: 'clip', clip_id: editingClip\.id \}\)",
-                     studio)
-    # FL3: no "Edit whole video" on the Clip Editor page; a whole video is
+    assert "onEdit={() => void openInEditor({ kind: 'clip', clip_id: clip.id })}" in studio
+    assert "onEdit={() => void openInEditor({ kind: 'clip', clip_id: current.id })}" in studio
+    assert studio.count("editReady={editorFound}") == 2
+    for gone in ("EditorModal", "EditorView", "editingClip", "setEditingClipId", "onOpenEditor", "onOpenInEditor"):
+        assert gone not in studio, gone
+    # FL3: no "Edit whole video" on the Clips page; a whole video is
     # opened from the Editor page's own "Edit a whole video".
     assert "Edit whole video" not in studio and "ShapeSelect" not in studio and "wholeShape" not in studio
-    # The controls themselves draw nothing without their callback.
-    assert "{onEdit && (" in _read(UI / "components" / "ClipCard.tsx")
-    assert "{onOpenInEditor && (" in _read(UI / "components" / "ClipEditor.tsx")
-    assert "{onOpenInEditor && (" in _read(UI / "components" / "EditorModal.tsx")
+    missing = "t('Clips Kitty Editor wasn’t found with this copy of Clips Kitty, so clips can’t be edited here.')"
+    for rel in ("components/ClipCard.tsx", "components/ClipEditor.tsx"):
+        source = _read(UI / rel)
+        assert missing in source, rel
+        assert "aria-disabled={!editReady}" in source, rel
+    assert "onClick={editReady ? onEdit : undefined}" in _read(UI / "components" / "ClipEditor.tsx")
+    assert "if (editReady) onEdit()" in _read(UI / "components" / "ClipCard.tsx")
+
+
+def test_quick_edit_is_gone():
+    """KC: the old editor and what only it used are deleted; nothing imports them."""
+    gone = ("components/TimelineEditor.tsx", "components/EditorModal.tsx", "components/ColorControls.tsx",
+            "components/FilterPicker.tsx", "components/EditChat.tsx", "components/EditSuggestions.tsx",
+            "components/FreeMusicPicker.tsx", "components/UploadPostPanel.tsx", "lib/captionEdits.ts",
+            "lib/speakerTurns.ts")
+    for rel in gone:
+        assert not (UI / rel).exists(), rel
+    names = [rel.rsplit("/", 1)[1].split(".")[0] for rel in gone]
+    for path in UI.rglob("*.ts*"):
+        text = path.read_text(encoding="utf-8")
+        for name in names:
+            assert not re.search(rf"from '[./]+(?:components/|lib/)?{name}'", text), (path.name, name)
+    # Shared pieces stay (queue settings, Creators, the add-videos form).
+    for rel in ("components/CaptionStyleControls.tsx", "components/GamingLayoutEditor.tsx",
+                "components/WatermarkControls.tsx", "components/LiveTextOverlay.tsx"):
+        assert (UI / rel).exists(), rel
 
 
 # Everything App.tsx (or the sidebar it draws) renders that can be drawn over
@@ -189,15 +220,16 @@ def test_quick_edit_asks_before_making_an_editor_export_again():
     assert "<ProjectExportPrompt />" in _read(APP)
 
 
-def test_the_new_way_in_has_its_own_name():
-    """UX round: "Open in editor" (new words), not a second "Edit" beside
-    "Edit this clip"; the old editor is named by what the app shows."""
-    for rel in ("components/ClipCard.tsx", "components/ClipEditor.tsx", "components/EditorModal.tsx"):
+def test_one_edit_per_place():
+    """KC: one "Edit" on the card and one in the side panel, both opening
+    the editor; no "Open in editor" beside an "Edit this clip"."""
+    for rel in ("components/ClipCard.tsx", "components/ClipEditor.tsx"):
         source = _read(UI / rel)
-        assert "t('Open in editor')" in source, rel
-        assert "t('Edit')" not in source, rel
+        assert "t('Edit')" in source, rel
+        assert "Open in editor" not in source and "Edit this clip" not in source, rel
     lib = _read(UI / "lib" / "editor.ts")
-    assert "Quick edit" not in "".join(re.findall(r"t\('([^']*)'\)", lib))
+    said = "".join(re.findall(r"t\('([^']*)'\)", lib))
+    assert "Quick edit" not in said and "Clip Editor" not in said
 
 
 def test_notices_and_exports_reach_a_screen_reader():
@@ -238,7 +270,7 @@ def test_saved_as_this_clips_video_has_no_folder_tooltip():
     and for an export kept beside the clip."""
     lib = _read(UI / "lib" / "editor.ts")
     case = lib[lib.index("case 'replaced_clip':"):lib.index("case 'kept_beside':")]
-    assert "t('Saved as this clip’s video.')" in case and "tooltip" not in case.replace("No tooltip", "")
+    assert "t('Saved as this clip’s video.')" in case and "answer.path" not in case
     rest = lib[lib.index("case 'kept_beside':"):lib.index("case 'failed':")]
     assert rest.count("tooltip: answer.path") == 2
 
@@ -421,3 +453,116 @@ def test_f1_regression_round_page_rules():
     backdrop = dialog[dialog.index('role="dialog"'):]
     backdrop = backdrop[:backdrop.index("<div")]
     assert "onClick={onClose}" not in backdrop and "if (!busy) onClose()" in backdrop
+
+
+# ---- KC: subtitles and dubbing in the editor, YouTube in the Publish window ------------------------
+
+
+def test_other_languages_is_a_window_from_the_editor_strip():
+    """KC (the owner's call): "Other languages…" sits next to Publish in the
+    Editor page's strip, for clip projects only, and opens today's
+    MultilingualExport unchanged in a window of its own: modal, the editor
+    hidden while it is open, the keyboard inside it, Escape closes it and
+    the focus goes back to the button."""
+    view = _project_view(_read(PAGE))
+    strip = view[view.index("{/* Publish and the project's state"):]
+    strip = strip[:strip.index("{/* An export's start")]
+    assert strip.index("{t('Other languages…')}") < strip.index("{t('Publish')}")
+    assert strip.count("{publish !== 'none' && (") == 2      # clip projects whose clip is there
+    assert "useEditorCover(languagesClip !== null)" in view
+    assert re.search(r"<OtherLanguagesDialog\s+clip=\{languagesClip\}\s+onClose=\{\(\) => setLanguagesClip\(null\)\}"
+                     r"\s+returnFocus=\{languagesButton\}", view)
+    window = _read(UI / "components" / "editor" / "OtherLanguagesDialog.tsx")
+    assert 'role="dialog"' in window and 'aria-modal="true"' in window
+    assert "useDialogFocus(" in window and "returnFocus" in window
+    assert "if (!typing()) onClose()" in window       # Escape in a text field is the field's
+    # Today's panel, unchanged, with the translated preview over the clip (moved from Quick edit).
+    assert "<MultilingualExport clipId={clip.id} videoId={clip.video_id} onPreview={setTranslated} />" in window
+    assert "<LiveTextOverlay videoRef={videoRef} overlay={overlay} />" in window
+    # The Clips page gets no new button for it.
+    assert "OtherLanguages" not in _read(UI / "pages" / "ClipStudio.tsx")
+    assert "{t('Other languages…')}" not in _read(UI / "components" / "ClipEditor.tsx")
+
+
+def test_a_window_over_a_dialog_keeps_its_own_keys():
+    """The "changed in the editor" question can open over Other languages:
+    its Tab and Escape are its own, not the window under it."""
+    hook = _read(UI / "lib" / "useDialogFocus.ts")
+    assert "!box.current.contains(target) &&" in hook and "target.closest('[aria-modal=\"true\"]')" in hook
+
+
+def test_youtube_and_published_links_are_in_the_one_clip_publish_window():
+    """KC: the one-clip Publish window (Clips page and Editor page) holds
+    "YouTube (direct upload)" while it is switched on, and the clip's
+    "Published links"; one clip can be published with only YouTube on."""
+    dialog = _read(UI / "components" / "PublishAllDialog.tsx")
+    # The frame picker runs over the file's own length (Quick edit's speed or cuts made some shorter).
+    assert "duration={fileSeconds ?? clipSeconds(clips[0])}" in dialog
+    assert "{single && youtube && ytStatus?.enabled && (" in dialog
+    assert "{t('YouTube (direct upload)')}" in dialog
+    assert "<YouTubePanel" in dialog and "pendingRender={null}" in dialog
+    assert "<PublishedDiscordLinks key={clips[0].id} clipId={clips[0].id} />" in dialog
+    assert "Open a clip and its Publish tab" not in dialog
+    setup = _read(UI / "lib" / "publishSetup.ts")
+    assert "api.youtubeStatus()" in setup and "canPublishOne" not in setup
+    studio = _read(UI / "pages" / "ClipStudio.tsx")
+    assert studio.count("youtube={publishSetup.youtube}") == 1
+    view = _project_view(_read(PAGE))
+    assert "providerReady={publishSetup.ready}" in view and "youtube={publishSetup.youtube}" in view
+    # The thumbnail has its own frame picker: no playhead from Quick edit.
+    thumb = _read(UI / "components" / "YouTubeThumbnail.tsx")
+    assert "currentTime" not in thumb and "currentTime" not in _read(UI / "components" / "YouTubePanel.tsx")
+    assert 'type="range"' in thumb and "{t('Use this frame')}" in thumb
+    # The stills carry the file's version (an editor export keeps the clip's
+    # id), and the slider stops before the end (no frame at the exact length).
+    assert "api.clipFrameUrl(clipId, Math.min(stillAt, lastFrame), version)" in thumb
+    assert "api.clipFrameUrl(clipId, at, version)" in thumb
+    assert "const lastFrame = Math.max(0, Math.floor((duration - 0.1) * 10) / 10)" in thumb
+    assert "max={lastFrame}" in thumb and "max={duration}" not in thumb
+    assert "version={clip.media_version}" in _read(UI / "components" / "YouTubePanel.tsx")
+
+
+def test_an_export_says_whether_the_caption_words_went_with_it():
+    """KC: after an export becomes the clip's video, the notice says the
+    caption words were saved for other languages, or that they were kept."""
+    lib = _read(UI / "lib" / "editor.ts")
+    case = lib[lib.index("case 'replaced_clip':"):lib.index("case 'kept_beside':")]
+    assert "answer.captions === 'followed'" in case and "answer.captions === 'kept'" in case
+    assert "t('Saved as this clip’s video. Other languages keep the old caption words.')" in case
+    assert "captions?: 'followed' | 'kept'" in _read(UI / "lib" / "api.ts")
+
+
+def test_the_clips_pages_publish_shows_like_the_editors():
+    """KC, his ask "publishing in clips": the Clips page's Publish (card and
+    side panel) and Publish all are always there, as the Editor page's
+    Publish is. The setup is read again on each click, and with no account
+    connected the same window says how to connect one."""
+    studio = _read(UI / "pages" / "ClipStudio.tsx")
+    assert "onPublish={() => void openPublish(() => setPublishOne(current))}" in studio
+    assert "onPublish={() => void openPublish(() => setPublishOne(clip))}" in studio
+    assert "onClick={() => void openPublish(() => setPublishing(true))}" in studio
+    bar = studio[studio.index("onClick={() => void openPublish(() => setPublishing(true))}") - 400:]
+    assert bar.index("Publish all (") < bar.index("{publishReady && (")   # Publish all is outside the rule
+    opener = studio[studio.index("const openPublish = async"):]
+    opener = opener[:opener.index("open()") + len("open()")]
+    assert "setPublishSetup(await readPublishSetup())" in opener and "open()" in opener
+    assert studio.count("providerReady={publishReady}") == 2
+    dialog = _read(UI / "components" / "PublishAllDialog.tsx")
+    assert "{!providerReady ? (" in dialog
+    assert "t('To send these clips to your social accounts, set up WoopSocial or Upload-Post in Settings.')" in dialog
+    assert "t('To send this clip to several platforms at once, set up WoopSocial or Upload-Post in Settings.')" in dialog
+
+
+def test_the_clips_pages_schedule_follows_a_newly_connected_account():
+    """Review r5 #6: Schedule shows once an account is connected, without a
+    Publish click first: the setup is read when the page is shown and again
+    when the window regains focus or becomes visible."""
+    studio = _read(UI / "pages" / "ClipStudio.tsx")
+    effect = studio[studio.index("// Which provider the windows send through (lib/publishSetup.ts): read"):]
+    effect = effect[:effect.index("}, [])")]
+    assert "readPublishSetup()" in effect and "setPublishSetup(setup)" in effect
+    assert "window.addEventListener('focus', read)" in effect
+    assert "document.addEventListener('visibilitychange', onVisible)" in effect
+    assert "window.removeEventListener('focus', read)" in effect
+    assert "document.removeEventListener('visibilitychange', onVisible)" in effect
+    assert "{publishReady && (" in studio                     # Schedule still follows the setup

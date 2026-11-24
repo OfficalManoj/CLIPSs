@@ -1,4 +1,4 @@
-/** The question Quick edit asks before it makes a clip again over Clips Kitty
+/** The question asked before a clip is made again over Clips Kitty
  *  Editor's export of it (lib/projectExportPrompt.ts): the sentence, then
  *  "Open in editor" (only when the editor is found and the project is still
  *  there), "Apply anyway" and "Cancel". The same dialog asks before NEW files

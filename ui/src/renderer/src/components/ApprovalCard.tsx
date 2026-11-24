@@ -117,7 +117,7 @@ function ApprovalCard({item, onOpen}: {item: PendingApproval; onOpen: (videoId: 
     <p className="text-xs text-muted">{item.platforms.map(platform => woopTargetLabel(platform, accounts)).join(', ')}{item.first_slot && ` · First slot: ${new Date(item.first_slot).toLocaleString()}`}</p>
     {item.answer ? <p role="status">{item.state_text || (item.answer === 'approve' ? `✅ Approved ${place}…` : `⛔ Denied ${place}. The clips stay in your library.`)}</p>
       : <ApprovalActions itemId={item.item_id} showDMCA={status?.show_dmca ?? item.show_dmca} onChanged={() => void refresh()} />}
-    <button className="text-xs text-accent underline" onClick={() => onOpen(item.video_id)}>Open in editor</button>
+    <button className="text-xs text-accent underline" onClick={() => onOpen(item.video_id)}>{t('Open in Clips')}</button>
   </article>
 }
 

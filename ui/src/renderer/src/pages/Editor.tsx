@@ -15,6 +15,7 @@
  *  and coming back shows the work as it was. */
 import { useEffect, useRef, useState } from 'react'
 import PublishAllDialog from '../components/PublishAllDialog'
+import OtherLanguagesDialog from '../components/editor/OtherLanguagesDialog'
 import { api, editorApi, type EditorProject, type EditorShape } from '../lib/api'
 import {
   appPointerRecent,
@@ -310,9 +311,14 @@ function ProjectView({
   const [publishSetup, setPublishSetup] = useState<PublishSetup | null>(null)
   const [publishClip, setPublishClip] = useState<Clip | null>(null)
   useEditorCover(publishClip !== null)
+  // Other languages (KC): subtitles and dubbing for the shown clip, in a
+  // window of its own; the editor is hidden while it is open.
+  const [languagesClip, setLanguagesClip] = useState<Clip | null>(null)
+  useEditorCover(languagesClip !== null)
   const area = useRef<HTMLDivElement>(null)
   const projectsButton = useRef<HTMLButtonElement>(null)
   const publishButton = useRef<HTMLButtonElement>(null)
+  const languagesButton = useRef<HTMLButtonElement>(null)
   const rt = store.runtime
   const bridge = window.studio.editor
 
@@ -432,11 +438,11 @@ function ProjectView({
       ? t('Export first: Publish sends the clip in your Library.')
       : publish === 'kept_beside'
         ? t(
-            'Your last export was saved next to this clip, not as its video, because the clip was changed in the Clip Editor meanwhile. Publish would send the other video, so it is off.'
+            'Your last export was saved next to this clip, not as its video, because the clip was changed meanwhile. Publish would send the other video, so it is off.'
           )
         : publish === 'clip_changed'
           ? t(
-              'This clip was changed in the Clip Editor after your export, so its video in your Library is not your edit. Publish would send that video, so it is off.'
+              'This clip was changed after your export, so its video in your Library is not your edit. Publish would send that video, so it is off.'
             )
           : null
   const publishOff = exportWhy
@@ -474,6 +480,33 @@ function ProjectView({
     }
     showEditorNotice({ text: t('This clip is no longer in the Library.'), failure: true })
     // Read again, so the project says its clip is gone and Publish goes away.
+    await rereadShownProject(id)
+  }
+
+  // Other languages (KC): there for a clip project whose clip is there
+  // (as Publish is), and on without an export first: it works from the
+  // clip's caption lines, which an export updates from the editor's words.
+  const openLanguages = async (): Promise<void> => {
+    const id = shownProject?.id
+    const clipId = shownProject?.clip?.id
+    const videoId = shownProject?.clip?.video_id
+    if (!id || clipId === undefined || !videoId) return
+    let clips: Clip[]
+    try {
+      clips = await api.clips(videoId)
+    } catch {
+      if (editorStore().shownId === id) {
+        showEditorNotice({ text: t('Clips Kitty could not read the clip. Try again in a moment.'), failure: true })
+      }
+      return
+    }
+    if (editorStore().shownId !== id) return
+    const clip = clips.find((c) => c.id === clipId)
+    if (clip) {
+      setLanguagesClip(clip)
+      return
+    }
+    showEditorNotice({ text: t('This clip is no longer in the Library.'), failure: true })
     await rereadShownProject(id)
   }
 
@@ -617,6 +650,19 @@ function ProjectView({
         <span className="ml-auto flex items-center gap-3 shrink-0">
           {publish !== 'none' && (
             <button
+              ref={languagesButton}
+              type="button"
+              className="px-2 py-0.5 rounded-md bg-raised hover:bg-raised/70"
+              onClick={() => void openLanguages()}
+              title={t(
+                'Subtitles and dubbing in other languages for this clip: translate, review, style and export. Export your edits first, so the subtitles use the caption words you typed here.'
+              )}
+            >
+              {t('Other languages…')}
+            </button>
+          )}
+          {publish !== 'none' && (
+            <button
               ref={publishButton}
               type="button"
               className="px-2 py-0.5 rounded-md bg-accent/20 text-accent hover:bg-accent/30 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
@@ -670,8 +716,17 @@ function ProjectView({
         <PublishAllDialog
           clips={[publishClip]}
           provider={publishSetup.provider}
+          providerReady={publishSetup.ready}
+          youtube={publishSetup.youtube}
           onClose={() => setPublishClip(null)}
           returnFocus={publishButton}
+        />
+      )}
+      {languagesClip && (
+        <OtherLanguagesDialog
+          clip={languagesClip}
+          onClose={() => setLanguagesClip(null)}
+          returnFocus={languagesButton}
         />
       )}
     </div>

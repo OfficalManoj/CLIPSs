@@ -246,12 +246,11 @@ with the engine's URL plays. No `fetch` is needed to play a track.
   (there is no `to_dict`: the saved edit is the dict itself, and
   `shift_edit` carries `music` through a moved window untouched).
 
-**In the app:** the Effects tab's "Free music" button
-(`components/FreeMusicPicker.tsx`) lists the `kind == "music"` items and
-writes `{"library": id, …}`; typing or browsing a file writes `{"path": …}`,
-so the two clear each other. `TimelineEditor.tsx`'s "nothing to do" check
-(`isDefault`) looks at both `e.music?.path` and `e.music?.library`, so a clip
-whose only edit is a free track is still sent. On the Creators page the
+**In the app:** the old clip editor's "Free music" picker, which wrote
+`{"library": id, …}`, was removed with that editor (step KC); it comes back
+in a later editor panel update. Until then the routes and `EditList` read
+both forms as above, and a clip's free track is carried into its Clips Kitty
+Editor project, where any music file can also be imported. On the Creators page the
 "About this creator" box saves with `POST /creators/{creator_id}/description`
 when it loses focus (`tests/test_ui_step4.py`).
 

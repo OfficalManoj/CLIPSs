@@ -50,47 +50,11 @@ WoopSocial accepts clips up to 100 MB. A 60 fps clip longer than about 2 minutes
 
 ## Make clips again from a video you already added
 
-Made a video's clips with a setting you didn't want, like 60+ second clips? You can make them again with other settings, without adding the video again.
+Made a video's clips with a setting you didn't want, like 60+ second clips? You can make them again with other settings.
 
 ### Making clips again
 
-In the **Clip Editor**, pick the video and click **Make clips again…**. The window opens with the settings the video's clips were last made with. Change what you want, then click **Make clips again**. The video joins the queue like any other, the queue starts if it was stopped, and you see its progress as usual. When it's done, its clip list shows the new clips, and a line under the buttons says what changed, for example "15 new · 7 removed · 2 kept as they were". If the new settings found no new clips, it says so, and your clips stay as they were. The Queue page shows the same line under the finished video.
-
-If those settings aren't known any more (clearing the Queue page's finished list forgets them), the window starts from your usual settings instead.
-
-If the whole video was made into one clip last time (a watched channel's Twitch clips are), the window shows **Whole video (one clip)**, ticked. Leave it ticked to make that clip again with your new settings, or untick it to let the AI pick the best moments instead. 60s+, Sports and Marketplace plugins can't be used with it, so ticking one of them unticks Whole video.
-
-**Make clips again** is off, and hovering over it says why, while the video is waiting or being made in the queue, or when Clips Kitty no longer has the video:
-- A video you added by link is downloaded again if its download was deleted.
-- A file from your PC has to still be in Clips Kitty. If it's gone, add the file again.
-
-It's also off while the queue is full: let a video finish first. And it's off while one of the video's clips is being published, exported or edited: try again once that's done.
-
-If you start publishing or exporting one of its clips while the video waits in the queue, Clips Kitty waits up to two minutes for it when the video's turn comes. If it still isn't done by then, nothing is changed and the queue shows why. Press **Retry** on the Queue page once it's done.
-
-### What's kept and what's replaced
-
-The window tells you how many clips will be replaced and how many kept. Hover over that line to see why each kept clip is kept.
-
-These are **kept**:
-- clips you edited: cut, muted, recoloured, captions changed, a new start or end, a new title, description or hashtags, or a thumbnail you chose. An edit counts as soon as you apply it, even if making it fails, so **Retry** on the Queue page still has its clip;
-- clips you published or sent to publish, scheduled, exported (even if you took the star off since) or starred, translated or exported in other languages, or sent to a clipping campaign;
-- clips a watched channel chose to post;
-- clips with an edit, a translation or an export still being made, or a post still being sent, even one you started while the new clips were being made;
-- clips made before this update, or in another version of Clips Kitty;
-- 16:9 Longform clips and match reels.
-
-A new title, description or hashtags you gave a clip in another version of Clips Kitty counts too.
-
-The **other clips are replaced**, but only once the new clips are ready. A moment the new settings find again is made again with them, and keeps its title; its new video shows straight away, in the Clip Editor and in an open editor. The rest are deleted, with their files.
-
-Nothing is replaced, and the clips from before stay exactly as they were, if making the new clips fails, finds no clips, or can't make one of the clips it found. In that last case, the new clips it did make are added beside the old ones.
-
-**Cancel** works right up to the moment Clips Kitty starts replacing the clips from before, a moment at the very end: before then, pressing it stops everything and nothing is replaced. Once it has started replacing them, it finishes.
-
-A kept clip stays exactly as it was, its video too, even when the new settings find the same moment again. A scheduled one goes out as the video you scheduled.
-
-Make clips again makes the tall 9:16 clips. For 16:9 Longform clips, add the video again.
+The **Make clips again…** button is no longer on the **Clips** page. To make a video's clips again, paste its link or add its file again on the **Dashboard**: Clips Kitty says the video was already processed and offers **Make clips again** with the settings you chose. That keeps the existing clips and adds the new ones beside them.
 
 ### Your cuts stay where they were
 
@@ -103,15 +67,8 @@ Before, a new start moved every cut and mute to a different moment.
 
 ### Good to know
 
-- Clips made before this update, or in another version of Clips Kitty (an older one you went back to, say), are kept, because Clips Kitty can't tell whether you changed their titles there. If the new settings find one of them again at exactly the same start and end, it's made again with them and keeps its title. Delete the old ones you don't want yourself.
-- Closing Clips Kitty while it's making clips again is safe, and so is a power cut. The next time it starts, before the queue makes anything, every clip from before plays its own video again, and the video goes back in the queue as usual. If it was closed in the last moments, while it was replacing the clips from before, the ones it had already replaced stay replaced.
-- Wiping a creator's learned memory or deleting the creator (on the Creators page), taking a clip's star off, or clearing the Queue page doesn't make Clips Kitty forget a clip you edited, exported or published.
-- Edits you haven't applied don't keep a clip. If a clip you have open in the editor is deleted when the new clips are ready, the editor closes; one that's made again stays open and shows its new video. A preview you're making keeps its clip.
-- Process again, offered when you add a video that was already done, still keeps every clip and adds the new ones beside them.
+- The old clips stay. Delete the ones you don't want yourself.
 - A match reel from before stays as it is, so no new reel of the same kind is made. For a new one, delete the old reel first, then make clips again.
-- While the new clips are being made, the video files of the clips from before get a new name in their folder (for example `clip_00010-00020.clip-17.mp4`), so nothing can write over them. When it's done they get their names back, unless a new clip now has that name.
-- **Settings → Storage → Free up** is safe while clips are being made again, and after Clips Kitty was closed in the middle: it leaves every file Clips Kitty still needs for them. So is deleting one of the new clips.
-- Making clips again from a file you added from your PC keeps that file's copy in Clips Kitty safe. On some USB drives Clips Kitty can only check the copy before it starts, so if the copy can't be read later in the run, add the file again.
 
 ## Caption fonts and animations
 
@@ -119,7 +76,7 @@ Your captions can now use 12 bold caption fonts that come with Clips Kitty, move
 
 ### Pick a look
 
-The caption settings (when you add a video, in a queued video's settings, and in the Clip Editor) start with **Presets**, a row of ready-made looks, each name written in its own font. Click one and every caption setting is filled in for you:
+The caption settings (when you add a video, and in a queued video's settings) start with **Presets**, a row of ready-made looks, each name written in its own font. Click one and every caption setting is filled in for you:
 
 - **Classic:** white Arial, three words at a time, at the bottom. Your captions as they've always been.
 - **Bold pop:** a heavy, round-lettered font, two words at a time, each word lighting up yellow as it's said, and every caption popping in.
@@ -201,14 +158,7 @@ Your note stays on this PC. The one exception: if you turned on cloud AI with yo
 
 ### Free music
 
-Clips Kitty now comes with 8 music tracks you can put under any clip:
-
-1. Open a clip in the **Clip Editor** and go to the **Effects** tab.
-2. Press **Free music**, beside the Music box. The tracks are listed with their mood (chill, upbeat, funny or tense) and length. Press ▶ on a track to hear it, and ■ to stop.
-3. Click a track's name to pick it. It plays under the clip, a little quieter while someone is talking if **Duck under voice** is on, and repeats if the clip is longer than the track. It starts as quiet background music, well under the voice. On a loud clip (a street, a crowd, a game) drag **Vol** up to hear more of it. Click the name again to take the music off.
-4. Press **Apply edits** as usual.
-
-Your own music file still works the same way as before. A clip has one or the other: picking a free track clears your file, and choosing your file clears the free track.
+Clips Kitty comes with 8 music tracks you can put under any clip. Their picker was in the old clip editor (Quick edit), which is gone: the tracks come to Clips Kitty Editor's sound shelf in a later update. Until then, import any music file in the editor and put it under your clip there. A clip that already has a free track keeps it, and opening it in the editor brings the music along.
 
 **The music is free to use, also in monetised videos.** Every track was released into the public domain (CC0) by its author. You don't need to credit anyone or ask permission. The tracks are all about as loud as each other, so the volume slider means the same for each.
 
@@ -239,7 +189,7 @@ In **Settings → Voice**:
 2. Pick the voice you want as your usual one.
 3. Click **Hear this voice** to listen to a short sample.
 
-When you dub a clip, the dubbing window offers the same voices, and you can pick a different one for each language. The dubbing window is in **Clip Editor**: click a clip, click **Edit this clip**, then open the **Subtitles** tab and choose **Subtitles + dubbed voice**.
+When you dub a clip, the dubbing window offers the same voices, and you can pick a different one for each language. The dubbing window is in the editor: open the clip in the editor, click **Other languages…** at the top of the Editor page, and choose **Subtitles + dubbed voice**.
 
 ### Using Voicebox, VoiceStudio or another voice app
 
@@ -268,12 +218,14 @@ Some voices may not be used in videos that earn money. Clips Kitty marks those w
 
 Clips Kitty has a full editor for when you want to do more than a quick fix: a timeline with tracks, cuts, captions, text, sound and export. It's called **Clips Kitty Editor** and it opens inside the Clips Kitty window, on the **Editor** page. It's based on Concat, an open-source video editor.
 
-If you don't see **Editor** in the menu on the left, your copy of Clips Kitty doesn't have the editor installed, and everything else works as before.
+It is the one editor: the old small one (**Edit this clip**, called Quick edit in these notes) is gone. Its subtitles and dubbing are under **Other languages…** in the editor, and its YouTube upload is in the **Publish** window. Some of its tools come back in later updates: see **Not in the editor yet** below.
+
+If you don't see **Editor** in the menu on the left, your copy of Clips Kitty doesn't have the editor installed, so clips can't be edited: **Edit** is off, and pointing at it says the editor wasn't found. Subtitles and dubbing (**Other languages…**) are in the editor too, so they can't be reached either. Everything else works as before.
 
 ### Open a clip in the editor
 
-1. Go to **Clip Editor** and pick a video.
-2. Point at a clip and click **Open in editor** (next to **Publish**). You can also click a clip and then **Open in editor**, next to **Edit this clip** in the clip's panel.
+1. Go to **Clips** and pick a video.
+2. Point at a clip and click **Edit** (next to **Publish**). You can also click a clip and then the big **Edit** button in the clip's panel.
 3. The **Editor** page opens straight on your clip: the bar at the top shows the clip's name and how far it is, and the page says **Opening the editor…** until the editor appears. The first time, Clips Kitty gets the clip ready, which takes a few seconds for most clips and up to a minute or two for some (gaming, sport or letterboxed clips). After that it opens straight away. Changed your mind? Click **← Projects**: it stops opening the clip. A clip that was being got ready for the first time is still made, and it stays in **Recent projects** for next time.
 4. Opening another clip while one is open saves and closes the first one, the same as **← Projects**. Opening the clip that is already open just shows it again, as you left it. If the new clip can't be opened, the bar says why, and **← Projects** takes you back.
 
@@ -290,7 +242,7 @@ The editor saves by itself as you work. **← Projects** at the top saves and cl
 
 Click **Export** in the editor (top right), then **Export**.
 
-- **A clip:** the export becomes that clip's video in your Library. The bar says **Saved as this clip's video.**
+- **A clip:** the export becomes that clip's video in your Library. The bar says **Saved as this clip's video.** If you changed the words of your captions, they're saved with the clip too (**…with your caption words**), so subtitles in other languages use them. That works while each caption stays where it was. If you moved, cut or deleted captions, Clips Kitty can't match them to the clip's own caption lines, so the bar says **Other languages keep the old caption words.** and the clip keeps its words from before. A clip that was already cut or sped up before you opened it (by the AI or the old clip editor) has captions that can't be matched either: it keeps its words from before, and the bar says nothing about them.
 - **A whole video or a file:** it's saved to your export folder (the one in Settings). If you haven't chosen one, it goes to your Downloads folder, the same place the app's other Export buttons use. The name box starts as "project name - date"; change it if you like, and that is the file's name. The bar says where, with **Show in folder**.
 
 The Export window says under the name where your video will go: **Replaces this clip in the Library**, or the export folder. If you deleted the clip from your Library meanwhile, it goes to the export folder, and the Export window says so.
@@ -299,13 +251,29 @@ No end card is added to what you export from the editor.
 
 ### Publish
 
-When a clip's export is saved as the clip's video, click **Publish** at the top of the Editor page. It opens the same **Publish this clip** window as the clip's **Publish** on the Clip Editor page, so you pick your platforms and send it the same way. The editor steps aside while the window is open.
+When a clip's export is saved as the clip's video, click **Publish** at the top of the Editor page. It opens the same **Publish this clip** window as the clip's **Publish** on the Clips page, so you pick your platforms and send it the same way. The editor steps aside while the window is open.
+
+The window has, besides the platforms:
+
+- **YouTube (direct upload)**, when you turned on direct upload to YouTube in Settings: the title, description, playlist, thumbnail and schedule, then **Upload now**. For the thumbnail, slide **Frame at** to any moment of the clip, check the picture beside it, and click **Use this frame**; or pick one of the suggested frames, make some, or upload an image.
+- **Published links**, once the clip is live somewhere and Discord is connected: open each post, or send its link to Discord.
+
+With only YouTube's direct upload turned on, **Publish** works too and the window shows just that.
 
 - **Publish** sends the clip in your Library, so it turns on after you **Export**. Before that, point at it to read **Export first: Publish sends the clip in your Library.**
 - It sends the clip as you last exported it. Export again after more changes.
-- If the clip was changed in the Clip Editor meanwhile, your export is saved next to the clip instead, and **Publish** stays off: point at it to read why.
-- Publish is there for clips. It works the same as on the Clip Editor page: the window opens even with nothing set up yet. To send the clip, set up WoopSocial or Upload-Post in Settings.
+- If the clip was changed meanwhile (made again, for example), your export is saved next to the clip instead, and **Publish** stays off: point at it to read why.
+- Publish is there for clips. It works the same as on the Clips page: the window opens even with nothing set up yet. To send the clip, set up WoopSocial, Upload-Post or YouTube's direct upload in Settings.
 - In the window, **Esc** is **Cancel**, and **Tab** stays inside it.
+
+### Other languages (subtitles and dubbing)
+
+With a clip open in the editor, click **Other languages…** at the top of the Editor page, next to **Publish**. A window opens with the clip on the left and the subtitles and dubbing you know on the right: pick from 19 languages, translate, read and fix each language's lines, keep names right with the glossary, choose the subtitle look, and export a video for each language with **Subtitles** (burned into the picture, the original audio kept) or **Subtitles + dubbed voice** (a voice per language). The language you're reviewing is shown over the clip the way it will be burned in. The editor steps aside while the window is open; **Esc** or **Close** brings it back (a translation or export keeps going).
+
+- The translation uses the clip's caption words. Export your edits from the editor first, so the words you typed there are the ones translated. If you export new caption words while a translation is still running, that translation isn't saved: the window says so, and you translate again.
+- Both choices make new videos from the clip as the AI made it, not from your editor version: without the editor's cuts, music, looks or titles. So for a clip you exported from the editor, **Subtitles** and **Subtitles + dubbed voice** both ask first, every time. Burning them onto your editor version comes in a later update.
+- The window always burns the subtitles into the picture. Separate subtitle files aren't a choice in it; they can only be made through Clips Kitty's local API.
+- **Other languages…** is there for clips. A whole video or a file has no clip's captions to translate.
 
 ### Edit a whole video or a file from your PC
 
@@ -317,12 +285,32 @@ Your projects are listed under **Recent projects** on the Editor page. Click one
 
 ### Your editor changes are never lost without a word
 
-Once you've exported a clip from the editor, today's clip editor (**Edit this clip** in the Clip Editor page, called **Quick edit** here) would start again from the clip as the AI made it. So:
+Once you've exported a clip from the editor, anything that makes the clip again from its own settings would start again from the clip as the AI made it. So:
 
-- **Apply**, the AI chat edit, saving captions and **Apply edits & upload** ask first. Choose **Open in editor**, **Apply anyway** or **Cancel**.
-- **Export in other languages** asks too, because those new files are made from the clip as the AI made it.
+- **Re-render** in the clip's panel on the Clips page asks first. Choose **Open in editor**, **Apply anyway** or **Cancel**.
+- **Subtitles** and **Subtitles + dubbed voice** under **Other languages…** ask too, because those new videos are made from the clip as the AI made it.
 - **Make clips again** and Storage clean-up keep your editor version.
-- If you changed a clip in Quick edit after its editor project was made, opening it in the editor asks whether to **Open the project** as you left it or **Start a new project from the clip**. An export from that older project is saved next to the clip instead of replacing it.
+- If the clip was made again after its editor project was made, opening it in the editor asks whether to **Open the project** as you left it or **Start a new project from the clip**. An export from that older project is saved next to the clip instead of replacing it.
+
+### Not in the editor yet
+
+The old clip editor (Quick edit) had a few tools that Clips Kitty Editor doesn't have yet. They come back in later updates:
+
+- **Gaming layouts:** switching a clip's gaming or reaction layout, and **Remember for this creator**. Next, in the gaming update. Until then a gaming clip opens in the editor with the layout the AI gave it.
+- **Automatic** framing for a clip. In the reframing update.
+- **Letterbox and Center** framing, and the note on a **Vertical Live** clip's framing. In the editor's own panel.
+- **Word tools:** muting or cutting a single word by clicking it, censoring swear words, and tightening pauses and filler words. In the editor's own panel. Until then, split the video at the word with the split tool and mute or delete that piece by hand.
+- **Swap speakers** for the second speaker's caption colour. In the same panel update. Until then, change a caption's colour in the editor by hand.
+- **Plugin suggested edits** (Use, Take it back, Hide). In a later panel update. Plugins' notes and ratings still show on the Clips page.
+- **The free music picker** and **Duck under voice** (music getting quieter while someone talks). In a later panel update. Until then, import any music file and set its volume by hand.
+
+- **The AI edit chat.** It comes back with typed edits in the editor.
+- **The old Publish tab's extras:** a different title and description for each platform, a first comment, each platform's status with refresh and retry, and the **Through** switch for choosing Upload-Post when both WoopSocial and Upload-Post are on. The **Publish** window sends with the clip's own title and description (through WoopSocial when both are on), and **Schedule** shows each post.
+- **Other languages burned onto your editor version.** The burned-in subtitles and the dub are made from the clip as the AI made it.
+
+**Sharpen** is already in the editor: add the **Sharpen** effect to the clip and set its amount.
+
+Music and sound, volume and fades, colour looks and effects, titles and text, and images over the video are in the editor already.
 
 ### Good to know
 

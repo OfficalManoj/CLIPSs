@@ -1,11 +1,11 @@
-/** Quick edit and a clip Clips Kitty Editor exported (editor suite K2, E5).
+/** Making again a clip Clips Kitty Editor exported (editor suite K2, E5).
  *
  *  After the editor exports a project made from a clip, the clip's file is
  *  that export (it lives in data/clips/projects/), while the clip's own
- *  settings still describe the clip as the AI made it. Applying a change in
- *  Quick edit (Apply, the chat edit, the caption save, "Apply edits &
- *  upload") would make the clip again from those settings and lose the
- *  editor's changes, so the engine asks first (409, reason
+ *  settings still describe the clip as the AI made it. A request that makes
+ *  the clip again from those settings (Quick edit's Apply, chat edit and
+ *  caption save did; Quick edit is gone since KC, the routes remain) would
+ *  lose the editor's changes, so the engine asks first (409, reason
  *  "project_export"). The app then asks the person: open it in the editor
  *  (when the editor is found and its project is there), apply anyway (the
  *  same request with replace_project_edits), or leave it.
@@ -20,8 +20,9 @@ export type ProjectExportChoice = 'apply' | 'make' | 'open' | 'cancel'
 export interface ProjectExportQuestion {
   message: string
   project_id: string
-  /** New files made beside the clip (a translation, a dub, subtitle files),
-   *  not a render that replaces the clip's file: the person is told they
+  /** New files made beside the clip (burned subtitles, a dub, or subtitle
+   *  files alone when the editor moved the captions; kitty_editor.intake
+   *  subtitles_follow), not a render that replaces the clip's file: the person is told they
    *  are made from the clip as the AI made it, and chooses "Make it anyway"
    *  or "Cancel". */
   separate?: boolean
@@ -71,7 +72,7 @@ export class NothingMade extends Error {
 }
 
 /** Send a request that makes NEW files from a clip's own settings (Export in
- *  other languages: burned subtitles, a dub, subtitle files). When a clip's
+ *  other languages: burned subtitles or a dub). When a clip's
  *  file is an editor export the engine asks first (409, separate_file); the
  *  request is sent again with `goAhead` only on "Make it anyway". */
 export async function sendAskingFirstForNewFiles(send: (goAhead: boolean) => Promise<Response>): Promise<Response> {

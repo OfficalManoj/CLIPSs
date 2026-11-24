@@ -210,11 +210,11 @@ zurückhaltend: Ein Spruch muss sich tatsächlich wiederholen, bevor er zählt, 
 erwähnt wird, ruht, und jeder Beitrag zur Bewertung daraus ist additiv, gedeckelt und lässt sich
 abschalten.
 
-**Videoeditor.** Nicht-destruktiv: Trims, interne Schnitte, Stummschaltungen, stummgeschaltete Wörter,
-Lautstärke, Blenden, Geschwindigkeit, Hook-Text, Musik und Wasserzeichen werden als Operationen
-gespeichert und beim Rendern angewendet. Es gibt auch einen KI-Bearbeitungschat (*„mach ihn 5 Sekunden
-länger“*, *„im Untertitel steht gost, es sollte ghost heißen“*), bei dem das Modell Vorschläge macht
-und geprüfter Code sie umsetzt.
+**Videoeditor.** Clips Kitty Editor, gebaut auf dem Open-Source-Editor Concat, öffnet jeden
+Clip auf einer Zeitleiste: Schnitte, Stummschaltungen, Lautstärke, Blenden, Geschwindigkeit,
+Untertitel, Musik, Farblooks, Titel und Bilder über dem Video. Untertitel und
+Synchronisation in anderen Sprachen gibt es dort auch. Der KI-Bearbeitungschat kommt in
+einem späteren Update zurück.
 
 **Verarbeitung im Langformat.** Ein optionaler 16:9-Weg mit derselben Analyse: horizontale
 Clips, Schnitte in X/Twitter-Länge, ein Best-of-Highlight-Reel oder der komplette Stream ohne
@@ -265,7 +265,7 @@ solange das noch geht. Ein Glossar schützt Kanalnamen, Sponsoren und Insider-Wi
   Position, Wörter pro Zeile, Groß-/Kleinschreibung oder aus). Korrigiere einen Transkriptionsfehler Zeile für
   Zeile vor dem Export. Wenn zwei Leute reden, können die Untertitel der zweiten Person eine andere Farbe
   bekommen, und eine falsche Zuordnung lässt sich von Hand umstellen.
-- **KI-Bearbeitungschat**: Beschreib in einfachen Worten, was nicht passt, und er bearbeitet neu.
+- **KI-Bearbeitungschat** (kommt in einem späteren Update zurück): Beschreib in einfachen Worten, was nicht passt, und er bearbeitet neu.
 - **Ask Clips Kitty**: das Textfeld unten im Dashboard. Sag in einem Satz, was du willst, etwa
   *„clippe diesen Stream, nimm auf jeden Fall rein, wie ich gegen den Boss gestorben bin,
   mit großen gelben Untertiteln“*, und es stellt das Video in die Warteschlange, sagt der Clip-Auswahl, worauf sie
@@ -282,7 +282,7 @@ solange das noch geht. Ein Glossar schützt Kanalnamen, Sponsoren und Insider-Wi
 - **Wasserzeichen- und Branding-Profile**: Standards pro Creator, die automatisch angewendet werden.
 - **Modellverwaltung**: Tausch das KI-Gehirn direkt in der App aus; Modelle herunterladen, entfernen und
   wechseln, mit Fortschrittsbalken und ohne Terminal.
-- **Direkt aus dem Editor auf YouTube veröffentlichen**: Titel, Beschreibung, Tags, Thumbnail,
+- **Im Veröffentlichen-Fenster auf YouTube veröffentlichen**: Titel, Beschreibung, Tags, Thumbnail,
   Playlist, Zielgruppe und Sichtbarkeit, dann sofort hochladen oder planen. Optional, standardmäßig
   aus, und es nutzt deinen eigenen Google-API-Schlüssel.
 - **Feedback in der App**: Fehlerberichte mit automatisch gesammelter Diagnose, kein Konto nötig.
@@ -381,7 +381,7 @@ npm install
 npm run dev        # opens the Clips Kitty desktop app
 ```
 
-Die App startet ihre eigene Python-Engine automatisch. Füge in **Clip Editor** einen Link ein,
+Die App startet ihre eigene Python-Engine automatisch. Füge im **Dashboard** einen Link ein,
 drück auf *Generate clips* (Clips erstellen) und verfolge den Fortschritt live.
 
 Den Installer selbst zu bauen ist ein einziger Befehl. Siehe
@@ -567,11 +567,13 @@ Du willst eine Sprache, die hier fehlt? [#61](https://github.com/ColinGPT9/clips
 
 ## Auf YouTube veröffentlichen
 
-Standardmäßig aus. Schalte es unter **Settings → Publish to YouTube** (Einstellungen → Auf YouTube veröffentlichen) ein, und im
-Editor erscheint ein Tab **YouTube**: Trag Titel, Beschreibung, Tags, Thumbnail,
-Playlist, Zielgruppe und Sichtbarkeit ein und drück dann auf **Upload now** (Jetzt hochladen). Clips Kitty rendert
-den Clip, falls du ungespeicherte Änderungen hast, und lädt ihn direkt auf deinen Kanal hoch. Es gibt
-keinen Export-Schritt und keine separate Veröffentlichungsseite. Du verlässt den Editor nie.
+Standardmäßig aus. Schalte es unter **Settings → Publish to YouTube** (Einstellungen → Auf
+YouTube veröffentlichen) ein, und das **Publish**-Fenster (Veröffentlichen) eines Clips (auf
+der Seite Clips oder im Editor) bekommt einen Abschnitt **YouTube (direct upload)**
+(YouTube, direkter Upload): Trag Titel, Beschreibung, Tags, Thumbnail, Playlist, Zielgruppe
+und Sichtbarkeit ein und drück dann auf **Upload now** (Jetzt hochladen). Clips Kitty lädt
+den Clip direkt auf deinen Kanal hoch. Es gibt keinen Export-Schritt und keine separate
+Veröffentlichungsseite.
 
 Wenn du es ausgeschaltet lässt, ändert sich nirgendwo in der App etwas.
 
@@ -649,12 +651,13 @@ stuft ein Video anhand seines Formats und seiner Länge von selbst als Short ein
 
 ## Auf allen Plattformen gleichzeitig veröffentlichen
 
-Ebenfalls standardmäßig aus. Schalte es unter **Settings → Publish through WoopSocial** (Einstellungen → Über WoopSocial veröffentlichen) ein,
-und im Editor erscheint ein Tab **Publish** (Veröffentlichen): Wähl deine Plattformen aus – oder drück auf
-**Everywhere** (Überall) –, schreib Titel und Beschreibung einmal, und ein einziger Upload geht gleichzeitig an
-YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest und
-Bluesky. **Publish all** (Alle veröffentlichen) im Clip Editor erledigt einen ganzen Stapel,
-zeitlich verteilt, damit nicht ein Dutzend Clips in derselben Sekunde landen.
+Ebenfalls standardmäßig aus. Schalte es unter **Settings → Publish through WoopSocial**
+(Einstellungen → Über WoopSocial veröffentlichen) ein, und im **Publish**-Fenster
+(Veröffentlichen) eines Clips (auf der Seite Clips oder im Editor) wählst du deine
+Plattformen aus – oder drückst auf **Everywhere** (Überall) –, und ein einziger Upload geht
+gleichzeitig an YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest und
+Bluesky. **Publish all** (Alle veröffentlichen) auf der Seite Clips erledigt einen ganzen
+Stapel, zeitlich verteilt, damit nicht ein Dutzend Clips in derselben Sekunde landen.
 
 Das hier ist **nicht lokal**. Der Clip und seine Angaben werden an einen Veröffentlichungsdienst
 geschickt, der sie ausliefert und die Verbindungen zu deinen Social-Media-Konten

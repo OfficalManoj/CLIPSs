@@ -3,7 +3,7 @@
 #     powershell -ExecutionPolicy Bypass -File scripts\capture_store_pages.ps1
 #
 # ONLY visits Models and Settings. Every other page shows the library: clip
-# thumbnails on Clip Editor and Creators, and video titles and channel names on
+# thumbnails on Clips and Creators, and video titles and channel names on
 # Dashboard and Queue. None of that belongs in a public listing - the footage
 # is someone else's, and neither their face nor their channel name is ours to
 # advertise with.

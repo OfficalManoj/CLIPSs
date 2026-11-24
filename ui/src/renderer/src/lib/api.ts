@@ -877,9 +877,12 @@ export const api = {
       method: 'POST'
     }),
 
-  /** A frame from the clip, for the thumbnail picker. Needs img-src in the CSP. */
-  clipFrameUrl: (clipId: number, t: number) =>
-    `${API_BASE}/clips/${clipId}/frame?t=${t.toFixed(3)}`,
+  /** A frame from the clip, for the thumbnail picker. Needs img-src in the CSP.
+   *  Pass the clip's media_version: an editor export keeps the clip's id, and
+   *  the URL then changes with the file. The engine ignores it. */
+  clipFrameUrl: (clipId: number, t: number, version?: string) =>
+    `${API_BASE}/clips/${clipId}/frame?t=${t.toFixed(3)}` +
+    (version ? `&v=${encodeURIComponent(version)}` : ''),
   /** `image` is base64 data, not a path: the backend never receives a filename
    *  for the thumbnail, so it never has to trust one. */
   chooseThumbnail: (clipId: number, body: { image?: string; t?: number; generated?: number }) =>
@@ -1233,6 +1236,10 @@ export interface EditorTakeIn {
   seconds?: number
   again?: boolean
   error?: string
+  /** replaced_clip only (step KC): "followed" when the words typed on the
+   *  editor's captions were saved as the clip's caption lines, "kept" when
+   *  they no longer match the clip's lines, which then stay as they were. */
+  captions?: 'followed' | 'kept'
 }
 
 /** 'source' is "Same as the video": the video's own picture size (FL3). */

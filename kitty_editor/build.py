@@ -391,6 +391,48 @@ def program_lines(lines, edit, length: float) -> list[dict]:
     return out
 
 
+def caption_record(source, plan: dict) -> dict | None:
+    """What the clip's project was given as captions, kept with the project
+    so an export can carry the editor's retyped words back to the clip
+    (step KC): {"lines": the captions as put on the timeline, "source": the
+    clip's own caption lines they came from}, one for one and in order.
+
+    None when the captions on the timeline are not the clip's lines one for
+    one at the same times (cuts or a speed moved them): the words then can't
+    be matched safely, and the clip keeps its lines."""
+    placed = sorted((line for group in plan.get("captions") or () for line in group["lines"]),
+                    key=lambda line: line["start"])
+    usable = [line for line in source or () if isinstance(line, dict) and str(line.get("text") or "").strip()]
+    try:
+        usable = sorted(usable, key=lambda line: float(line["start"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not placed or len(placed) != len(usable):
+        return None
+    out = []
+    for put, own in zip(placed, usable):
+        try:
+            start, end = float(own["start"]), float(own["end"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if put["text"] != str(own["text"]).strip() or abs(put["start"] - start) > 0.01 or abs(put["end"] - end) > 0.01:
+            return None
+        out.append({"start": start, "end": end, "text": str(own["text"]).strip()})
+    # The project's other titles (the hook, a text watermark), by their
+    # times: a caption with the same span can't be told from them in the
+    # editor's saved file, so its words are never taken back (review r5).
+    titles = []
+    try:
+        if plan.get("hook"):
+            titles.append([0.0, float(plan["hook"]["seconds"])])
+        if plan.get("watermark_text"):
+            titles.append([0.0, float(plan.get("length") or 0.0)])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return {"lines": [{k: line[k] for k in ("start", "end", "text")} for line in placed], "source": out,
+            "titles": titles}
+
+
 def plan_clip(*, opts: dict, window: float, base_seconds: float, lines, canvas: tuple[int, int],
               default_style: dict | None = None, captions: bool = True, music_file=None,
               watermark: dict | None = None, watermark_image=None) -> dict:

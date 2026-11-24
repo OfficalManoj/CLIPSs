@@ -319,7 +319,7 @@ export interface ExportBatch {
 }
 
 /** What this window knows and started, kept while it moves between pages:
- *  the Clip Editor page is unmounted on the way to Settings and back, and an
+ *  the Clips page is unmounted on the way to Settings and back, and an
  *  export carries on meanwhile. */
 export const exportSession: {
   jobs: Map<string, ExportJob>

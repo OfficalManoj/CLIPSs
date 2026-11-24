@@ -226,7 +226,8 @@ export interface CaptionLine {
   end: number
   text: string
   /** Set on a line someone other than the main speaker says, when the
-   *  caption style colours them (lib/speakerTurns.ts). */
+   *  caption style colours them (the engine marks it, video/captions.py
+   *  tag_lines). */
   speaker?: number
 }
 

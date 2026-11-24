@@ -34,8 +34,9 @@ Upload-Post is there for what WoopSocial does not do.
 comment, or a posting queue. Otherwise WoopSocial is the simpler and cheaper
 route.
 
-With both switched on, the Publish tab gets a **Through** switch at the top so
-you pick per clip. It starts on WoopSocial.
+With both switched on, the **Publish** window sends through WoopSocial. The
+old clip editor's **Through** switch, which picked Upload-Post per clip, is not
+in the Publish window yet.
 
 ---
 
@@ -126,10 +127,12 @@ under *Profile name*.
 
 ## Publishing one clip
 
-Open a clip in the editor and choose the **Publish** tab.
+Click **Publish** on a clip: on the Clips page, or at the top of the Editor
+page once you have exported the clip there. The **Publish this clip** window
+opens.
 
 1. Pick platforms, or press **Everywhere**.
-2. Check the title, description and hashtags — they come from the clip.
+2. The title, description and hashtags come from the clip.
 3. Press **Publish**.
 
 One upload happens, and Upload-Post distributes it. You do not upload the clip
@@ -138,12 +141,18 @@ once per platform.
 Platforms you have not connected are shown dimmed with a `○`. If you pick one
 anyway it comes back as *skipped*, not failed.
 
-Publishing is blocked while you have unsaved edits, because the rendered file
-is what gets uploaded. Apply your edits first.
+The clip in your Library is what gets uploaded: after changes in the editor,
+export first.
+
+**Not in the Publish window yet.** The old clip editor's Publish tab is gone,
+and with it a few things this guide describes below: per-platform wording,
+first comments, the thumbnail tick, **When** for one clip, and **Where it
+went** with retry. Until they come back, every platform gets the clip's own
+text, and **Schedule** on the Clips page shows how each post is going.
 
 ## Publishing a batch
 
-**Clip Editor → Publish all.** It asks before doing anything, and tells you
+**Clips → Publish all.** It asks before doing anything, and tells you
 exactly how many posts that means — twelve clips across four platforms is
 forty-eight posts.
 
@@ -158,8 +167,8 @@ undone.
 
 ## Titles, descriptions and hashtags
 
-Written once, in the Publish tab, and used everywhere. Each clip starts with
-the title, description and hashtags Clips Kitty generated for it.
+Used everywhere: each clip is sent with the title, description and hashtags
+Clips Kitty generated for it.
 
 Anything in **Settings → Added to every description** is appended to every
 post — links to your Twitch, your Discord, whatever should always be there.
@@ -179,7 +188,7 @@ Leave them blank and every platform uses the common text.
 ## Thumbnails and covers
 
 Tick **Use the thumbnail chosen for this clip** to send the thumbnail you
-picked in the editor.
+picked for it (not in the Publish window yet, see above).
 
 Only **YouTube, LinkedIn and Facebook (video posts)** accept a custom
 thumbnail through Upload-Post. The others use a frame from the video. Clips
@@ -300,4 +309,4 @@ to be updated in `ui/src/main/index.ts`.
 
 **A publish sits on "Processing" for a long time.** Large videos take a while
 at their end, and Clips Kitty stops watching after a few minutes. The upload
-is not lost — check the platform, or reopen the clip's Publish tab.
+is not lost — check the platform, or **Schedule** on the Clips page.

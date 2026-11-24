@@ -1,5 +1,4 @@
 {
-  "Clip Editor": "Clip Editor",
   "Creators": "ครีเอเตอร์",
   "Models": "โมเดล",
   "Settings": "การตั้งค่า",
@@ -145,7 +144,6 @@
   "Links / screenshots of that feature (optional)": "ลิงก์ / ภาพหน้าจอของฟีเจอร์นั้น (ไม่บังคับ)",
   "Which part of the app is this about? (optional)": "เกี่ยวข้องกับส่วนใดของแอป? (ไม่บังคับ)",
   "The app’s look & controls": "รูปลักษณ์และการควบคุมของแอป",
-  "The clip editor": "เครื่องมือตัดต่อคลิป",
   "AI results (clips picked, captions, titles)": "ผลลัพธ์จาก AI (คลิปที่เลือก, คำบรรยาย, ชื่อเรื่อง)",
   "Speed / freezes": "ความเร็ว / การค้าง",
   "YouTube videos": "วิดีโอ YouTube",

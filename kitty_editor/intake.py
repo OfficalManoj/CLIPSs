@@ -7,7 +7,7 @@ a path), and take_in moves it to where it belongs:
 - a clip's project, the clip is there and still on the file the project
   stands on: the export becomes the clip's video (data/clips/projects/), the
   clip's old file is removed only after that worked;
-- the clip was changed since (Quick edit rendered it again): the export is
+- the clip was changed since (rendered again, for example): the export is
   kept beside it in data/clips/projects/ and the clip is left alone;
 - no clip to re-point (a whole video, a file, a deleted clip): the export
   goes to the person's export folder under the name typed in the editor's
@@ -21,6 +21,7 @@ Standard library only when imported.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -165,6 +166,177 @@ def _answer(entry: dict, again: bool, clip_id=None) -> dict:
         out["clip_id"] = entry["clip_id"]
     if entry["result"] == "kept_beside":
         out["reason"] = "clip_changed"
+    if entry.get("captions") in ("followed", "kept"):
+        out["captions"] = entry["captions"]
+    return out
+
+
+def edited_captions(project_dir, record: dict) -> list[dict] | None:
+    """The clip's caption lines with the words now on the editor's titles
+    (step KC), from the project's saved file: each line the project was
+    given (`record`, build.caption_record) is found again as the one text
+    item starting AND ending where it does (within 0.05 s), so the hook or
+    a text watermark that starts with it is never taken for a caption. A
+    title emptied in the editor drops its line.
+
+    None when any line is not found exactly once that way (moved, trimmed,
+    split, cut or deleted in the editor, or a duplicate) or the file can't
+    be read: the clip then keeps its lines."""
+    try:
+        project = json.loads((Path(project_dir) / "concat.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return None
+    if not isinstance(project, dict):
+        return None
+    items = project.get("clips")
+    for timeline in project.get("timelines") or ():
+        if isinstance(timeline, dict) and timeline.get("id") == project.get("activeTimelineId"):
+            items = timeline.get("clips")
+    texts = []
+    for item in items or ():
+        try:
+            if isinstance(item, dict) and item.get("kind") == "text":
+                text = item.get("text")
+                words = text.get("content") if isinstance(text, dict) else text
+                texts.append((str(item["id"]), float(item["start"]), float(item["start"]) + float(item["duration"]),
+                              words))
+        except (KeyError, TypeError, ValueError):
+            continue
+    lines, source = record.get("lines") or [], record.get("source") or []
+    if not lines or len(lines) != len(source):
+        return None
+    # A caption with the same span as the hook or a text watermark (the
+    # record's "titles"): with that caption deleted, the other title would
+    # be found in its place, so the clip keeps its lines.
+    try:
+        titles = [(float(a), float(b)) for a, b in record.get("titles") or ()]
+        if any(abs(float(line["start"]) - a) < 0.1 and abs(float(line["end"]) - b) < 0.1
+               for line in lines for a, b in titles):
+            return None
+    except (KeyError, TypeError, ValueError):
+        return None
+    used: set[str] = set()
+    out = []
+    for line, own in zip(lines, source):
+        start, end = float(line["start"]), float(line["end"])
+        # Both ends, every time: the hook or a text watermark at 0 s, a
+        # trimmed title or the halves of a split title never match.
+        found = [x for x in texts if x[0] not in used and abs(x[1] - start) < 0.05 and abs(x[2] - end) < 0.05]
+        if len(found) != 1 or not isinstance(found[0][3], str):
+            return None
+        used.add(found[0][0])
+        words = " ".join(found[0][3].split())
+        if words:
+            out.append({"start": float(own["start"]), "end": float(own["end"]), "text": words})
+    return out
+
+
+def follow_captions(db, row, manifest: dict) -> str | None:
+    """After an export became the clip's video: the clip's saved caption
+    lines take the words typed on the editor's titles, so translation, the
+    MCP clip_captions tool and a translated burn use them (step KC).
+
+    "followed" when the words changed and were saved (the clip's saved
+    translations, made from the old words, are then removed), "same" when every
+    caption is still in place with the clip's own words (nothing to save),
+    "kept" when the project was given the clip's lines one for one but they
+    no longer match them or every title was emptied (the clip keeps its
+    lines), None when there was
+    nothing to compare. "same" is kept on the export's record only: the
+    answer leaves it out (_answer), and subtitle files read it
+    (subtitles_follow). A
+    project whose captions never matched the clip's lines one for one (the
+    clip's own cuts or speed had moved them) has no record: None, so no
+    notice says the person moved captions they never touched.
+    Never raises: the export is the clip's video whatever happens here."""
+    try:
+        captions = manifest.get("captions")
+        if not isinstance(captions, dict):
+            return None
+        record = captions.get("follow")
+        if not isinstance(record, dict):
+            return None
+        lines = edited_captions(manifest.get("project_dir") or "", record)
+        if not lines:
+            return "kept"           # not found, or every title emptied: never "followed" with no lines
+        opts = json.loads(row["render_opts"]) if row["render_opts"] else {}
+        current = opts.get("caption_lines")
+        source = record.get("source") or []
+        # The clip's own lines must still be ones the project was given
+        # (their times; the words, or a line emptied, may come from a last
+        # export of this project).
+        if current:
+            usable = [x for x in current if isinstance(x, dict) and str(x.get("text") or "").strip()]
+            if not usable or not all(
+                any(abs(float(a["start"]) - float(b["start"])) <= 0.01
+                    and abs(float(a["end"]) - float(b["end"])) <= 0.01 for b in source)
+                for a in usable
+            ):
+                return "kept"
+            before = [" ".join(str(x["text"]).split()) for x in usable]
+        else:
+            before = [" ".join(str(x["text"]).split()) for x in source]
+        # Both sides with their spaces and line breaks collapsed, as the
+        # edited words are: a double space alone is never "followed".
+        if [x["text"] for x in lines] == before:
+            return "same"           # the same words, every caption in place: nothing to save
+        opts["caption_lines"] = lines
+        db.set_clip(int(row["id"]), render_opts=json.dumps(opts))
+        _drop_translations(db, int(row["id"]))
+        return "followed"
+    except Exception:
+        return "kept"
+
+
+def _drop_translations(db, clip_id: int) -> None:
+    """The clip's saved translations, made from its words before the edit:
+    removed, so no other language goes out with the old words. The next
+    translation starts from the new ones. Never raises."""
+    try:
+        for saved in db.translations_for(clip_id):
+            db.delete_translation(clip_id, saved["language"])
+    except Exception:
+        pass
+
+
+def subtitles_follow(data_dir, path) -> bool:
+    """Whether subtitle files made from a clip's caption lines, at their own
+    times, fit its file `path`, an editor export (step KC): True only when
+    the take-in that made that export the clip's video recorded its captions
+    as followed, or as the same words with every caption still in place.
+    False with no such record: the editor moved the captions (a cut, a trim,
+    a speed change; "kept"), the project had no caption record (the clip's
+    own cuts or speed, captions off), the project or its record is gone.
+    Then the person is asked first, as for a burn or a dub. Never raises."""
+    try:
+        project_id = registry.project_of_export(path, data_dir)
+        if not project_id:
+            return False
+        manifest = registry.load(data_dir, project_id)
+        for entry in reversed(manifest.get("exports") or []):
+            if (isinstance(entry, dict) and entry.get("result") == "replaced_clip"
+                    and registry.same_path(entry.get("path"), path)):
+                return entry.get("captions") in ("followed", "same")
+    except Exception:
+        pass
+    return False
+
+
+def captions_moved(db, found: dict) -> dict:
+    """Of these editor-export clips (StateDB.project_export_clips), the
+    ones subtitle files alone would not fit: all but those whose last editor
+    export kept every caption in place (subtitles_follow). For POST
+    /translate (server/api.py project_edits_left_out) and the translate
+    job (server/jobs.py)."""
+    data_dir = db.data_dir()
+    out = {}
+    for clip_id, project_id in found.items():
+        try:
+            row = db.get_clip(int(clip_id))
+        except Exception:
+            row = None
+        if row is None or data_dir is None or not subtitles_follow(data_dir, row["path"]):
+            out[clip_id] = project_id
     return out
 
 
@@ -260,6 +432,9 @@ def _take_in(data_dir: Path, project_id: str, name: str, folder, open_db, publis
                     _discard_old(db, data_dir, old, target, int(row["id"]))
                     entry = {"file": name, "at": registry.now(), "result": "replaced_clip", "path": str(target),
                              "seconds": seconds, "clip_id": int(row["id"])}
+                    followed = follow_captions(db, row, manifest)
+                    if followed is not None:
+                        entry["captions"] = followed
 
                     def change(m, target=target):
                         m["clip"]["file"] = str(target)

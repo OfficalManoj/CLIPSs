@@ -226,7 +226,7 @@ One piece, the whole source, shown whole in the chosen shape (`clip_frame(framin
 |---|---|
 | Apply `POST /clips/{id}/render`; the chat edit `POST /clips/{id}/ai-edit`; the caption save `PUT /clips/{id}/captions`; "Apply edits & upload" `POST /clips/{id}/publish` with `render_first` | 409 `{"detail": {"message", "reason": "project_export", "project_id": "<id>" or null}}` before anything is queued or any AI is asked, unless the body has `"replace_project_edits": true` (`render_first.replace_project_edits` for publish). `server.api.project_edits_kept` |
 | the queue's `render` job | asks again when it runs, under the clip's lock: it fails with a plain sentence unless its payload has `replace_project_edits` (which the four routes add only when the person chose so) |
-| Export in other languages, `POST /translate`, stage `export` with burned subtitles, a dub or subtitle files | 409 `{"detail": {"message", "reason": "project_export", "separate_file": true, "clip_ids", "count", "total", "project_id"}}` unless `"without_project_edits": true`. A batch is asked about once; `project_id` is set only when one clip is affected and its project is there. `server.api.project_edits_left_out` |
+| Export in other languages, `POST /translate`, stage `export` with burned subtitles, a dub or subtitle files (subtitle files alone: only when the clip's last take-in did not keep every caption in place, `intake.subtitles_follow`) | 409 `{"detail": {"message", "reason": "project_export", "separate_file": true, "clip_ids", "count", "total", "project_id"}}` unless `"without_project_edits": true`. A batch is asked about once; `project_id` is set only when one clip is affected and its project is there. `server.api.project_edits_left_out` |
 | the `translate` job | asks again when it runs, before any AI is set up and before anything is written |
 | `POST /translate` for text only (the review stage, the post text), or only "include the video" | not asked: nothing is made from the clip's window |
 | a forced run of the video; story reels made again (`core.pipeline._register_clip`, `_sport_reels`) | the clip stays on its export (`_keeps_project_export`); the fresh render stays on disk for the run |
@@ -368,7 +368,7 @@ Every call checks it comes from the main window's own page (as `plugin-session` 
 
 ### The page
 
-- Sidebar entry "Editor", right after "Clip Editor" (that label is unchanged), only while the editor is found.
+- Sidebar entry "Editor", right after "Clips" (called "Clip Editor" until KC), only while the editor is found.
 - No project shown: "Recent projects" (kind as an icon with a tooltip, last opened, delete with a native confirm, a bar while a project is being made), "Edit a whole video" (a Library video and a shape), "Edit a file from your PC" (a shape, then the file picker).
 - A project shown: the strip ("← Projects", the name, one-line notes, export notices, "Clip approvals (n)", and "Saved" / "Saving…" / "Exporting 42%" at the right) and the area. The area's rectangle goes to the main process from a `ResizeObserver` (on the area and the page), `window` resize, a `matchMedia` resolution change and `onMeasure`, at most once per frame, in physical pixels (x and y floored, width and height rounded, at least 1).
 - "← Projects" calls `close()` (the editor saves and leaves); while it exports it first asks natively "The editor is still exporting. Close the project and stop the export?" ("Keep exporting", the default, or "Close").
@@ -390,7 +390,8 @@ The editor is a native child window above the page. One gate, `lib/editorCover.t
 | export notices, project notes | in the strip |
 | `title` tooltips, the Alt menu, native dialogs, notifications | windows of their own, above the editor |
 | the page's own Publish window (`PublishAllDialog` for the shown clip, FL3) | holds the cover while open (`useEditorCover(publishClip !== null)` in `pages/Editor.tsx`) |
-| dialogs of other pages (`RemakeDialog`, the Clips page's `PublishAllDialog`, ...) | cannot overlap: the editor is hidden on other pages |
+| the page's own Other languages window (`components/editor/OtherLanguagesDialog.tsx`, KC) | holds the cover while open (`useEditorCover(languagesClip !== null)` in `pages/Editor.tsx`) |
+| dialogs of other pages (the Clips page's `PublishAllDialog`, ...) | cannot overlap: the editor is hidden on other pages |
 
 `tests/test_ui_editor_page.py` reads every component `App.tsx` imports and fails on one that draws a fixed overlay, a portal or a `<dialog>` without a rule here.
 
@@ -398,11 +399,13 @@ The editor is a native child window above the page. One gate, `lib/editorCover.t
 
 | Where | Control | Request |
 |---|---|---|
-| a Library clip card (Clip Editor page) | "Open in editor" (on hover, beside Publish), tooltip "Open this clip in the editor" | `{kind: "clip", clip_id}` |
-| Quick edit's panel (`ClipEditor.tsx`) | "Open in editor" beside "Edit this clip" | the same |
-| Quick edit's full page (`EditorModal.tsx`) | "Open in editor" in its header | the same |
+| a Library clip card (Clips page) | "Edit" (on hover, beside Publish), tooltip "Open this clip in Clips Kitty Editor" (KC; "Open in editor" before) | `{kind: "clip", clip_id}` |
+| the clip's side panel (`ClipEditor.tsx`) | the big "Edit" (KC; it opened Quick edit, with "Open in editor" beside it) | the same |
+| ~~Quick edit's full page (`EditorModal.tsx`)~~ | removed in KC with Quick edit | |
 | ~~a Library video (Clip Editor page's toolbar)~~ | removed in FL3: a whole video is opened from the Editor page | |
 | the Editor page | a recent row; "Edit a whole video"; "Edit a file from your PC" | by id; video; file |
+
+KC: Quick edit is gone, so there is one "Edit" per place and it opens the editor. While the editor is not found, both stay, off (`aria-disabled`), with the tooltip "Clips Kitty Editor wasn’t found with this copy of Clips Kitty, so clips can’t be edited here." The paragraph below is the K2 history.
 
 The new ways in say "Open in editor" (UX round: a plain "Edit" beside "Edit this clip", and in the header next to "Editing — <clip>", read as the same thing). Today's clip editor is unchanged; renaming its button "Quick edit" waits for the owner's OK, so the app's own words call it by the page it is on, "the Clip Editor" ("This clip was changed in the Clip Editor …"); "Quick edit" stays only in these docs and in code comments.
 
@@ -419,7 +422,7 @@ Every way in switches to the Editor page at once; a project being made shows its
 | exporting, another project asked for | "The editor is exporting. Open another project when it has finished." |
 | a project's notes | "Some things from the clip are not carried over." in the strip, the sentences in its tooltip, once per open |
 
-After an export: `replaced_clip` "Saved as this clip's video."; `kept_beside` "This clip was changed in the Clip Editor meanwhile, so the export was saved next to it." + "Show in folder"; `saved_to_folder` "Saved to {folder}" + "Show in folder"; `failed` "The export did not finish." (the editor's sentence in the tooltip); `cancelled` nothing. The notice is said to a screen reader: the page keeps a `role="status"` region (and a `role="alert"` one for a failure) that is always there, and puts the notice's words in it. "Exporting n%" is shown at every poll but announced only at its start and each quarter (a separate polite region); the percent shown never goes back (the editor starts its fraction again at 0 for an export's last step). The Clip Editor page reads its clips again on `clip_file_replaced`, and a card of an editor export shows `editor_export.seconds` as its length.
+After an export: `replaced_clip` "Saved as this clip's video." (KC: "Saved as this clip’s video, with your caption words." when `captions` is `followed`, "Saved as this clip’s video. Other languages keep the old caption words." with the reason in its tooltip when `kept`); `kept_beside` "This clip was changed meanwhile, so the export was saved next to it." (KC; it named the Clip Editor before) + "Show in folder"; `saved_to_folder` "Saved to {folder}" + "Show in folder"; `failed` "The export did not finish." (the editor's sentence in the tooltip); `cancelled` nothing. The notice is said to a screen reader: the page keeps a `role="status"` region (and a `role="alert"` one for a failure) that is always there, and puts the notice's words in it. "Exporting n%" is shown at every poll but announced only at its start and each quarter (a separate polite region); the percent shown never goes back (the editor starts its fraction again at 0 for an export's last step). The Clips page reads its clips again on `clip_file_replaced`, and a card of an editor export shows `editor_export.seconds` as its length.
 
 ### Keyboard and focus (U5)
 
@@ -631,7 +634,7 @@ From his click-through of FL2: "when i open the editor it opens projects first",
 - The shown project is read again when an export is taken in (`rereadShownProject`, from `onExport`) and again just before the window opens. The editor is hidden while the window is open (the cover rule, table above).
 - No engine change. It publishes the clip as last exported: edits made after that export are not in it until the next export (a real fix needs KL, live edits).
 - When the clip cannot be read for the window, the strip says so (a failure notice): "Clips Kitty could not read the clip. Try again in a moment." when the Library could not be read, or "This clip is no longer in the Library." after which the project is read again and the button goes.
-- Publish is on under the Clips page's rule (F1 desktop fix, U-4): once the export replaced the clip, whether or not a provider is set up; the provider is read when it is clicked and the window handles "nothing set up" as it does from the Clips page. Off is `aria-disabled` (still reached by Tab, the click ignored). The window keeps the keyboard inside it, Escape is Cancel, and focus goes back to Publish (`lib/useDialogFocus.ts`, shared with Make clips again).
+- Publish is on under the Clips page's rule (F1 desktop fix, U-4): once the export replaced the clip, whether or not a provider is set up; the provider is read when it is clicked and the window handles "nothing set up" as it does from the Clips page. Off is `aria-disabled` (still reached by Tab, the click ignored). The window keeps the keyboard inside it, Escape is Cancel, and focus goes back to Publish (`lib/useDialogFocus.ts`, shared with the other windows).
 - An open that starts while a project is shown saves and closes that project the way "Projects" does (asked first while it exports; two opens at once share one question), so nothing of it (editor, name, notices, Publish) stays on screen. An open of the shown project itself (its id, its clip, or a video or file the engine answers with it) only shows the page: no close, no restart, no question. Export answers show in the strip only for the shown project. Entering the page again clears an earlier failed open. A failed open says why in the strip (role alert) and the area offers "Projects". "Projects" during a first open stops the open on the page only: the engine still makes the project and it stays in Recent projects.
 - Not built here: the plan's "YouTubePanel when direct upload is on". It moved to KC, where YouTube upload goes inside the one Publish window.
 - Publish and "Saved" sit together at the right of the strip (mockup 03). "Clip approvals (n)" shows only with a project shown: during an open the cards themselves are up.
@@ -650,3 +653,78 @@ From his click-through of FL2: "when i open the editor it opens projects first",
 - `tests/test_ui_editor_page.py`: the open goes to the project view; the strip, the area and "Projects" during an open; "Same as the video" first and the default; no "Edit whole video" on the Clip Editor page; Publish's window, provider, cover and words; `publishState` under Node.
 - `tests/test_kitty_editor_routes.py`: a whole video with no shape or `source` opens at its own size and is found again by the same shape and size; 16:9 by hand is its own project; an odd size is kept and made even; a file from the PC in its own size; a 720x1280 video's 9:16 by hand is its own 1080x1920 project; a 4K and an anamorphic source; a failed source-shaped build made again keeps its size; a probe that could not read the file is a 503, not "doesn't look like a video".
 - `tests/test_ui_editor_open.py`: `lib/editor.ts` run under Node with a fake bridge and `editorApi`: an open shows the project; "Projects" while the show options are read stops it before `show()`; a `show()` that returns after a stop is followed by `close()`; one that another open took over is not closed.
+
+## KC (2026-11-23): one editor, subtitles and dubbing in it, YouTube in the Publish window
+
+From the owner's click-through of F1: "it still says clip editor when it should say clips and the old editor is still there i don't need anymore if you put the stuff that is missing into the new editor subbing and dubbing"; earlier, "the subs and dubs should be in the editor and not clog the clips menu". KC and KR's removal run together; Concat's own features (music and audio import, volume and fades, colour looks and effects, titles and text, image overlays) count as parity and are not rebuilt.
+
+### "Clip Editor" is "Clips"
+
+- The sidebar (`App.tsx`, translated through the existing "Clips" key; the comment keeps the Store guard: the label before "Clip Editor" must never come back) and the page's title (`t('Clips')`).
+- The Dashboard's tooltip "Open this clip in Clips", the approval card's "Open in Clips" (it opens the page for the video), the setup wizard's last page (links are pasted on the Dashboard).
+- README.md's two mentions and the same two in each README translation, with the language's word for "Clips" from the app's locale files.
+
+### Quick edit is deleted
+
+Deleted, each used only by Quick edit (checked with `git grep` before): `components/TimelineEditor.tsx`, `EditorModal.tsx`, `ColorControls.tsx`, `FilterPicker.tsx` (only ColorControls), `EditChat.tsx`, `EditSuggestions.tsx`, `FreeMusicPicker.tsx`, `UploadPostPanel.tsx`, `lib/captionEdits.ts`, `lib/speakerTurns.ts`. `bakedToOrig` moved into `LiveTextOverlay.tsx`, its last user. Kept, used elsewhere: `CaptionStyleControls` (queue settings, the subtitles style), `GamingLayoutEditor` (the add-videos form), `WatermarkControls` (Creators, WatermarkCard), `FeatureBoundary`, `LiveTextOverlay`, `lib/editSuggestions.ts` (the card's and panel's suggestion lines), `lib/gamingLayout.ts`.
+
+No engine route was removed. These now have no caller in the app, and stay because they are part of the local API (the MCP server, plugins, the bottom box) and later steps use them: `PUT /clips/{id}/captions`, `POST /clips/{id}/tighten`, `POST /clips/{id}/ai-edit`, `POST /clips/{id}/preview`, `GET/PUT /clips/{id}/creator-gaming-layout`, `GET /assets/library`, `POST /uploadpost/clips/{id}/publish` and `POST /woopsocial/clips/{id}/publish` (one clip's publish with per-platform text; the window uses the batch routes), and the provider refresh and retry routes. Their client functions stay in `lib/api.ts`.
+
+### Subtitles and dubbing in the editor
+
+- "Other languages…" in the strip, before Publish, shown when Publish is (`publishState(project) !== 'none'`: a clip project whose clip is there). It reads the clip from the Library and opens `OtherLanguagesDialog`.
+- The window: `role="dialog"`, `aria-modal`, `useDialogFocus` (focus inside, Tab kept inside, Escape closes unless a text field has the focus, the focus back on the button), and the page holds the cover. It holds today's `MultilingualExport` unchanged (with `onPreview`, so its "Show on video", style and glossary show) beside the clip's video, with the language under review drawn over it by `LiveTextOverlay` and the burned captions masked under it: Quick edit's translated preview (EditorModal.tsx 162-195), moved.
+- `useDialogFocus` leaves keys alone whose target is inside another `aria-modal` window over it (the "changed in the editor" question can open over this one).
+- The translated burn of an edited clip still asks first (`ProjectExportPrompt`), as before.
+
+### Translations follow editor edits
+
+- Building a clip's project (`build_clip`) records `captions: {"follow": record}` in the manifest when the project got captions. `build.caption_record(own_lines, plan)` gives `{"lines": the captions as put on the timeline, "source": the clip's caption lines}` when they are the clip's lines one for one at the same times (within 0.01 s), else `None` (cuts or a speed moved them). A project with no captions has `captions: null`.
+- When an export replaces the clip's file (`replaced_clip`), `intake.follow_captions` reads the project's `concat.json` (the active timeline's items): each recorded line must be found again as exactly one text item whose start AND end are both within 0.05 s of it, every time (review r3: the hook or a text watermark that starts at 0 s, a trimmed title and the halves of a split title never match; a line not found gives "kept"). The clip's own lines must still be ones the project was given (by their times). Then `render_opts.caption_lines` takes the items' words (spaces tidied; an emptied item drops its line), at the clip's own times, and the clip's saved translations (made from the old words) are removed, so no other language goes out with the old words; the notice's tooltip says to translate again. Every title emptied is "kept", never "followed" with no lines. Translation, `GET /clips/{id}/captions` (the MCP `clip_captions` tool) and the translated burn read those lines.
+- The answer (and the export's record) carries `captions: "followed"` when words changed and were saved, `"kept"` when the project had a record but its captions could not be matched (moved, trimmed, split, cut or deleted in the editor, all emptied, or the file unreadable), and nothing when the words are the same, there were no captions, or there is no record (the clip's own cuts or speed had already moved its captions: the person never touched them, so nothing is said). The export's record alone also keeps `"same"` when every caption is still in place with the clip's own words. It never fails the take-in.
+- With the second speaker's colour on, the project's captions are the lines as the render burns them (`_clip_captions(row, as_burned=True)`: a line ends where the speaker changes), so a retyped line saved back never mixes two speakers in one colour.
+- Other languages on an edited clip, in the app: the window (`MultilingualExport`) always sends `burn: true`. Its two choices are "Subtitles" (burned into the picture, original audio kept) and "Subtitles + dubbed voice"; both are made from the clip as the AI made it, without the editor's cuts, music, looks or titles, so for an editor-export clip both ask the "changed in the editor" question every time. Burning onto the editor's export itself is a later step.
+- Subtitle files alone (SRT, VTT; `subtitles: true` without `burn` or `dub`) are reachable only through the local API and MCP, not from the window. They are written from the clip's caption lines at their own times, and skip the question only when the take-in that made the clip's file recorded its captions `"followed"` or `"same"` (`intake.subtitles_follow`: every caption still in place). After a cut, trim or speed change that moved them (`"kept"`), with no record (the clip's own cuts or speed, captions off) or with the project gone, the question is asked, at the route and again when the job runs.
+- Comparison (review r5): `follow_captions` collapses spaces and line breaks on both sides (`" ".join(text.split())`) before comparing, so a difference in spaces alone is "same", never "followed".
+- A caption with the same span (within 0.1 s) as the project's hook or text watermark: `caption_record` keeps those titles' spans as `titles`, and `edited_captions` then gives None ("kept"), because with that caption deleted the other title would be found in its place (review r5). Records made before keep working without it.
+- A translation running while an export is taken in (review r5): the translate stage reads the clip's `caption_lines` again just before saving. If they changed since the clip's translation started, its translations are not saved and the job fails with "The captions of "<title>" were changed in the editor while translating, so those translations were not saved. Translate again to use the new words." after the other clips are saved.
+- "followed" removes every saved translation, the person's corrected ones (`edited`) and their translated post text included (`_drop_translations`). Left as it is for his click-through (review r5 #5: keep `post`, or keep corrected languages and flag them, is a design call).
+- Limit: the words are read from the project's saved file. The editor saves as it goes; a word typed in the last moment before Export could be missed until the next export.
+
+### YouTube upload and published links in the Publish window
+
+- `lib/publishSetup.ts` also reads `GET /youtube/status`: `{ready, provider, youtube}`. The Clips page's Publish (card and side panel) and Publish all are always shown, as the Editor page's Publish is (his ask, "publishing in clips"): each click reads the setup again (`openPublish`) and opens the window, which says how to connect an account when none is set up. The page also reads it when shown and again on the window's `focus` and `visibilitychange`, so Schedule (shown only when a provider is ready) appears as soon as an account is connected (review r5).
+- `PublishAllDialog` takes `providerReady` and `youtube`. With one clip: a "YouTube (direct upload)" section (a `<details>`, open when no provider is ready) holding `YouTubePanel` with `pendingRender={null}`, shown when `youtube` is on and the status says enabled; and `PublishedDiscordLinks` for the clip. With no provider ready the platform part is replaced by one line pointing to Settings. Its "done" line now points at Schedule.
+- `YouTubeThumbnail` lost `currentTime` (Quick edit's playhead) and has its own frame picker: a "Frame at" slider over the clip file's own length (read from the file's metadata, as Quick edit's speed or cuts made some files shorter than their window; until it is read, `editor_export.seconds`, else the window), a still from `GET /clips/{id}/frame?t=` shown 250 ms after the slider rests, and "Use this frame".
+- The still's cache name carries the clip file's stamp (`clip_<id>_<ms>_<mtime><size>.jpg`) and `clipFrameUrl` carries `media_version`: an editor export keeps the clip's id, so a still of the old video is never shown after it. The slider stops 0.1 s before the end (a seek to the file's exact length gives no frame).
+- The Clips page has no new button. Its "Make clips again…" button and RemakeDialog are removed (his call: he never asked for them); the remake routes, `core/remake.py`, `lib/remake.ts` (the queue row's result line) and their tests stay.
+
+### Not in the editor yet (deferred)
+
+Checked in the fork's source (kitty/embed at 94aa48ff): Concat has auto captions from the sound (Whisper), SubRip import and export, voice-over and text to speech, speed, mute, split and delete, but no silence or filler removal, no censoring, no word-level transcript editing, no speakers and no gaming layouts.
+
+| Gone with Quick edit | Comes back in |
+|---|---|
+| switching gaming layouts, "Remember for this creator" | KG (next) |
+| Automatic framing (the AI's) | RF (per shot in KP1) |
+| Letterbox / Center | KP1 (the Look panel) |
+| word tools: mute or cut a word, censor, tighten pauses and fillers | KP1 (until then, split and mute or delete by hand in the editor) |
+| swap speakers / back to automatic | KP1 (until then, a caption's colour by hand) |
+| the Vertical Live framing note | KP1 |
+| plugin suggested edits (Use, Take it back, Hide, Make again) | KP2 |
+| the free music picker | KP2 (any music file can be imported in the editor now; a clip's free track is carried into its project) |
+| "Duck under voice" (music ducking; Concat has none) | KP2 |
+| the Sharpen slider | not missing: the fork ships the Sharpen effect (concat.sharpen) |
+| the AI edit chat | K6, with HyperFrames |
+| per-clip platform text and status (`UploadPostPanel`: per-platform title and description, first comment, per-platform status with refresh and retry) | no plan step yet; the lead or the owner gives it a place in the Publish window (the routes remain). Until then the one-clip Publish window sends with the clip's title and description, and Schedule shows each post |
+| the Publish tab's "Through" switch (Upload-Post when both providers are on) | with the row above; until then the window sends through WoopSocial when both are on |
+| Other languages burned onto the editor's export (the translated burn and dub are made from the clip as the AI made it) | a later step; subtitle files alone (local API and MCP only) already follow the editor's words |
+
+### Tests (KC)
+
+- `tests/test_ui_editor_page.py`: the "Clips" label and its guard comment; every Edit opens the editor and is off with the reason when it is not found; Quick edit's files are gone and nothing imports them; one Edit per place; Other languages' place, window, focus, cover and preview; the key rule in `useDialogFocus`; YouTube and Published links in the window; the thumbnail's frame picker; the export notice's caption words.
+- `tests/test_kitty_editor_engine.py`: `caption_record` one for one and `None` after cuts or a speed; retyped words become the clip's lines, twice over; moved or deleted captions keep the clip's lines; same words or no captions save nothing; a hook with a caption's exact span gives "kept"; spaces alone never give "followed" (review r5).
+- `tests/test_remake_worker.py` `test_translations_of_caption_words_changed_meanwhile_are_not_saved`: the translate stage does not save a clip whose caption lines changed while it ran, and says so; the other clips are saved.
+- `tests/test_ui_editor_page.py` `test_the_clips_pages_schedule_follows_a_newly_connected_account`: the Clips page reads the setup again on focus and visibility.
+- `tests/test_kitty_editor_routes.py`: through the routes, the manifest's record, the export's `captions`, and `GET /clips/{id}/captions` after it.
+- Removed with Quick edit: `test_ui_caption_edits.py`, `test_ui_speaker_turns_sync.py` (their TypeScript is gone; the engine's caption and speaker code keeps its own tests), the Free music picker's tests in `test_ui_step4.py`, the Quick edit parts of `test_ui_edit_suggestions.py` (the library's own tests stay), `test_plugin_sdk_edit.py`'s check of Quick edit's controls, and `test_captions_off_kept.py`'s Quick edit checks (one now checks the Other languages window reads the same switch).

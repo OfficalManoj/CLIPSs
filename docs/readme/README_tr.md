@@ -216,11 +216,11 @@ kullanılan bir sözün sayılması için gerçekten tekrar etmesi gerekir, art�
 bilgiler uykuya geçer ve buradan gelen her puan katkısı eklemelidir, bir üst sınırı vardır
 ve kapatılabilir.
 
-**Video düzenleyici.** Tahribatsız düzenleme: kırpmalar, ara kesimler, sessize almalar,
-sessize alınan kelimeler, ses seviyesi, geçişler (fade), hız, kanca metni, müzik ve
-filigran işlem olarak saklanır ve render sırasında uygulanır. Bir de yapay zekâ ile
-düzenleme sohbeti var (*"5 saniye daha uzun yap"*, *"altyazıda gost yazıyor, ghost
-olmalı"*); model önerir, doğrulanmış kod uygular.
+**Video düzenleyici.** Açık kaynaklı Concat düzenleyicisi üzerine kurulan Clips Kitty
+Editor, her klibi bir zaman çizelgesinde açar: kesimler, sessize almalar, ses seviyesi,
+geçişler (fade), hız, altyazılar, müzik, renk görünümleri, başlıklar ve videonun üzerine
+resimler. Başka dillerde altyazı ve seslendirme de orada. Yapay zekâ ile düzenleme sohbeti
+sonraki bir güncellemede geri geliyor.
 
 **Uzun format işleme.** Aynı analizi kullanan, isteğe bağlı bir 16:9 yolu: yatay klipler,
 X/Twitter uzunluğunda kesitler, en iyi anlardan oluşan bir derleme ya da ölü anları
@@ -277,7 +277,7 @@ donanımsal video kodlama (otomatik algılanır, CPU yedeğiyle) ve Ollama üzer
   kapalı). Dışa aktarmadan önce transkripsiyon hatalarını satır satır düzeltin. İki kişi
   konuşurken ikinci konuşmacının altyazıları başka bir renk alabilir; yanlış atananlar elle
   değiştirilebilir.
-- **Yapay zekâ ile düzenleme sohbeti**: neyin yanlış olduğunu günlük dille anlatın, o
+- **Yapay zekâ ile düzenleme sohbeti** (sonraki bir güncellemede geri geliyor): neyin yanlış olduğunu günlük dille anlatın, o
   yeniden düzenlesin.
 - **Ask Clips Kitty**: kontrol panelinin altındaki metin kutusu. Ne istediğinizi tek
   cümleyle söyleyin, örneğin *"bu yayından klip çıkar, boss'a öldüğüm anı mutlaka ekle,
@@ -300,7 +300,7 @@ donanımsal video kodlama (otomatik algılanır, CPU yedeğiyle) ve Ollama üzer
 - **Model yöneticisi**: yapay zekâ beynini uygulamanın içinden değiştirin; modelleri
   terminale gerek kalmadan, ilerleme çubuklarıyla indirin, kaldırın ve aralarında geçiş
   yapın.
-- **Düzenleyiciden YouTube'a yayınlama**: başlık, açıklama, etiketler, küçük resim,
+- **Publish penceresinden YouTube'a yayınlama**: başlık, açıklama, etiketler, küçük resim,
   oynatma listesi, kitle ve görünürlük; ardından hemen yükleyin ya da zamanlayın. İsteğe
   bağlıdır, varsayılan olarak kapalıdır ve kendi Google API anahtarınızı kullanır.
 - **Uygulama içi geri bildirim**: tanılama bilgilerini otomatik toplayan hata bildirimleri,
@@ -405,8 +405,7 @@ npm install
 npm run dev        # opens the Clips Kitty desktop app
 ```
 
-Uygulama kendi Python motorunu otomatik olarak başlatır. **Clip Editor** (Klip
-Düzenleyici) ekranına bir bağlantı yapıştırın, *Generate clips* (Klip oluştur) düğmesine
+Uygulama kendi Python motorunu otomatik olarak başlatır. **Dashboard** (Panel) ekranına bir bağlantı yapıştırın, *Generate clips* (Klip oluştur) düğmesine
 basın ve ilerlemeyi canlı izleyin.
 
 Kurulum programını kendiniz derlemek tek bir komut. Bkz.
@@ -597,11 +596,11 @@ Burada olmayan bir dil mi istiyorsunuz? [#61](https://github.com/ColinGPT9/clips
 ## YouTube'da yayınlama
 
 Varsayılan olarak kapalıdır. **Settings → Publish to YouTube** (Ayarlar → YouTube'da
-yayınla) bölümünden açtığınızda düzenleyicide bir **YouTube** sekmesi belirir: başlığı,
-açıklamayı, etiketleri, küçük resmi, oynatma listesini, kitleyi ve görünürlüğü doldurun,
-ardından **Upload now** (Şimdi yükle) düğmesine basın. Kaydedilmemiş düzenlemeleriniz
-varsa Clips Kitty klibi render eder ve doğrudan kanalınıza yükler. Dışa aktarma adımı yok,
-ayrı bir yayınlama sayfası yok. Düzenleyiciden hiç çıkmazsınız.
+yayınla) bölümünden açtığınızda bir klibin **Publish** (Yayınla) penceresinde (Clips
+sayfasında ya da düzenleyicide) bir **YouTube (direct upload)** (YouTube, doğrudan yükleme)
+bölümü belirir: başlığı, açıklamayı, etiketleri, küçük resmi, oynatma listesini, kitleyi ve
+görünürlüğü doldurun, ardından **Upload now** (Şimdi yükle) düğmesine basın. Clips Kitty
+klibi doğrudan kanalınıza yükler. Dışa aktarma adımı yok, ayrı bir yayınlama sayfası yok.
 
 Kapalı bırakırsanız uygulamanın hiçbir yerinde hiçbir şey değişmez.
 
@@ -683,12 +682,12 @@ bir videoyu şekline ve uzunluğuna bakarak kendisi Short olarak sınıflandır�
 ## Tüm platformlarda aynı anda yayınlama
 
 Bu da varsayılan olarak kapalıdır. **Settings → Publish through WoopSocial** (Ayarlar →
-WoopSocial üzerinden yayınla) bölümünden açtığınızda düzenleyicide bir **Publish**
-(Yayınla) sekmesi belirir: platformlarınızı seçin — ya da **Everywhere** (Her yerde)
-düğmesine basın — başlığı ve açıklamayı bir kez yazın; tek bir yükleme YouTube, TikTok,
-Instagram, Facebook, X, Threads, LinkedIn, Pinterest ve Bluesky'a birlikte gider. Clip
-Editor'deki **Publish all** (Tümünü yayınla), bir düzine klip aynı saniyede düşmesin diye
-aralıklarla bütün bir grubu yayınlar.
+WoopSocial üzerinden yayınla) bölümünden açtığınızda, bir klibin **Publish** (Yayınla)
+penceresinde (Clips sayfasında ya da düzenleyicide) platformlarınızı seçin — ya da
+**Everywhere** (Her yerde) düğmesine basın — ve tek bir yükleme YouTube, TikTok, Instagram,
+Facebook, X, Threads, LinkedIn, Pinterest ve Bluesky'a birlikte gider. Clips sayfasındaki
+**Publish all** (Tümünü yayınla), bir düzine klip aynı saniyede düşmesin diye aralıklarla
+bütün bir grubu yayınlar.
 
 Bu özellik **yerel değildir**. Klip ve ayrıntıları bir yayınlama hizmetine gönderilir; bu
 hizmet onları teslim eder ve sosyal hesaplarınızla bağlantıları elinde tutar, bu yüzden

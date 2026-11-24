@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import { t } from '../lib/i18n'
 
@@ -13,8 +13,10 @@ import { t } from '../lib/i18n'
 
 interface Props {
   clipId: number
+  /** The clip's media_version: frames are asked for again when the file
+   *  changes (an editor export keeps the clip's id). */
+  version?: string
   duration: number
-  currentTime: number
   value: string | null
   onChange: (thumbnail: string | null) => void
   disabled?: boolean
@@ -22,8 +24,8 @@ interface Props {
 
 export default function YouTubeThumbnail({
   clipId,
+  version,
   duration,
-  currentTime,
   value,
   onChange,
   disabled
@@ -35,6 +37,17 @@ export default function YouTubeThumbnail({
   // fetched by URL like the fixed suggestions are.
   const [generated, setGenerated] = useState(0)
   const [chosenGenerated, setChosenGenerated] = useState<number | null>(null)
+  // A frame of your own (KC): the slider's time, and the still shown for it,
+  // fetched once the slider rests so dragging does not ask for every frame.
+  const [frameAt, setFrameAt] = useState(0)
+  const [stillAt, setStillAt] = useState(0)
+  // The slider stops a little before the end: a seek to the file's exact
+  // length gives no frame.
+  const lastFrame = Math.max(0, Math.floor((duration - 0.1) * 10) / 10)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStillAt(frameAt), 250)
+    return () => window.clearTimeout(timer)
+  }, [frameAt])
 
   // The same three positions Studio offers. Recomputed only when the clip
   // changes, so the <img> elements are not rebuilt on every playhead move.
@@ -132,7 +145,7 @@ export default function YouTubeThumbnail({
             }`}
           >
             <img
-              src={api.clipFrameUrl(clipId, at)}
+              src={api.clipFrameUrl(clipId, at, version)}
               alt=""
               loading="lazy"
               className="w-full aspect-video object-cover bg-raised"
@@ -165,6 +178,46 @@ export default function YouTubeThumbnail({
         </div>
       )}
 
+      {duration > 0 && (
+        <div className="flex items-center gap-3">
+          <img
+            src={api.clipFrameUrl(clipId, Math.min(stillAt, lastFrame), version)}
+            alt=""
+            className="w-24 aspect-video object-cover rounded-md bg-raised shrink-0"
+          />
+          <div className="flex-1 min-w-0 space-y-1">
+            <label className="flex items-center gap-2 text-xs">
+              <span className="shrink-0">{t('Frame at')}</span>
+              <input
+                type="range"
+                min={0}
+                max={lastFrame}
+                step={0.1}
+                value={Math.min(frameAt, lastFrame)}
+                onChange={(e) => setFrameAt(Number(e.target.value))}
+                disabled={disabled || busy}
+                className="flex-1 min-w-0"
+                title={t('Slide to pick any moment of the clip. The picture beside it shows that frame.')}
+              />
+              <span className="tabular-nums w-12 text-right">{Math.min(frameAt, lastFrame).toFixed(1)}s</span>
+            </label>
+            <button
+              type="button"
+              className={`btn-ghost !px-2.5 !py-1 text-xs ${chosenAt === stillAt && chosenAt === Math.min(frameAt, lastFrame) ? 'text-accent' : ''}`}
+              disabled={disabled || busy}
+              onClick={() => {
+                const at = Math.min(frameAt, lastFrame)
+                setStillAt(at)
+                void pick(at)
+              }}
+              title={t('Use the frame shown beside the slider as the thumbnail.')}
+            >
+              {t('Use this frame')}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -173,14 +226,6 @@ export default function YouTubeThumbnail({
           onClick={generate}
         >
           {generated > 0 ? t('Make new ones') : t('Make thumbnails')}
-        </button>
-        <button
-          type="button"
-          className="btn-ghost !px-2.5 !py-1 text-xs"
-          disabled={disabled || busy}
-          onClick={() => pick(currentTime)}
-        >
-          {t('Use current frame')}
         </button>
         <button
           type="button"

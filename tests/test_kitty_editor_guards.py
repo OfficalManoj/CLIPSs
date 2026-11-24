@@ -322,14 +322,17 @@ def test_a_publish_that_renders_nothing_is_never_asked(env, monkeypatch):
 def test_export_in_other_languages_asks_first_for_an_editor_export(env, tmp_path):
     """Burned subtitles, a dub and subtitle files are made from the clip's
     own window and caption lines. For a clip whose file is an editor export,
-    POST /translate asks first (409, reason project_export, separate_file)
-    and queues nothing; "Make it anyway" (without_project_edits) queues the
-    job as before, with the flag. Text only (the review stage, the post
-    text) never asks."""
+    POST /translate asks first for a burn, a dub or subtitle files (409,
+    reason project_export, separate_file) and queues nothing; "Make it
+    anyway" (without_project_edits) queues the job as before, with the flag.
+    Text only (the review stage, the post text) never asks. This export has
+    no caption record (no captions were matched one for one), so subtitle
+    files alone are asked about too."""
     clip_id, project, exported = env.exported()
     folder = tmp_path / "out"
     base = {"clip_ids": [clip_id], "languages": ["es"], "stage": "export", "folder": str(folder)}
-    for asked in ({"burn": True}, {"dub": True}, {"subtitles": True}, {"burn": True, "dub": True}):
+    for asked in ({"burn": True}, {"dub": True}, {"subtitles": True, "dub": True}, {"burn": True, "dub": True},
+                  {"subtitles": True}, {"subtitles": True, "post_text": True}):
         r = env.post("/translate", {**base, **asked})
         assert r.status_code == 409, (asked, r.text)
         detail = r.json()["detail"]
@@ -344,6 +347,48 @@ def test_export_in_other_languages_asks_first_for_an_editor_export(env, tmp_path
     r = env.post("/translate", {**base, "burn": True, "without_project_edits": True})
     assert r.status_code == 200, r.text
     assert translate_jobs(env)[-1]["without_project_edits"] is True
+
+
+def _captions_were(env, project, result):
+    """The clip's last take-in recorded its captions as `result` (KC)."""
+    from kitty_editor import registry
+
+    def change(m):
+        if result is None:
+            m["exports"][-1].pop("captions", None)
+        else:
+            m["exports"][-1]["captions"] = result
+
+    registry.update(env.data_dir, project["id"], change)
+
+
+def test_subtitle_files_alone_are_asked_about_unless_the_captions_stayed_in_place(env, tmp_path):
+    """Subtitle files are written from the clip's caption lines at their
+    own times (KC). They fit the export, and nothing is asked, only when the
+    clip's last editor export recorded its captions followed, or the same
+    words with every caption in place. Moved captions ("kept": a cut, a trim
+    or a speed change pulled them), no record (the clip's own cuts, captions
+    off) or no project: asked, as for a burn. A burn or a dub is asked about
+    whatever the record says."""
+    clip_id, project, exported = env.exported()
+    base = {"clip_ids": [clip_id], "languages": ["es"], "stage": "export", "folder": str(tmp_path / "out"),
+            "subtitles": True}
+    for result, asked in (("followed", False), ("same", False), ("kept", True), (None, True)):
+        _captions_were(env, project, result)
+        r = env.post("/translate", base)
+        assert r.status_code == (409 if asked else 200), (result, r.text)
+        for burned in ({"burn": True}, {"dub": True}):
+            assert env.post("/translate", {**base, **burned}).status_code == 409, (result, burned)
+    _captions_were(env, project, "followed")
+    # A later take-in of another export is the one that counts: the record is the clip's file's.
+    from kitty_editor import registry
+
+    registry.update(env.data_dir, project["id"], lambda m: m["exports"][-1].update(path=str(tmp_path / "x.mp4")))
+    assert env.post("/translate", base).status_code == 409
+    registry.update(env.data_dir, project["id"], lambda m: m["exports"][-1].update(path=str(exported)))
+    assert env.post("/translate", base).status_code == 200
+    env.delete_project(project)                                   # no project, no record: asked
+    assert env.post("/translate", base).status_code == 409
 
 
 def test_a_batch_is_asked_about_once_and_a_plain_clip_never(env, tmp_path):
@@ -400,6 +445,17 @@ def test_a_translate_job_never_makes_files_it_was_not_asked_about(env, tmp_path,
     assert not folder.exists()
     with pytest.raises(AssertionError, match="no AI"):     # past the question: on as before
         jobs.Worker._translate_clips(Worker(), env.db, {**payload, "without_project_edits": True})
+    # Subtitle files alone: asked again unless the clip's last export kept its captions in place (KC).
+    files = {**payload, "burn": False, "subtitles": True}
+    with pytest.raises(RuntimeError, match="changed in the editor"):
+        jobs.Worker._translate_clips(Worker(), env.db, files)
+    assert not folder.exists()
+    from kitty_editor import registry as projects
+
+    project_id = projects.project_of_export(env.clip_row(clip_id)["path"], env.data_dir)
+    projects.update(env.data_dir, project_id, lambda m: m["exports"][-1].update(captions="followed"))
+    with pytest.raises(AssertionError, match="no AI"):
+        jobs.Worker._translate_clips(Worker(), env.db, files)
 
 
 # ---- runs that only happen to find the clip's window again --------------------------------------

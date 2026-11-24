@@ -1,4 +1,4 @@
-"""The exported mark on clips, shown as a star in the Clip Editor.
+"""The exported mark on clips, shown as a star on the Clips page.
 
 Copying a clip out marks it exported, the star sets or clears the mark by hand,
 and Export all relies on it to skip clips that are already done. A database

@@ -223,11 +223,11 @@ réellement se répéter pour compter, une connaissance qui n'est plus mentionn�
 sommeil, et toute contribution à la note qui en découle est additive, plafonnée et
 désactivable.
 
-**Éditeur vidéo.** Non destructif : coupes, coupes internes, passages muets, mots coupés,
-volume, fondus, vitesse, texte d'accroche, musique et filigrane sont enregistrés comme des
-opérations et appliqués au rendu. Il y a aussi un chat de montage par IA (*« rallonge-le de
-5 secondes »*, *« le sous-titre dit fantme, il faut fantôme »*), où le modèle propose et du
-code validé applique.
+**Éditeur vidéo.** Clips Kitty Editor, basé sur l'éditeur open source Concat, ouvre chaque
+clip sur une timeline : coupes, passages muets, volume, fondus, vitesse, sous-titres,
+musique, looks de couleur, titres et images par-dessus la vidéo. Les sous-titres et le
+doublage dans d'autres langues y sont aussi. Le chat de montage par IA revient dans une
+prochaine mise à jour.
 
 **Traitement en format long.** Un mode 16:9 optionnel qui utilise la même analyse : clips
 horizontaux, coupes à la durée de X/Twitter, un best-of, ou le stream complet sans les
@@ -288,7 +288,7 @@ le GPU via Ollama.
   erreur de transcription ligne par ligne avant l'export. Quand deux personnes parlent, les
   sous-titres de la deuxième peuvent prendre une autre couleur, et une réplique mal
   attribuée peut être réassignée à la main.
-- **Chat de montage par IA** : décrivez ce qui ne va pas avec vos mots, et il refait le montage.
+- **Chat de montage par IA** (de retour dans une prochaine mise à jour) : décrivez ce qui ne va pas avec vos mots, et il refait le montage.
 - **Ask Clips Kitty** : la zone de texte en bas du tableau de bord. Dites ce que vous
   voulez en une phrase, par exemple *« fais des clips de ce stream, n'oublie pas le moment
   où le boss m'a tué, avec de gros sous-titres jaunes »*, et il met la vidéo en file
@@ -308,7 +308,7 @@ le GPU via Ollama.
   créateur, appliqués automatiquement.
 - **Gestionnaire de modèles** : changez le cerveau de l'IA depuis l'application ;
   téléchargez, supprimez et changez de modèle avec des barres de progression et sans terminal.
-- **Publier sur YouTube depuis l'éditeur** : titre, description, tags, miniature,
+- **Publier sur YouTube depuis la fenêtre Publish** : titre, description, tags, miniature,
   playlist, public cible et visibilité, puis mise en ligne immédiate ou programmée.
   Optionnel, désactivé par défaut, et utilise votre propre clé d'API Google.
 - **Retours depuis l'application** : rapports de bug avec diagnostics collectés
@@ -416,8 +416,8 @@ npm install
 npm run dev        # opens the Clips Kitty desktop app
 ```
 
-L'application démarre automatiquement son propre moteur Python. Collez un lien dans
-**Clip Editor**, cliquez sur *Generate clips* (Générer les clips) et suivez la progression
+L'application démarre automatiquement son propre moteur Python. Collez un lien dans le
+**Dashboard** (Tableau de bord), cliquez sur *Generate clips* (Générer les clips) et suivez la progression
 en direct.
 
 Compiler l'installateur vous-même tient en une commande. Voir
@@ -609,12 +609,12 @@ Vous voulez une langue qui n'est pas dans la liste ? [#61](https://github.com/Co
 ## Publier sur YouTube
 
 Désactivé par défaut. Activez-le dans **Settings → Publish to YouTube** (Paramètres →
-Publier sur YouTube) et un onglet **YouTube** apparaît dans l'éditeur : renseignez le
-titre, la description, les tags, la miniature, la playlist, le public cible et la
-visibilité, puis cliquez sur **Upload now** (Mettre en ligne). Clips Kitty effectue le rendu
-du clip si vous avez des modifications non enregistrées et le met en ligne directement sur
-votre chaîne. Pas d'étape d'export, pas de page de publication à part. Vous ne quittez
-jamais l'éditeur.
+Publier sur YouTube) et la fenêtre **Publish** (Publier) d'un clip (dans la page Clips ou
+dans l'éditeur) gagne une section **YouTube (direct upload)** (YouTube, mise en ligne
+directe) : renseignez le titre, la description, les tags, la miniature, la playlist, le
+public cible et la visibilité, puis cliquez sur **Upload now** (Mettre en ligne). Clips
+Kitty met le clip en ligne directement sur votre chaîne. Pas d'étape d'export, pas de page
+de publication à part.
 
 Si vous le laissez désactivé, rien ne change nulle part dans l'application.
 
@@ -699,12 +699,12 @@ classe de lui-même une vidéo comme Short d'après son format et sa durée.
 ## Publier sur toutes les plateformes à la fois
 
 Également désactivé par défaut. Activez-le dans **Settings → Publish through WoopSocial**
-(Paramètres → Publier via WoopSocial) et un onglet **Publish** (Publier) apparaît dans
-l'éditeur : choisissez vos plateformes — ou cliquez sur **Everywhere** (Partout) —,
-rédigez le titre et la description une seule fois, et une seule mise en ligne part vers
-YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest et Bluesky en même
-temps. **Publish all** (Tout publier) dans le Clip Editor traite un lot entier, en espaçant
-les publications pour qu'une douzaine de clips ne tombent pas à la même seconde.
+(Paramètres → Publier via WoopSocial) et, dans la fenêtre **Publish** (Publier) d'un clip
+(dans la page Clips ou dans l'éditeur), choisissez vos plateformes — ou cliquez sur
+**Everywhere** (Partout) — et une seule mise en ligne part vers YouTube, TikTok, Instagram,
+Facebook, X, Threads, LinkedIn, Pinterest et Bluesky en même temps. **Publish all** (Tout
+publier) dans la page Clips traite un lot entier, en espaçant les publications pour qu'une
+douzaine de clips ne tombent pas à la même seconde.
 
 Cette fonction n'est **pas locale**. Le clip et ses informations sont envoyés à un service
 de publication, qui les diffuse et détient les connexions à vos comptes sociaux : Clips

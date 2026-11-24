@@ -519,3 +519,53 @@ def test_a_clip_exported_in_other_languages_is_marked_and_kept(tmp_path, monkeyp
         assert db.get_flag(f"clip_language_export:{idle}") == ""
     finally:
         db.close()
+
+
+def test_translations_of_caption_words_changed_meanwhile_are_not_saved(tmp_path, monkeypatch):
+    """Review r5 #2 (KC): the translate stage reads the clip's caption lines
+    again just before saving. An editor export that gave the clip new caption
+    words while the AI was translating (intake.follow_captions) means the
+    translations of the old words are not saved, and the job says so. The
+    other clips' translations are saved."""
+    pytest.importorskip("numpy")
+    pytest.importorskip("cv2")
+    pytest.importorskip("PIL")
+    pytest.importorskip("yaml")
+    import llm.registry
+    import multilingual.publish
+    from core import pipeline
+    from main import BUNDLED_CONFIG, load_config
+
+    config = load_config(BUNDLED_CONFIG)
+    config["paths"]["data_dir"] = str(tmp_path)
+    db = StateDB(tmp_path / "state.db")
+    db.upsert_video(VID, title="A stream")
+    old = [{"start": 0.0, "end": 1.0, "text": "old words"}]
+    edited = db.add_clip(VID, 10.0, 40.0, 70, "h", status="queued", title="Edited meanwhile",
+                         render_opts=json.dumps({"caption_lines": old}))
+    steady = db.add_clip(VID, 50.0, 80.0, 70, "h", status="queued", title="Left alone",
+                         render_opts=json.dumps({"caption_lines": old}))
+
+    def translate_only(lines, languages, llm, **_kw):
+        if lines == old and db.get_flag("edited_once") == "":
+            # The editor's export is taken in while the first clip translates.
+            db.set_flag("edited_once", "1")
+            db.set_clip(edited, render_opts=json.dumps({"caption_lines": [
+                {"start": 0.0, "end": 1.0, "text": "new words"}]}))
+        return {code: {"lines": [{"start": 0.0, "end": 1.0, "text": "viejas"}], "post": {}} for code in languages}
+
+    monkeypatch.setattr(multilingual.publish, "translate_only", translate_only)
+    monkeypatch.setattr(llm.registry, "create_backend", lambda cfg: object())
+    monkeypatch.setattr(pipeline, "_with_usable_model", lambda cfg: cfg)
+    monkeypatch.setattr(jobs.Worker, "_source_language", lambda self, video_id, data_dir: "en")
+    worker = jobs.Worker(config)
+    try:
+        with pytest.raises(RuntimeError, match='"Edited meanwhile" were changed in the editor while translating'):
+            worker._translate_clips(db, {"clip_ids": [edited, steady], "languages": ["es"], "stage": "translate"})
+        assert list(db.translations_for(edited)) == []
+        assert [r["language"] for r in db.translations_for(steady)] == ["es"]
+        # Started again from the new words: saved.
+        worker._translate_clips(db, {"clip_ids": [edited], "languages": ["es"], "stage": "translate"})
+        assert [r["language"] for r in db.translations_for(edited)] == ["es"]
+    finally:
+        db.close()

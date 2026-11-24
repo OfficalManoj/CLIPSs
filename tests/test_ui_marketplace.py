@@ -321,9 +321,9 @@ def test_an_editor_shows_suggests_edits(tmp_path):
     # When a suggestion reaches a clip, in the words the Suggest edits switch
     # uses; then the time limit the app stops it at, in the edit run's words.
     # One that also rates or understands gets one time line for both.
-    promise = ("Clips Kitty doesn’t put a suggestion into a clip until you use it in the editor and apply your "
-               "edits (Apply edits, or Apply edits & upload).")
-    assert got[1] == [f"Its suggestions wait in the editor. {promise}",
+    promise = ("Clips Kitty doesn’t put a suggestion into a clip by itself. Using one in the editor comes in a "
+               "later update.")
+    assert got[1] == [f"Its suggestions are kept with each clip. {promise}",
                       "Clips Kitty stops it after 10 minutes when it suggests edits for a video’s clips."]
     assert details["time_limit"] == got[1][1]
     form = (LIB.parent / "components" / "queue" / "AddVideos.tsx").read_text(encoding="utf-8")

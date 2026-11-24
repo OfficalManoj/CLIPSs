@@ -1152,3 +1152,37 @@ def test_the_bar_follows_the_render_never_back_and_never_whole_before_it_is_read
     project = env.open({"kind": "clip", "clip_id": env.clip()})
     assert seen == [0.425, 0.425, 0.8]          # 5% + 75% of the render's own share; never back
     assert project["progress"] == 1.0
+
+
+def test_caption_words_typed_in_the_editor_reach_the_clip_and_clip_captions(env):
+    """KC: a clip's project keeps the caption lines it was given; the words
+    on the editor's captions at export become the clip's caption lines, so
+    GET /clips/{id}/captions (and the MCP clip_captions tool, translation and
+    the translated burn, which read the same lines) use them."""
+    lines = [{"start": 0.5, "end": 3.0, "text": "first line"}, {"start": 16.0, "end": 22.0, "text": "after it"}]
+    clip_id = env.clip({"caption_lines": lines})
+    project = env.open({"kind": "clip", "clip_id": clip_id})
+    record = env.get(f"/editor/projects/{project['id']}").json()["captions"]["follow"]
+    assert record["source"] == lines and [x["text"] for x in record["lines"]] == ["first line", "after it"]
+    doc = saved(project)
+    for item in doc["clips"]:
+        if item["kind"] == "text" and item["text"] == "after it":
+            item["text"] = "after it all"
+    (Path(project["project_dir"]) / "concat.json").write_text(json.dumps(doc), encoding="utf-8")
+    env.export(project, "Clip one.mp4")
+    r = env.post(f"/editor/projects/{project['id']}/exports", {"file": "Clip one.mp4", "export_folder": None})
+    assert r.status_code == 200, r.text
+    assert r.json()["result"] == "replaced_clip" and r.json()["captions"] == "followed"
+    got = env.get(f"/clips/{clip_id}/captions").json()["lines"]
+    assert [x["text"] for x in got] == ["first line", "after it all"]
+
+    # The clip's own cuts move the captions: nothing can be matched, and the
+    # export says nothing (the person never moved them; the old words stay).
+    other = env.clip({"caption_lines": lines, "edit": {"keep": [[0.0, 10.0], [15.0, 40.0]]}},
+                     name="clip_00060-00105.mp4", start=60.0, end=105.0, title="Clip two")
+    project = env.open({"kind": "clip", "clip_id": other})
+    assert env.get(f"/editor/projects/{project['id']}").json()["captions"] == {"follow": None}
+    env.export(project, "Clip two.mp4")
+    r = env.post(f"/editor/projects/{project['id']}/exports", {"file": "Clip two.mp4", "export_folder": None})
+    assert r.json()["result"] == "replaced_clip" and "captions" not in r.json()
+    assert env.get(f"/clips/{other}/captions").json()["lines"] == lines

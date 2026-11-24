@@ -3,7 +3,11 @@ import { api } from '../lib/api'
 import { t } from '../lib/i18n'
 import { useDialogFocus } from '../lib/useDialogFocus'
 import DiscordDestinationSelect from './DiscordDestinationSelect'
+import FeatureBoundary from './FeatureBoundary'
+import PublishedDiscordLinks from './PublishedDiscordLinks'
+import YouTubePanel from './YouTubePanel'
 import type { Clip } from '../lib/types'
+import type { YouTubeStatus } from '../lib/youtube'
 import {
   PROVIDER_LABEL,
   localZone,
@@ -26,16 +30,27 @@ import {
  *  reads as spam and spends the per-account daily cap in one go. The
  *  provider's own scheduler does the spreading, so a run stretching over
  *  weeks keeps going with Clips Kitty closed.
+ *
+ *  With one clip (from the Clips page or the Editor page's Publish) it also
+ *  holds what Quick edit had (step KC): "YouTube (direct upload)" while that
+ *  is switched on in Settings, and the clip's "Published links".
  */
 export default function PublishAllDialog({
   clips,
   provider,
   onClose,
-  returnFocus
+  returnFocus,
+  providerReady = true,
+  youtube = false
 }: {
   clips: Clip[]
   provider: Provider
   onClose: () => void
+  /** WoopSocial or Upload-Post is set up. One clip can be published with
+   *  only YouTube's direct upload, and then the window shows just that. */
+  providerReady?: boolean
+  /** Direct upload to YouTube is switched on (one clip only). */
+  youtube?: boolean
   /** Where the keyboard goes when the window closes (the Editor page's
    *  Publish); without it, what had the focus when it opened. */
   returnFocus?: RefObject<HTMLElement>
@@ -62,7 +77,7 @@ export default function PublishAllDialog({
   const [done, setDone] = useState<{ started: number; skipped: { clip_id: number; reason: string }[] } | null>(null)
   // The keyboard starts in the window and stays in it; Escape is Cancel
   // (never while it publishes, as Cancel is off then); closed, it goes back
-  // to the button that opened it (F1 U-1, as Make clips again does).
+  // to the button that opened it (F1 U-1, lib/useDialogFocus.ts).
   const box = useRef<HTMLDivElement>(null)
   useDialogFocus(box, () => {
     if (!busy) onClose()
@@ -74,8 +89,26 @@ export default function PublishAllDialog({
       : { connections: api.uploadPostConnections, batch: api.uploadPostBatch }
   const usable = platformsFor(provider)
 
+  // YouTube's direct upload needs its account and settings (one clip only).
+  const single = clips.length === 1
+  const fileSeconds = useFileSeconds(single ? clips[0] : null)
+  const [ytStatus, setYtStatus] = useState<YouTubeStatus | null>(null)
   useEffect(() => {
-    if (provider !== 'woopsocial') return
+    if (!single || !youtube) return
+    let alive = true
+    api
+      .youtubeStatus()
+      .then((got) => alive && setYtStatus(got))
+      .catch(() => {
+        /* switched off or not reachable: the section stays away */
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!providerReady || provider !== 'woopsocial') return
     api
       .woopSocialSchedule()
       .then((got) =>
@@ -91,6 +124,7 @@ export default function PublishAllDialog({
   }, [])
 
   useEffect(() => {
+    if (!providerReady) return
     backend
       .connections()
       .then((got) => {
@@ -105,7 +139,6 @@ export default function PublishAllDialog({
   const toggle = (id: string): void =>
     setPlatforms((c) => (c.includes(id) ? c.filter((p) => p !== id) : [...c, id]))
 
-  const single = clips.length === 1
   const chosen = clips.filter((c) => !dropped.has(c.id))
   /** Platforms this clip will actually go to. */
   const going = (id: number): string[] =>
@@ -195,20 +228,35 @@ export default function PublishAllDialog({
       <div
         ref={box}
         tabIndex={-1}
-        className="card w-full max-w-lg space-y-4 max-h-[85vh] overflow-y-auto outline-none"
+        className={`card w-full ${single && youtube ? 'max-w-2xl' : 'max-w-lg'} space-y-4 max-h-[85vh] overflow-y-auto outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         <div>
           <h3 className="font-semibold text-lg">
             {single ? t('Publish this clip') : `${t('Publish')} ${clips.length} ${t('clips')}`}
           </h3>
-          <p className="text-xs text-muted mt-1">
-            {t('Each clip is uploaded once and sent to every platform you pick, through your')}{' '}
-            {PROVIDER_LABEL[provider]} {t('account.')}
-          </p>
+          {providerReady && (
+            <p className="text-xs text-muted mt-1">
+              {t('Each clip is uploaded once and sent to every platform you pick, through your')}{' '}
+              {PROVIDER_LABEL[provider]} {t('account.')}
+            </p>
+          )}
         </div>
 
-        {done ? (
+        {!providerReady ? (
+          <div className="space-y-2">
+            <p className="text-xs text-muted">
+              {single
+                ? t('To send this clip to several platforms at once, set up WoopSocial or Upload-Post in Settings.')
+                : t('To send these clips to your social accounts, set up WoopSocial or Upload-Post in Settings.')}
+            </p>
+            {!youtube && (
+              <button className="btn-ghost w-full !py-2" onClick={onClose}>
+                {t('Close')}
+              </button>
+            )}
+          </div>
+        ) : done ? (
           <div className="space-y-2 text-sm">
             <p className="text-success">
               ✓ {done.started} {done.started === 1 ? t('clip') : t('clips')} {t('sent to')}{' '}
@@ -225,7 +273,7 @@ export default function PublishAllDialog({
               </div>
             )}
             <p className="text-xs text-muted">
-              {t('Open a clip and its Publish tab to watch each platform.')}
+              {t('Schedule on the Clips page shows how each post is going.')}
             </p>
             <button className="btn-accent w-full !py-2" onClick={onClose}>
               {t('Done')}
@@ -410,7 +458,75 @@ export default function PublishAllDialog({
             </div>
           </>
         )}
+
+        {single && youtube && ytStatus?.enabled && (
+          <details
+            className="border border-raised/60 rounded-lg"
+            open={!providerReady}
+          >
+            <summary
+              className="px-3 py-2 text-sm font-medium cursor-pointer hover:bg-raised/40 rounded-lg"
+              title={t('Upload this clip straight to your YouTube channel, with its title, thumbnail and schedule.')}
+            >
+              {t('YouTube (direct upload)')}
+            </summary>
+            <div className="p-3 pt-0">
+              <FeatureBoundary name="YouTube publishing">
+                <YouTubePanel
+                  clip={clips[0]}
+                  status={ytStatus}
+                  pendingRender={null}
+                  duration={fileSeconds ?? clipSeconds(clips[0])}
+                  onOpenSettings={() => window.dispatchEvent(new CustomEvent('open-settings'))}
+                />
+              </FeatureBoundary>
+            </div>
+          </details>
+        )}
+
+        {single && (
+          <FeatureBoundary name="Published links">
+            <PublishedDiscordLinks key={clips[0].id} clipId={clips[0].id} />
+          </FeatureBoundary>
+        )}
+
+        {single && !providerReady && youtube && (
+          <button className="btn-ghost w-full !py-2" onClick={onClose}>
+            {t('Close')}
+          </button>
+        )}
       </div>
     </div>
   )
+}
+
+/** How long the clip's file is: an editor export's own length, else its window. */
+function clipSeconds(clip: Clip): number {
+  return clip.editor_export?.seconds ?? Math.max(0, clip.end_s - clip.start_s)
+}
+
+/** The clip file's real length, read from the file itself: a clip the old
+ *  Quick edit sped up or cut is shorter than its window, and a frame asked
+ *  for past its end can't be read. Null until it is known. */
+function useFileSeconds(clip: Clip | null): number | null {
+  const [seconds, setSeconds] = useState<number | null>(null)
+  const id = clip?.id
+  const version = clip?.media_version
+  useEffect(() => {
+    setSeconds(null)
+    if (id === undefined) return
+    const probe = document.createElement('video')
+    probe.preload = 'metadata'
+    probe.muted = true
+    probe.onloadedmetadata = () => {
+      if (Number.isFinite(probe.duration) && probe.duration > 0) setSeconds(probe.duration)
+    }
+    probe.src = api.mediaUrl(id, version)
+    return () => {
+      probe.onloadedmetadata = null
+      probe.removeAttribute('src')
+      probe.load()
+    }
+  }, [id, version])
+  return seconds
 }

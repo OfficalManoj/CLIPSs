@@ -684,7 +684,7 @@ export function stepBadge(words: string): Badge {
 /** The one sentence that says when a suggested edit reaches a clip: the
  *  same on the Suggest edits switch, here and in the docs. */
 export const SUGGESTION_PROMISE =
-  'Clips Kitty doesn’t put a suggestion into a clip until you use it in the editor and apply your edits (Apply edits, or Apply edits & upload).'
+  'Clips Kitty doesn’t put a suggestion into a clip by itself. Using one in the editor comes in a later update.'
 
 /** The details panel's lines about a plugin that rates or understands
  *  moments, or suggests edits for clips: what its answers change, and its
@@ -696,7 +696,7 @@ export function stepLines(details: Pick<PluginDetails, 'steps' | 'time_limit'>):
     out.push('Its scores decide which clips are made and their order, and which are posted when a channel posts only the best few.')
   if (steps.includes('Understands moments') || steps.includes('Understands what it finds'))
     out.push('What it says about a moment goes into the request that writes your titles.')
-  if (steps.includes('Suggests edits')) out.push(`Its suggestions wait in the editor. ${SUGGESTION_PROMISE}`)
+  if (steps.includes('Suggests edits')) out.push(`Its suggestions are kept with each clip. ${SUGGESTION_PROMISE}`)
   if (details.time_limit) out.push(details.time_limit)
   return out
 }

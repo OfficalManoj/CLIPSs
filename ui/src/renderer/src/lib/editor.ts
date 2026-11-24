@@ -6,11 +6,12 @@
  *  exactly as it was, and a project being made keeps being made while the
  *  person is on another page.
  *
- *  Every way in (a Library clip's Edit, Quick edit's Edit, the page's own
- *  lists: Recent projects, "Edit a whole video" and "Edit a file from your
- *  PC") calls openInEditor() or openEditorProject(); App.tsx switches to the
- *  page on 'open-editor-page'. The Clip Editor's "Edit whole video" was
- *  removed in FL3. */
+ *  Every way in (a Library clip's Edit on its card or in the Clips page's
+ *  side panel, the page's own lists: Recent projects, "Edit a whole video"
+ *  and "Edit a file from your PC") calls openInEditor() or
+ *  openEditorProject(); App.tsx switches to the page on 'open-editor-page'.
+ *  The Clips page's "Edit whole video" was removed in FL3, and Quick edit
+ *  (the old editor) in KC. */
 import { useEffect, useState } from 'react'
 import { editorApi, EditorRouteError, type EditorOpenRequest, type EditorProject, type EditorTakeIn } from './api'
 import { exportDestination, nextOpeningProgress, OPENING_MOST } from './editorOpening'
@@ -124,10 +125,27 @@ export function exportNotice(answer: EditorTakeIn): EditorNotice | null {
   switch (answer.result) {
     case 'replaced_clip':
       // No tooltip: the folder is Clips Kitty's own, nothing a person looks for (K-D21).
+      // The captions' words go with it for other languages (KC), or say why not.
+      if (answer.captions === 'followed') {
+        return {
+          text: t('Saved as this clip’s video, with your caption words.'),
+          tooltip: t(
+            'Other languages and the subtitles you make now use the words you typed in the editor. Translations made before this edit were removed, so translate again to use the new words.'
+          )
+        }
+      }
+      if (answer.captions === 'kept') {
+        return {
+          text: t('Saved as this clip’s video. Other languages keep the old caption words.'),
+          tooltip: t(
+            'The captions were moved, cut, split or deleted in the editor, or all emptied, so Clips Kitty could not match them to the clip’s caption lines. Subtitles in other languages are made from the words from before.'
+          )
+        }
+      }
       return { text: t('Saved as this clip’s video.') }
     case 'kept_beside':
       return {
-        text: t('This clip was changed in the Clip Editor meanwhile, so the export was saved next to it.'),
+        text: t('This clip was changed meanwhile, so the export was saved next to it.'),
         tooltip: answer.path,
         revealProject: answer.project_id
       }
@@ -176,11 +194,12 @@ export async function askNative(message: string, buttons: string[], detail?: str
   return bridge.ask({ message, detail, buttons, defaultId: 0, cancelId: 0 })
 }
 
-/** "This clip was changed in Quick edit after this project was made": open
+/** "This clip was changed after this project was made" (made again, for
+ *  example): open
  *  the project as it is (default), or start a new one from the clip. */
 async function wantsFresh(project: EditorProject): Promise<boolean> {
   if (project.kind !== 'clip' || !project.clip_changed || project.clip_gone) return false
-  const answer = await askNative(t('This clip was changed in the Clip Editor after this project was made.'), [
+  const answer = await askNative(t('This clip was changed after this project was made.'), [
     t('Open the project'),
     t('Start a new project from the clip')
   ])
@@ -432,7 +451,7 @@ export async function openInEditor(req: EditorOpenRequest): Promise<void> {
   releasePrepared(token)
 }
 
-/** Open a project from the page's list (or from Quick edit's question). */
+/** Open a project from the page's list (or from the "changed in the editor" question). */
 export async function openEditorProject(id: string): Promise<void> {
   if (store.shownId && id === store.shownId) {
     keepShown()

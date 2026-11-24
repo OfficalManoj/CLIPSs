@@ -29,18 +29,20 @@ function pluginNotes(notes: PluginNote[] | undefined): { key: string; who: strin
 export default function ClipEditor({
   clip,
   onChanged,
-  onOpenEditor,
+  onEdit,
+  editReady,
   onPublish,
-  exports,
-  onOpenInEditor
+  exports
 }: {
   clip: Clip
   onChanged: () => void
-  onOpenEditor: () => void
-  /** Open this clip in Clips Kitty Editor. Absent while the editor is not found. */
-  onOpenInEditor?: () => void
-  /** Publish this one clip. Absent when no provider is set up, which hides
-   *  the button rather than showing one that can only apologise. */
+  /** Open this clip in Clips Kitty Editor (KC: the one editor). */
+  onEdit: () => void
+  /** False while the editor is not found: Edit is off and says why. */
+  editReady: boolean
+  /** Publish this one clip. Always given on the Clips page, as on the
+   *  Editor page: with nothing set up, its window says how to connect an
+   *  account. */
   onPublish?: () => void
   /** Exports made in the background (Settings → Export set to anything but
    *  Original), so this clip's progress and result show under its buttons. */
@@ -142,22 +144,22 @@ export default function ClipEditor({
         className="w-full rounded-lg bg-base max-h-96"
       />
 
-      <div className="flex gap-2">
-        <button
-          onClick={onOpenEditor}
-          className="btn-accent flex-1 !py-3 text-base font-semibold"
-          title={t("Open the editor: trim, cut, mute words, censor, color, captions, AI edit")}
-        >
-          <span className="inline-flex items-center gap-2 justify-center">
-            <Scissors size={16} /> Edit this clip
-          </span>
-        </button>
-        {onOpenInEditor && (
-          <button className="btn-ghost !py-3 font-semibold" onClick={onOpenInEditor} title={t('Open this clip in the editor')}>
-            {t('Open in editor')}
-          </button>
-        )}
-      </div>
+      {/* One Edit: Clips Kitty Editor (KC). Off, not hidden, while the
+          editor is not found, so its tooltip can say why. */}
+      <button
+        onClick={editReady ? onEdit : undefined}
+        aria-disabled={!editReady}
+        className="btn-accent w-full !py-3 text-base font-semibold aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
+        title={
+          editReady
+            ? t('Open this clip in Clips Kitty Editor: cut, captions, text, music, colour and more. Subtitles and dubbing are under Other languages there.')
+            : t('Clips Kitty Editor wasn’t found with this copy of Clips Kitty, so clips can’t be edited here.')
+        }
+      >
+        <span className="inline-flex items-center gap-2 justify-center">
+          <Scissors size={16} /> {t('Edit')}
+        </span>
+      </button>
 
       <div className="flex gap-2 flex-wrap text-xs items-center">
         {CHANNELS.map((ch) => (
@@ -231,7 +233,7 @@ export default function ClipEditor({
           <p
             key={`edit-${e.id}`}
             className="text-xs text-muted -mt-2"
-            title={t("An edit a Marketplace plugin suggested for this clip. Open the editor to use it or hide it.")}
+            title={t("An edit a Marketplace plugin suggested for this clip. Using or hiding it in the editor comes in a later update.")}
           >
             {suggestionLine(e, { start: clip.start_s, end: clip.end_s })}
           </p>
@@ -317,8 +319,8 @@ export default function ClipEditor({
         </button>
         {/* Beside Export rather than only on the card in the grid: Export
             writes this one clip to a folder, and Publish is the same scope
-            for the other destination. Only shown once a provider is set up,
-            so the row does not carry a button that can only explain itself.
+            for the other destination. Always there (as the Editor page's
+            Publish): with nothing set up, the window says how to connect one.
             Posting is not undoable, so it opens the confirm dialog rather
             than acting on the click, exactly like Publish all. */}
         {onPublish && (

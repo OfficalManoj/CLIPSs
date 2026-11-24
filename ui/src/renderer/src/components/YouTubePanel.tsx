@@ -17,12 +17,13 @@ import YouTubeSchedule from './YouTubeSchedule'
 import YouTubeThumbnail from './YouTubeThumbnail'
 import DiscordDestinationSelect from './DiscordDestinationSelect'
 
-/** Publishing, inside the editor.
+/** Direct upload to YouTube, in the one-clip Publish window (step KC; it
+ *  was a tab of Quick edit, which is gone). It uploads the clip's file as it
+ *  is: an editor export taken in as the clip's video is that file.
  *
- *  The clip's own project is never touched by any of this. When there are
- *  unsaved edits the publish carries a render request, which runs through the
- *  SAME job the Apply edits button uses — so the uploaded video is exactly
- *  what the preview showed, and the timeline stays editable afterwards.
+ *  `pendingRender` is kept for a caller with unsaved edits: the publish then
+ *  renders first through the same job a re-render uses. The Publish window
+ *  passes null.
  */
 
 interface Props {
@@ -37,8 +38,8 @@ interface Props {
     render_opts: Record<string, unknown>
     suggestions?: UsedSuggestions
   } | null
+  /** The clip file's length, for the thumbnail's frame picker. */
   duration: number
-  currentTime: number
   onOpenSettings: () => void
 }
 
@@ -53,7 +54,6 @@ export default function YouTubePanel({
   status,
   pendingRender,
   duration,
-  currentTime,
   onOpenSettings
 }: Props): JSX.Element {
   const settings = status.settings
@@ -283,8 +283,8 @@ export default function YouTubePanel({
 
       <YouTubeThumbnail
         clipId={clip.id}
+        version={clip.media_version}
         duration={duration}
-        currentTime={currentTime}
         value={thumbnail}
         onChange={setThumbnail}
         disabled={busy}

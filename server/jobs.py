@@ -570,8 +570,14 @@ class Worker(threading.Thread):
             # Asked again when the job runs (K2, E5), as a render job is: a
             # clip whose file became an editor export after the job was
             # queued is never translated from its old window without the
-            # person's word. Before anything is written.
+            # person's word. Before anything is written. Subtitle files
+            # alone go ahead for a clip whose last editor export kept every
+            # caption in place (KC, kitty_editor.intake.subtitles_follow).
             changed = db.project_export_clips(payload["clip_ids"])
+            if changed and not (payload.get("burn") or payload.get("dub")):
+                from kitty_editor.intake import captions_moved
+
+                changed = captions_moved(db, changed)
             if changed:
                 raise RuntimeError(
                     "A clip in this export was changed in the editor after the export was started, so "
@@ -593,6 +599,7 @@ class Worker(threading.Thread):
         n_clips = len(payload["clip_ids"])
         voice_checked = False
         dub_problems: list[str] = []
+        stale: list[str] = []       # clips whose caption words changed while they were translating
 
         def reporter(index: int):
             """Per-clip progress folded into one 0..1 bar across the batch, so
@@ -653,6 +660,16 @@ class Worker(threading.Thread):
                     terms=terms, source_language=src_lang, post=post, keep=keep,
                     on_progress=on_progress,
                 )
+                # Read again just before saving: an editor export taken in
+                # meanwhile may have given the clip new caption words (KC,
+                # kitty_editor.intake.follow_captions). Translations of the
+                # old words are then not saved (review r5).
+                now = db.get_clip(int(clip_id))
+                now_opts = _json.loads(now["render_opts"]) if now is not None and now["render_opts"] else {}
+                if now is None or now_opts.get("caption_lines") != opts.get("caption_lines"):
+                    stale.append(str(clip["title"] or clip["hook"] or f"clip {clip_id}"))
+                    print(f"      Clip {clip_id}'s captions changed while it was translating: not saved")
+                    continue
                 for code, entry in results.items():
                     db.save_translation(
                         int(clip_id), code,
@@ -711,6 +728,13 @@ class Worker(threading.Thread):
             )
         if stage != "translate":
             print(f"      Multilingual publish complete: {len(written)} file(s) in {folder}")
+        if stale:
+            # The other clips' translations are saved; the job says which
+            # were not, so the person translates them again from the new words.
+            names = ", ".join(f'"{name}"' for name in stale)
+            raise RuntimeError(
+                f"The captions of {names} were changed in the editor while translating, so those "
+                "translations were not saved. Translate again to use the new words.")
         if dub_problems:
             # A voice the person picked could not speak (their voice app was
             # closed during the job, say). The other files are written; the
