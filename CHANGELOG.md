@@ -12,6 +12,12 @@ were often broken in a way that only showed up on somebody else's machine.
 
 ### Added
 
+- **Captions use the editor's looks.** The Caption style on the Dashboard and in a video's
+  settings now offers Clips Kitty Editor's 45 text presets, in their own fonts, with Small,
+  Medium or Large and Bottom, Middle or Top, as the editor's Captions sheet has them, and a
+  live preview. A clip's captions look the same burned in as they do when you open it in the
+  editor. The old caption fonts, colours, all caps, word highlight and animations are gone; a
+  style you saved before becomes the nearest preset.
 - **One editor, and "Clip Editor" is now "Clips".** Clips Kitty Editor is the only editor: the
   old small editor (Edit this clip) is gone, and every Edit opens the clip in Clips Kitty Editor.
   Subtitles and dubbing in 19 languages are under "Other languages…" at the top of the Editor

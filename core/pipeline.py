@@ -1571,6 +1571,11 @@ def _render_files(
     ass_path = None
     # Per-clip style wins; otherwise the job/config default chosen at generate time.
     caption_style = _plain_caption_style(opts.get("caption_style") or config["clips"].get("caption_style"))
+    if caption_style:
+        # One of the editor's presets, an old saved style mapped to one.
+        from video.caption_presets import normalize
+
+        caption_style = normalize(caption_style)
     # Where someone other than the main speaker talks, when the caption style
     # asks for them in a second colour (#126). Empty for every other clip.
     turns: list = []
@@ -1593,7 +1598,6 @@ def _render_files(
             elif said:
                 wpc = {**DEFAULT_STYLE, **(caption_style or {})}["words_per_caption"]
                 lines = build_caption_lines(segments, candidate, wpc, said)
-        retimed = False
         if edit is not None and (edit.keep is not None or abs(edit.speed - 1) >= 0.01):
             # Sections were cut out and/or the clip was sped up: every
             # surviving caption shifts to its new time on the edited timeline.
@@ -1604,14 +1608,12 @@ def _render_files(
                 wpc = {**DEFAULT_STYLE, **(caption_style or {})}["words_per_caption"]
                 lines = build_caption_lines(segments, candidate, wpc)
             lines = remap_lines(lines, edit)
-            retimed = True
         ass_path = build_captions(
             segments, candidate, clip_dir / f"{stem}.ass",
             style=caption_style,
             lines=lines,
             canvas=canvas,
             language=content_language,
-            **({"karaoke_untimed": True} if retimed else {}),
         )
 
     # Hook title (big text, top third, first few seconds) burns through the
@@ -2066,6 +2068,14 @@ def _register_clip(
                 # was rendered with, or the editor starts from a stale one.
                 kept = {**kept, "gaming": rendered["gaming"]}
                 fresh["render_opts"] = json.dumps(kept)
+            for key in ("captions", "caption_style"):
+                # The caption look this file was burned with: the row must
+                # carry it, or the editor opens the clip in the old style.
+                if rendered.get(key) != kept.get(key):
+                    kept = {k: v for k, v in kept.items() if k != key}
+                    if key in rendered:
+                        kept[key] = rendered[key]
+                    fresh["render_opts"] = json.dumps(kept)
             for key in ("sport_moment", "framing"):
                 # A basketball clip's play and how sure its framing was: this
                 # file's, so a re-render plans around the same play.

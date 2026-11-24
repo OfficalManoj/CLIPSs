@@ -1,5 +1,5 @@
 {
-  "about": "Editor suite step 3: captions in a bundled font, staged into fonts/ beside them and burned with fontsdir=fonts, by the one-encode cut and by the editor's pass.",
+  "about": "Editor suite step KF: captions in the editor's presets (Impact; Block, Large), their fonts staged into fonts/ beside them and burned with fontsdir=fonts, by the one-encode cut and by the editor's pass.",
   "cpu": {
     "commands": [
       {
@@ -47,19 +47,19 @@
             "",
             "[V4+ Styles]",
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-            "Style: Default,Anton,47,&H00FFFFFF,&H00FFFFFF,&H00000000,&H7F000000,0,0,0,0,100,100,0,0,1,7,2,2,60,60,248,1",
+            "Style: Default,Anton,94,&H00FFFFFF,&H00FFFFFF,&H00000000,&H69000000,0,0,0,0,100,100,0,0,1,5.4,0,5,60,60,0,1",
             "",
             "[Events]",
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,SO THIS IS",
-            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,THE PART WHERE",
-            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,IT ALL GOES",
-            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,WRONG WATCH THE",
-            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,LEFT SIDE, RIGHT",
-            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,THERE. NO WAY",
-            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,THAT JUST HAPPENED!",
-            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,CHAT DID YOU",
-            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,SEE"
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}see"
           ]
         }
       },
@@ -104,19 +104,19 @@
             "",
             "[V4+ Styles]",
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-            "Style: Default,Poppins ExtraBold,47,&H00FFFFFF,&H00FFFFFF,&H00000000,&H7F000000,-1,0,0,0,100,100,0,0,1,7,2,2,60,60,248,1",
+            "Style: Default,Archivo Black,95,&H00111111,&H00111111,&H004AE1FF,&H00000000,0,0,0,0,100,100,0,0,3,19.44,0,5,60,60,0,1",
             "",
             "[Events]",
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}SO THIS IS",
-            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}THE PART WHERE",
-            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}IT ALL GOES",
-            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}WRONG WATCH THE",
-            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}LEFT SIDE, RIGHT",
-            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}THERE. NO WAY",
-            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}THAT JUST HAPPENED!",
-            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}CHAT DID YOU",
-            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}SEE"
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(960,918)}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(960,918)}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(960,918)}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(960,918)}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(960,918)}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(960,918)}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\an5\\pos(960,918)}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(960,918)}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(960,918)}see"
           ]
         }
       }
@@ -128,7 +128,7 @@
       "edited.mp4",
       "edited.source.mp4",
       "fonts/Anton-Regular.ttf",
-      "fonts/Poppins-ExtraBold.ttf",
+      "fonts/ArchivoBlack-Regular.ttf",
       "source.mp4"
     ]
   },
@@ -183,19 +183,19 @@
             "",
             "[V4+ Styles]",
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-            "Style: Default,Anton,47,&H00FFFFFF,&H00FFFFFF,&H00000000,&H7F000000,0,0,0,0,100,100,0,0,1,7,2,2,60,60,248,1",
+            "Style: Default,Anton,94,&H00FFFFFF,&H00FFFFFF,&H00000000,&H69000000,0,0,0,0,100,100,0,0,1,5.4,0,5,60,60,0,1",
             "",
             "[Events]",
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,SO THIS IS",
-            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,THE PART WHERE",
-            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,IT ALL GOES",
-            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,WRONG WATCH THE",
-            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,LEFT SIDE, RIGHT",
-            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,THERE. NO WAY",
-            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,THAT JUST HAPPENED!",
-            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,CHAT DID YOU",
-            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,SEE"
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(960,918)\\xshad2.7\\yshad3.78}see"
           ]
         }
       },
@@ -244,19 +244,19 @@
             "",
             "[V4+ Styles]",
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-            "Style: Default,Poppins ExtraBold,47,&H00FFFFFF,&H00FFFFFF,&H00000000,&H7F000000,-1,0,0,0,100,100,0,0,1,7,2,2,60,60,248,1",
+            "Style: Default,Archivo Black,95,&H00111111,&H00111111,&H004AE1FF,&H00000000,0,0,0,0,100,100,0,0,3,19.44,0,5,60,60,0,1",
             "",
             "[Events]",
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}SO THIS IS",
-            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}THE PART WHERE",
-            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}IT ALL GOES",
-            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}WRONG WATCH THE",
-            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}LEFT SIDE, RIGHT",
-            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}THERE. NO WAY",
-            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}THAT JUST HAPPENED!",
-            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}CHAT DID YOU",
-            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}SEE"
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(960,918)}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(960,918)}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(960,918)}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(960,918)}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(960,918)}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(960,918)}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\an5\\pos(960,918)}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(960,918)}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(960,918)}see"
           ]
         }
       }
@@ -268,7 +268,7 @@
       "edited.mp4",
       "edited.source.mp4",
       "fonts/Anton-Regular.ttf",
-      "fonts/Poppins-ExtraBold.ttf",
+      "fonts/ArchivoBlack-Regular.ttf",
       "source.mp4"
     ]
   }

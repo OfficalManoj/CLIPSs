@@ -369,6 +369,11 @@ class Worker(threading.Thread):
                         self._translate_clips(db, payload)
                     finally:
                         _release_voice()
+                elif job["type"] == "editor_languages":
+                    try:
+                        self._editor_languages(db, payload)
+                    finally:
+                        _release_voice()
                 else:
                     raise ValueError(f"Unknown job type {job['type']!r}")
                 db.finish_job(job["id"], "done")
@@ -557,8 +562,7 @@ class Worker(threading.Thread):
         writes new files. A failure here can never damage a clip."""
         import json as _json
 
-        from core.pipeline import _safe_name, _with_usable_model
-        from llm.registry import create_backend
+        from core.pipeline import _safe_name
         from multilingual import glossary, publish
 
         data_dir = Path(self.config["paths"]["data_dir"])
@@ -583,17 +587,7 @@ class Worker(threading.Thread):
                     "A clip in this export was changed in the editor after the export was started, so "
                     "nothing was made. Start the export again to choose whether to make it without those "
                     "changes.")
-        # Translation may run on its own local model (see llm.translation_model).
-        # With a cloud model chosen, translation uses it too: everything the
-        # local model would have done runs on the user's own key instead.
-        from llm.spec import is_local
-
-        llm_cfg = dict(self.config["llm"])
-        tm = str(llm_cfg.get("translation_model") or "").strip()
-        if tm and is_local(llm_cfg.get("backend") or ""):
-            llm_cfg["backend"] = tm if "/" in tm else f"ollama/{tm}"
-            print(f"      Translating with {tm}")
-        llm = create_backend(_with_usable_model(llm_cfg))  # one that's installed (#118)
+        llm = self._translation_llm()
         written: list[str] = []
 
         n_clips = len(payload["clip_ids"])
@@ -741,6 +735,63 @@ class Worker(threading.Thread):
             # job says what is missing rather than finishing as if all was
             # made.
             raise RuntimeError(" ".join(dict.fromkeys(dub_problems)))
+
+    def _translation_llm(self):
+        """The model translations use. Translation may run on its own local
+        model (see llm.translation_model). With a cloud model chosen,
+        translation uses it too: everything the local model would have done
+        runs on the user's own key instead."""
+        from core.pipeline import _with_usable_model
+        from llm.registry import create_backend
+        from llm.spec import is_local
+
+        llm_cfg = dict(self.config["llm"])
+        tm = str(llm_cfg.get("translation_model") or "").strip()
+        if tm and is_local(llm_cfg.get("backend") or ""):
+            llm_cfg["backend"] = tm if "/" in tm else f"ollama/{tm}"
+            print(f"      Translating with {tm}")
+        return create_backend(_with_usable_model(llm_cfg))  # one that's installed (#118)
+
+    def _editor_languages(self, db: StateDB, payload: dict) -> None:
+        """Other languages as editor tabs (step KF): the captions of the
+        project's own tab translated (and spoken) per language, kept for the
+        app to add as tabs (kitty_editor.languages). The project itself is
+        not changed here: the editor may have it open."""
+        from kitty_editor import languages, registry
+        from multilingual import glossary
+        from multilingual.dub import dub
+        from multilingual.translate import translate_lines
+
+        data_dir = Path(self.config["paths"]["data_dir"])
+        project_id = str(payload["project_id"])
+        manifest = registry.load(data_dir, project_id)
+        video_id = (manifest.get("clip") or {}).get("video_id") or manifest.get("video_id")
+        vrow = db.conn.execute("SELECT creator_id, title FROM videos WHERE video_id = ?",
+                               (video_id,)).fetchone() if video_id else None
+        terms = glossary.build(db, vrow["creator_id"] if vrow else None, vrow["title"] if vrow else "")
+        llm = self._translation_llm()
+        voices = payload.get("voices") or {}
+        problems: list[str] = []
+        work = languages.folder(data_dir, project_id) / "work"
+
+        def report(label: str, done: int, total: int) -> None:
+            progress.emit(stage="multilingual", message=label,
+                          fraction=min(0.999, done / max(1, total)), project_id=project_id)
+
+        def speak(lines, code, out):
+            return dub(lines, code, None, out, data_dir / "voices", work, voice_id=voices.get(code) or None,
+                       data_dir=data_dir, problems=problems, voice_only=True)
+
+        if payload.get("dub"):
+            from voice import check_dub
+
+            for note in check_dub(data_dir, payload["languages"], voices):
+                print(f"      {note}")
+        languages.prepare(data_dir, project_id, payload["languages"],
+                          translate=lambda lines, code: translate_lines(lines, code, llm, terms=terms),
+                          speak=speak if payload.get("dub") else None, progress=report)
+        if problems:
+            raise RuntimeError(" ".join(dict.fromkeys(problems)))
 
     def _source_language(self, video_id: str, data_dir: Path) -> str:
         try:

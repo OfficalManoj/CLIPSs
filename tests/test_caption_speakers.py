@@ -4,7 +4,7 @@ An option in the caption style, off unless ticked. What it promises:
 - off, or absent, a clip's captions are written exactly as before, even when
   its saved lines still carry a speaker from an earlier render;
 - on, a line ends where the speaker changes and the other speaker's lines
-  burn in the second colour, with the word highlight still working on top;
+  burn in the second colour;
 - lines the user saved keep their text and their grouping.
 
 Who is talking comes from analysis/voice_turns.py as turns, [[start, end,
@@ -65,7 +65,7 @@ def test_a_speaker_left_on_saved_lines_never_colours_a_plain_clip(tmp_path):
     assert any("speaker" in line for line in tagged)
 
     assert _burn(tmp_path, lines=tagged) == _burn(tmp_path, lines=plain)
-    assert _burn(tmp_path, {"highlight": True}, tagged) == _burn(tmp_path, {"highlight": True}, plain)
+    assert _burn(tmp_path, {"preset": "concat.comic"}, tagged) == _burn(tmp_path, {"preset": "concat.comic"}, plain)
 
 
 def test_the_option_alone_changes_nothing_in_a_clip_with_one_voice(tmp_path):
@@ -100,9 +100,9 @@ def test_the_other_speakers_lines_burn_in_the_second_colour(tmp_path):
     for line, event in zip(lines, events):
         text = event.split(",,", 2)[-1]
         if line.get("speaker"):
-            assert text == f"{{\\1c{SECOND}}}{line['text'].upper()}"
+            assert text.endswith(f"\\1c{SECOND}}}{line['text']}")
         else:
-            assert text == line["text"].upper()
+            assert "\\1c" not in text and text.endswith(f"}}{line['text']}")
 
 
 def test_the_second_colour_is_the_one_chosen(tmp_path):
@@ -110,24 +110,7 @@ def test_the_second_colour_is_the_one_chosen(tmp_path):
 
     ass = _burn(tmp_path, {"second_speaker": True, "second_speaker_color": "#FF8800"}, lines)
 
-    assert "{\\1c&H0088FF&}" in ass and SECOND not in ass
-
-
-def test_the_word_highlight_runs_over_the_second_colour(tmp_path):
-    lines = build_caption_lines(_segments(), CLIP, 3, TURNS)
-    style = {"second_speaker": True, "highlight": True, "highlight_color": "#FFE600"}
-
-    ass = _burn(tmp_path, style, lines)
-
-    hot, white = "&H00E6FF&", "&HFFFFFF&"
-    theirs = [e for e in ass.splitlines() if "W24" in e]
-    assert len(theirs) == 3                     # one event per word of the line
-    for event in theirs:
-        assert f"{{\\1c{SECOND}}}" in event and hot in event and white not in event
-    ours = [e for e in ass.splitlines() if "W20" in e]
-    assert all(white in e and SECOND not in e for e in ours)
-    # A line of one word has nothing to move a highlight across: still theirs.
-    assert any(e.endswith(f"{{\\1c{SECOND}}}W27") for e in ass.splitlines())
+    assert "\\1c&H0088FF&}" in ass and SECOND not in ass
 
 
 # ---- lines the user saved -----------------------------------------------------------
@@ -222,7 +205,7 @@ def test_hand_fixes_alone_colour_a_clip_nobody_else_was_heard_in(tmp_path):
     assert [(_said(line), line.get("speaker")) for line in lines[:5]] == [
         ([20, 21, 22], None), ([23], None), ([24, 25, 26], 1), ([27], 1), ([28, 29, 30], None),
     ]
-    assert f"{{\\1c{SECOND}}}W24 W25 W26" in _burn(tmp_path, {"second_speaker": True}, lines)
+    assert f"\\1c{SECOND}}}w24 w25 w26" in _burn(tmp_path, {"second_speaker": True}, lines)
 
 
 def test_saved_lines_go_by_what_was_said_about_them_over_what_was_heard():

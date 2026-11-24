@@ -101,10 +101,3 @@ def test_a_clips_own_switch_from_an_earlier_run_is_not_saved_over_a_captions_off
     _resaved, ass = render(captions=True, opts=saved)
     assert ass is None
 
-
-def test_the_translation_preview_reads_the_clips_switch():
-    """The Other languages window (step KC) masks the burned captions under
-    a translated language only when the clip burns captions: the same
-    switch the render reads."""
-    window = (EDITOR.parent / "editor" / "OtherLanguagesDialog.tsx").read_text(encoding="utf-8")
-    assert "clip.render_opts?.captions ?? clip.render_opts?.job_captions ?? true" in window

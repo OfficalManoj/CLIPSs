@@ -29,7 +29,7 @@ from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from core import in_use
-from kitty_editor import automation, build, intake, registry
+from kitty_editor import automation, build, intake, languages, registry
 from plugins import session
 from server.projects_api import local_origin
 
@@ -92,6 +92,20 @@ class ExportIn(BaseModel):
 
     file: str
     export_folder: str | None = None
+    # The tab the export was made from (the editor's host.state says, step
+    # KF); left out by an older editor.
+    timeline: str | None = None
+
+
+class LanguagesIn(BaseModel):
+    """Make language tabs: the languages, whether to dub, and a voice per
+    language (left out: the language's default voice)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    languages: list[str]
+    dub: bool = False
+    voices: dict[str, str] | None = None
 
 
 def supported() -> bool:
@@ -376,7 +390,11 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
             project_dir = build.apply_clip_plan(editor_session, home, manifest["name"], canvas, base, plan)
         print(f"  Editor project {manifest['id']}: the editor's project made in {time.monotonic() - planned:.1f} s")
         _drop_old_video(manifest, base)
-        return {"canvas": canvas, "shape": _shape_of(info["width"], info["height"]), "project_dir": project_dir,
+        try:        # the clip's own tab, told from language tabs added later (KF)
+            source_tab = languages.read_project({"project_dir": project_dir}).get("activeTimelineId")
+        except (OSError, ValueError):
+            source_tab = None
+        return {"source_timeline": source_tab, "canvas": canvas, "shape": _shape_of(info["width"], info["height"]), "project_dir": project_dir,
                 "notes": plan["notes"], "media": [], "clip": {**manifest["clip"], **stood_on},
                 "video_file": str(base), "captions": captions, **made}
 
@@ -696,6 +714,13 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         elif manifest.get("state") != "ready":
             start(project_id, editor())
         else:
+            if languages.has_pending(data_dir, project_id):
+                # Language tabs made while the project was not on screen (KF):
+                # added before the editor opens it. Left for later if refused.
+                try:
+                    languages.apply(data_dir, project_id, exe=editor())
+                except (languages.Held, languages.Failed, HTTPException) as e:
+                    print(f"  Editor project {project_id}: language tabs not added yet: {e}")
             recovered = intake.recover(data_dir, project_id, open_db=db, publish=publish,
                                        folder=body.export_folder if body is not None else None)
         if not manifest.get("damaged"):
@@ -735,7 +760,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
             # exports in, wait for it: the export it took is then answered as
             # it was recorded ("again"), never as busy or failed (K-D17).
             return intake.take_in(data_dir, project_id, body.file, folder=body.export_folder, open_db=db,
-                                  publish=publish, wait=intake.LOCK_WAIT)
+                                  publish=publish, wait=intake.LOCK_WAIT, timeline=body.timeline)
         except intake.BadName as e:
             raise HTTPException(400, "file is the export's file name, with no folder.") from e
         except intake.BadFolder as e:
@@ -745,4 +770,47 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         except intake.Busy as e:
             raise HTTPException(409, {"message": "This export is being saved right now.", "reason": "busy"}) from e
         except intake.Failed as e:
+            raise HTTPException(500, {"message": str(e)}) from e
+
+    # ---- other languages as tabs (KF) ---------------------------------------
+
+    @app.get("/editor/projects/{project_id}/languages", dependencies=guarded)
+    def project_languages(project_id: str):
+        """The languages this project has a tab for, and those made but not
+        added yet."""
+        found(project_id)
+        return languages.tabs(data_dir, project_id)
+
+    @app.post("/editor/projects/{project_id}/languages", dependencies=guarded)
+    def make_languages(project_id: str, body: LanguagesIn):
+        """Queue the translation (and dub) of the project's captions, one
+        language tab each. The tabs are added by .../languages/apply."""
+        from multilingual.languages import is_supported
+
+        manifest = found(project_id)
+        if manifest.get("state") != "ready":
+            raise HTTPException(409, {"message": "This project is still being made.", "reason": "building"})
+        codes = list(dict.fromkeys(c for c in body.languages if is_supported(c)))
+        if not codes:
+            raise HTTPException(400, "Pick at least one language.")
+        d = db()
+        try:
+            job_id = d.add_job("editor_languages", json.dumps({
+                "project_id": project_id, "languages": codes, "dub": bool(body.dub),
+                "voices": {k: v for k, v in (body.voices or {}).items() if k in codes and v}}),
+                title=str(manifest.get("name") or ""))
+        finally:
+            d.close()
+        return {"job_id": job_id, "languages": codes}
+
+    @app.post("/editor/projects/{project_id}/languages/apply", dependencies=guarded)
+    def apply_languages(project_id: str):
+        """Add the language tabs made for this project. The editor's window
+        must have closed the project first."""
+        found(project_id)
+        try:
+            return languages.apply(data_dir, project_id, exe=editor())
+        except languages.Held as e:
+            raise HTTPException(409, {"message": str(e), "reason": "open_in_editor"}) from e
+        except languages.Failed as e:
             raise HTTPException(500, {"message": str(e)}) from e

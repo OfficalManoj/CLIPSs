@@ -268,7 +268,7 @@ def test_a_clips_players_load_its_video_as_it_is_now():
             "      ? `${API_BASE}/media/${clipId}?v=${encodeURIComponent(version)}`\n"
             "      : `${API_BASE}/media/${clipId}`,") in api
     assert "media_version?: string" in _source("lib/types.ts")
-    for screen in ("components/ClipCard.tsx", "components/ClipEditor.tsx", "components/editor/OtherLanguagesDialog.tsx"):
+    for screen in ("components/ClipCard.tsx", "components/ClipEditor.tsx"):
         source = _source(screen)
         assert "api.mediaUrl(clip.id, clip.media_version)" in source, screen
         assert "api.mediaUrl(clip.id)" not in source, screen

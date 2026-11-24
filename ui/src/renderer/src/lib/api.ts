@@ -595,7 +595,6 @@ export const api = {
     subtitles?: boolean
     post_text?: boolean
     voices?: Record<string, string>
-    style?: CaptionStyle
   }) =>
     newFilesRequest<{ job_id: number; languages: string[]; clips: number }>('/translate', body),
   translations: (clipId: number) =>
@@ -1296,5 +1295,22 @@ export const editorApi = {
       method: 'POST',
       body: JSON.stringify(exportFolder ? { export_folder: exportFolder } : {})
     }),
-  remove: (id: string) => editorRequest<{ deleted: boolean }>(`/editor/projects/${id}`, { method: 'DELETE' })
+  remove: (id: string) => editorRequest<{ deleted: boolean }>(`/editor/projects/${id}`, { method: 'DELETE' }),
+  /** The job list, to follow a language-tabs job (KF). */
+  jobs: () => editorRequest<Job[]>('/jobs'),
+  /** Other languages as tabs (KF): the languages with a tab, and those made but not added yet. */
+  languages: (id: string) =>
+    editorRequest<{ tabs: { timeline: string; language: string }[]; pending: string[] }>(
+      `/editor/projects/${id}/languages`
+    ),
+  makeLanguages: (id: string, body: { languages: string[]; dub: boolean; voices?: Record<string, string> }) =>
+    editorRequest<{ job_id: number; languages: string[] }>(`/editor/projects/${id}/languages`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  applyLanguages: (id: string) =>
+    editorRequest<{ added: { timeline: string; language: string; voice: boolean }[] }>(
+      `/editor/projects/${id}/languages/apply`,
+      { method: 'POST' }
+    )
 }

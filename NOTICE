@@ -230,50 +230,53 @@ the editor's THIRD_PARTY_NOTICES.md.
 Fonts
 -------------------------------------------------------------------------------
 
-The caption fonts in assets/fonts/ are licensed under the SIL Open Font
-License 1.1 (https://openfontlicense.org), each with its OFL.txt beside it.
-They are the static TTF files from https://github.com/google/fonts (the ofl/
-folder) at commit 5bb28733cec313b63fbd415b574b5ae35c8aa8b8, unmodified and
-unrenamed; assets/fonts/manifest.json lists each file with its sha256. They
-ship inside the app to burn captions and are not sold on their own.
+The caption fonts in assets/fonts/ are Clips Kitty Editor's own fonts,
+copied byte for byte from our Concat fork (concat-text/fonts at commit
+94aa48ffac8a983e1fde6f305f3788cb424f7850) by scripts/sync_editor_presets.py.
+Each has its licence file beside it, which carries its copyright notice;
+assets/fonts/manifest.json lists every file with its sha256. The six
+"-Concat" Noto files are the editor's subsets of the Noto fonts, shipped
+as the editor ships them. They ship inside the app to burn captions and
+are not sold on their own.
 
-  Anton              Copyright 2020 The Anton Project Authors
-                     (https://github.com/googlefonts/AntonFont.git)
-                     SIL Open Font License 1.1
-  Archivo Black      Copyright 2017 The Archivo Black Project Authors
-                     (https://github.com/Omnibus-Type/ArchivoBlack)
-                     SIL Open Font License 1.1
-  Bangers            Copyright 2010 The Bangers Project Authors
-                     (https://github.com/googlefonts/bangers)
-                     SIL Open Font License 1.1
-  Barlow ExtraBold   Copyright 2017 The Barlow Project Authors
-                     (https://github.com/jpt/barlow)
-                     SIL Open Font License 1.1
-  Bebas Neue         Copyright © 2010 by Dharma Type.
-                     SIL Open Font License 1.1
-  Bowlby One         Copyright (c) 2011 by vernon adams
-                     (vern@newtypography.co.uk), with Reserved Font Names
-                     "Bowlby" "Bowlby One" and "Bowlby One SC"
-                     SIL Open Font License 1.1
-  Kanit ExtraBold    Copyright 2020 The Kanit Project Authors
-                     (https://github.com/cadsondemak/kanit)
-                     SIL Open Font License 1.1
-  Lilita One         Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz),
-                     with Reserved Font Name Lilita
-                     SIL Open Font License 1.1
-  Passion One Black  Copyright (c) 2011 Fontstage (info@fontstage.com), with
-                     Reserved Font Names, 'Passion'
-                     SIL Open Font License 1.1
-  Poppins ExtraBold  Copyright 2020 The Poppins Project Authors
-                     (https://github.com/itfoundry/Poppins)
-                     SIL Open Font License 1.1
-  Russo One          Copyright (c) 2011-2012, Jovanny Lemonad (jovanny.ru),
-                     with Reserved Font Name "Russo"
-                     SIL Open Font License 1.1
-  Titan One          Copyright (c) 2011, Rodrigo Fuenzalida
-                     (www.rfuenzalida.com|hello@rfuenzalida.com), with
-                     Reserved Font Name Titan.
-                     SIL Open Font License 1.1
+  Font                    Licence                     Licence file
+  Abril Fatface           SIL Open Font License 1.1   LICENSE-AbrilFatface.txt
+  Anton                   SIL Open Font License 1.1   LICENSE-Anton.txt
+  Archivo Black           SIL Open Font License 1.1   LICENSE-ArchivoBlack.txt
+  Atomic Age              SIL Open Font License 1.1   LICENSE-AtomicAge.txt
+  Bangers                 SIL Open Font License 1.1   LICENSE-Bangers.txt
+  Bebas Neue              SIL Open Font License 1.1   LICENSE-BebasNeue.txt
+  Black Ops One           SIL Open Font License 1.1   LICENSE-BlackOpsOne.txt
+  Bungee Hairline         SIL Open Font License 1.1   LICENSE-BungeeHairline.txt
+  Caveat Brush            SIL Open Font License 1.1   LICENSE-CaveatBrush.txt
+  DM Serif Display        SIL Open Font License 1.1   LICENSE-DMSerifDisplay.txt
+  Emilys Candy            SIL Open Font License 1.1   LICENSE-EmilysCandy.txt
+  Frijole                 SIL Open Font License 1.1   LICENSE-Frijole.txt
+  Germania One            SIL Open Font License 1.1   LICENSE-GermaniaOne.txt
+  Google Sans Code        SIL Open Font License 1.1   LICENSE-GoogleSansCode.txt
+  Hammersmith One         SIL Open Font License 1.1   LICENSE-HammersmithOne.txt
+  Hanken Grotesk          SIL Open Font License 1.1   LICENSE-HankenGrotesk.txt
+  Inter                   SIL Open Font License 1.1   LICENSE-Inter.txt
+  Kosugi Maru             Apache License 2.0          LICENSE-KosugiMaru.txt
+  Lobster                 SIL Open Font License 1.1   LICENSE-Lobster.txt
+  Londrina Solid          SIL Open Font License 1.1   LICENSE-LondrinaSolid.txt
+  Montserrat              SIL Open Font License 1.1   LICENSE-Montserrat.txt
+  Mystery Quest           SIL Open Font License 1.1   LICENSE-MysteryQuest.txt
+  Noto Sans Arabic UI     SIL Open Font License 1.1   LICENSE-NotoSansArabicUI.txt
+  Noto Sans Bengali       SIL Open Font License 1.1   LICENSE-NotoSansBengali.txt
+  Noto Sans CJK SC        SIL Open Font License 1.1   LICENSE-NotoSansCJK.txt
+  Noto Sans Devanagari    SIL Open Font License 1.1   LICENSE-NotoSansDevanagari.txt
+  Noto Sans Hebrew        SIL Open Font License 1.1   LICENSE-NotoSansHebrew.txt
+  Noto Sans Thai          SIL Open Font License 1.1   LICENSE-NotoSansThai.txt
+  Pacifico                SIL Open Font License 1.1   LICENSE-Pacifico.txt
+  Permanent Marker        Apache License 2.0          LICENSE-PermanentMarker.txt
+  Pixelify Sans           SIL Open Font License 1.1   LICENSE-PixelifySans.txt
+  Rubik Scribble          SIL Open Font License 1.1   LICENSE-RubikScribble.txt
+  Secular One             SIL Open Font License 1.1   LICENSE-SecularOne.txt
+  Shadows Into Light Two  SIL Open Font License 1.1   LICENSE-ShadowsIntoLightTwo.txt
+  Space Grotesk           SIL Open Font License 1.1   LICENSE-SpaceGrotesk.txt
+  Staatliches             SIL Open Font License 1.1   LICENSE-Staatliches.txt
+  Zen Tokyo Zoo           SIL Open Font License 1.1   LICENSE-ZenTokyoZoo.txt
 
 
 -------------------------------------------------------------------------------

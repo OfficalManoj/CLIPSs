@@ -64,6 +64,8 @@ interface HostExport {
   project: string
   output: string
   error?: string
+  /** The tab the export was made from (step KF); an older editor leaves it out. */
+  timeline?: string
 }
 
 interface HostState {
@@ -668,6 +670,7 @@ async function takeIn(target: Running, entry: HostExport): Promise<void> {
     return
   }
   const file = win32.basename(String(entry.output || ''))
+  const body = { file, export_folder: project.exportFolder || null, timeline: entry.timeline || null }
   // The engine waits while a reopen's recover takes this project's exports
   // in, and answers a file it took as it recorded it ("again"): so a 409
   // (still busy after that wait) or an engine that can't be reached for a
@@ -676,7 +679,7 @@ async function takeIn(target: Running, entry: HostExport): Promise<void> {
   let answer = await engine(
     'POST',
     `/editor/projects/${project.id}/exports`,
-    { file, export_folder: project.exportFolder || null },
+    body,
     10 * 60 * 1000
   )
   for (let attempt = 1; attempt <= TAKE_IN_RETRIES && (answer.status === 0 || answer.status === 409); attempt++) {
@@ -684,7 +687,7 @@ async function takeIn(target: Running, entry: HostExport): Promise<void> {
     answer = await engine(
       'POST',
       `/editor/projects/${project.id}/exports`,
-      { file, export_folder: project.exportFolder || null },
+      body,
       10 * 60 * 1000
     )
   }

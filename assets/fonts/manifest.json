@@ -1,199 +1,955 @@
 {
-  "about": "Caption fonts bundled with Clips Kitty (video/fonts.py). Each is an unmodified static TTF from github.com/google/fonts (ofl/) at one pinned commit, under the SIL Open Font License 1.1, with its OFL.txt beside it. family is the name libass matches (the TTF name table's family name, ID 1). scripts lists only the writing systems whose every letter is in the file's character map (video/alphabets.py SCRIPT_LETTERS); tests/test_caption_fonts.py reads each file's character map and checks the list is exactly that. Whether a clip keeps a bundled font goes by the letters of its language (video/captions.py caption_font_for), not by this list.",
-  "source": "https://github.com/google/fonts",
-  "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8",
-  "licence": "OFL-1.1",
+  "about": "Clips Kitty Editor's fonts (our Concat fork, concat-text/fonts), byte for byte, with each font's licence file beside it. family is the name libass matches (name ID 1), typographic the family the editor's presets name (ID 16, else ID 1). ass_scale is (usWinAscent + usWinDescent) / unitsPerEm: libass sizes a font by it, so an ASS Fontsize is the em times ass_scale. scripts lists the writing systems whose every letter is in the file (video/alphabets.py). Made by scripts/sync_editor_presets.py.",
+  "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850",
   "files": [
     {
-      "family": "Anton",
+      "file": "AbrilFatface-Regular.ttf",
+      "family": "Abril Fatface",
+      "subfamily": "Regular",
+      "typographic": "Abril Fatface",
       "weight": 400,
-      "file": "anton/Anton-Regular.ttf",
+      "italic": false,
+      "ass_scale": 1.349,
+      "scripts": [
+        "latin",
+        "latin-ext"
+      ],
+      "sha256": "5971d4a3758a922a9fedc7f6fb825a96341a2e718c45a4b2c9a6b417c8c4dbe9",
+      "bytes": 67364,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-AbrilFatface.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Anton-Regular.ttf",
+      "family": "Anton",
+      "subfamily": "Regular",
+      "typographic": "Anton",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.7334,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
       "sha256": "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab",
       "bytes": 170812,
-      "scripts": [
-        "latin",
-        "latin-ext",
-        "vietnamese"
-      ],
       "licence": "OFL-1.1",
-      "licence_file": "anton/OFL.txt",
-      "copyright": "Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git)",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/anton/Anton-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-Anton.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     },
     {
+      "file": "ArchivoBlack-Regular.ttf",
       "family": "Archivo Black",
+      "subfamily": "Regular",
+      "typographic": "Archivo Black",
       "weight": 400,
-      "file": "archivoblack/ArchivoBlack-Regular.ttf",
+      "italic": false,
+      "ass_scale": 1.347,
+      "scripts": [
+        "latin",
+        "latin-ext"
+      ],
       "sha256": "dd9a89a019b4849f66ab75455fe7bdf931311042cbb0f0f97acc061539703180",
       "bytes": 90988,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-ArchivoBlack.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "AtomicAge-Regular.ttf",
+      "family": "Atomic Age",
+      "subfamily": "Regular",
+      "typographic": "Atomic Age",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.3413,
       "scripts": [
         "latin",
         "latin-ext"
       ],
+      "sha256": "5ea6111180af882b0799a1e1c04b7acc557807ff76e0cc24258b259a06f67ed2",
+      "bytes": 62592,
       "licence": "OFL-1.1",
-      "licence_file": "archivoblack/OFL.txt",
-      "copyright": "Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack)",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/archivoblack/ArchivoBlack-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-AtomicAge.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     },
     {
+      "file": "Bangers-Regular.ttf",
       "family": "Bangers",
+      "subfamily": "Regular",
+      "typographic": "Bangers",
       "weight": 400,
-      "file": "bangers/Bangers-Regular.ttf",
+      "italic": false,
+      "ass_scale": 1.757,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
       "sha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824",
       "bytes": 93148,
-      "scripts": [
-        "latin",
-        "latin-ext",
-        "vietnamese"
-      ],
       "licence": "OFL-1.1",
-      "licence_file": "bangers/OFL.txt",
-      "copyright": "Copyright 2010 The Bangers Project Authors (https://github.com/googlefonts/bangers)",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/bangers/Bangers-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-Bangers.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     },
     {
-      "family": "Barlow ExtraBold",
-      "weight": 800,
-      "file": "barlow/Barlow-ExtraBold.ttf",
-      "sha256": "5234d91030e1bb89525cbaccc4386892c3fe005a0582c705264ce3572d96a1a1",
-      "bytes": 110228,
-      "scripts": [
-        "latin",
-        "vietnamese"
-      ],
-      "licence": "OFL-1.1",
-      "licence_file": "barlow/OFL.txt",
-      "copyright": "Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/barlow/Barlow-ExtraBold.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
-    },
-    {
+      "file": "BebasNeue-Regular.ttf",
       "family": "Bebas Neue",
+      "subfamily": "Regular",
+      "typographic": "Bebas Neue",
       "weight": 400,
-      "file": "bebasneue/BebasNeue-Regular.ttf",
-      "sha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73",
-      "bytes": 61400,
+      "italic": false,
+      "ass_scale": 1.3,
       "scripts": [
         "latin",
         "latin-ext"
       ],
+      "sha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73",
+      "bytes": 61400,
       "licence": "OFL-1.1",
-      "licence_file": "bebasneue/OFL.txt",
-      "copyright": "Copyright © 2010 by Dharma Type.",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/bebasneue/BebasNeue-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-BebasNeue.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     },
     {
-      "family": "Bowlby One",
+      "file": "BlackOpsOne-Regular.ttf",
+      "family": "Black Ops One",
+      "subfamily": "Regular",
+      "typographic": "Black Ops One",
       "weight": 400,
-      "file": "bowlbyone/BowlbyOne-Regular.ttf",
-      "sha256": "c46a806d7b51fd4987e5f0be449fe40a944cb407e43290ce1cdeed029a8cdc1d",
-      "bytes": 59856,
-      "scripts": [
-        "latin"
-      ],
-      "licence": "OFL-1.1",
-      "licence_file": "bowlbyone/OFL.txt",
-      "copyright": "Copyright (c) 2011 by vernon adams (vern@newtypography.co.uk), with Reserved Font Names \"Bowlby\" \"Bowlby One\" and \"Bowlby One SC\"",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/bowlbyone/BowlbyOne-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
-    },
-    {
-      "family": "Kanit ExtraBold",
-      "weight": 800,
-      "file": "kanit/Kanit-ExtraBold.ttf",
-      "sha256": "70082870d1f5bb6ae9faa708572b2c36de3c076caae187edae753f709d0de984",
-      "bytes": 177836,
+      "italic": false,
+      "ass_scale": 1.4263,
       "scripts": [
         "latin",
         "latin-ext",
-        "vietnamese",
+        "vietnamese"
+      ],
+      "sha256": "282a825b5f294377387e3969f765408157dbea8da0f5d0aae68c6bc704b145b3",
+      "bytes": 166532,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-BlackOpsOne.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "BungeeHairline-Regular.ttf",
+      "family": "Bungee Hairline",
+      "subfamily": "Regular",
+      "typographic": "Bungee Hairline",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 2.508,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "fa720052780a73c9e8ba196bbb5332d361d366624f13f486beff125097fdbfb2",
+      "bytes": 104700,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-BungeeHairline.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "CaveatBrush-Regular.ttf",
+      "family": "Caveat Brush",
+      "subfamily": "Regular",
+      "typographic": "Caveat Brush",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.26,
+      "scripts": [
+        "latin",
+        "latin-ext"
+      ],
+      "sha256": "e565bd7bffd895ca64f8d1cb77c816b9b38d9c010246386a07c9648592f6f282",
+      "bytes": 295568,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-CaveatBrush.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "DMSerifDisplay-Italic.ttf",
+      "family": "DM Serif Display",
+      "subfamily": "Italic",
+      "typographic": "DM Serif Display",
+      "weight": 400,
+      "italic": true,
+      "ass_scale": 1.371,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "df74c0ac387baeaeb0fe4f2324e1668e6a3ed8c09cd9796fe162c71753e19e45",
+      "bytes": 71208,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-DMSerifDisplay.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "DMSerifDisplay-Regular.ttf",
+      "family": "DM Serif Display",
+      "subfamily": "Regular",
+      "typographic": "DM Serif Display",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.371,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "8cc3643535edf039aa5d95440a8542735e9197e4f4b8d9303e980fefbf5ab616",
+      "bytes": 76580,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-DMSerifDisplay.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "EmilysCandy-Regular.ttf",
+      "family": "Emilys Candy",
+      "subfamily": "Regular",
+      "typographic": "Emilys Candy",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.2588,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "0cf3ca9dbe71b33596e8a1eb12b40deac2e6414fe5616dda50c554580b6e0c68",
+      "bytes": 237216,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-EmilysCandy.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Frijole-Regular.ttf",
+      "family": "Frijole",
+      "subfamily": "Regular",
+      "typographic": "Frijole",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.3789,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "e182bbad0e1ba7eb06d93edb1c97a71f5b7d56e27433fb375f5f7138399ab72c",
+      "bytes": 227860,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Frijole.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "GermaniaOne-Regular.ttf",
+      "family": "Germania One",
+      "subfamily": "Regular",
+      "typographic": "Germania One",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.161,
+      "scripts": [],
+      "sha256": "3ee3d56584bab8c9e3f59cc3360aa8a36e219dcf0a9f3c8928e3da5a19277e3f",
+      "bytes": 33240,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-GermaniaOne.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "GoogleSansCode-Variable.ttf",
+      "family": "Google Sans Code",
+      "subfamily": "Regular",
+      "typographic": "Google Sans Code",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.6535,
+      "scripts": [
+        "latin",
+        "vietnamese"
+      ],
+      "sha256": "c9649573afcd966f61096b1e9c3c3115e7b54315ca2adf9839c6f8b17d5f8e1f",
+      "bytes": 126224,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-GoogleSansCode.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "HammersmithOne-Regular.ttf",
+      "family": "Hammersmith One",
+      "subfamily": "Regular",
+      "typographic": "Hammersmith One",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.25,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "6faf4e9a59a2b25e1016c4e47cf4da4a494d07aee15dc2f708a88caae015ff8a",
+      "bytes": 102884,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-HammersmithOne.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "HankenGrotesk-Bold.ttf",
+      "family": "Hanken Grotesk",
+      "subfamily": "Bold",
+      "typographic": "Hanken Grotesk",
+      "weight": 700,
+      "italic": false,
+      "ass_scale": 1.303,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "d4483ef2e26692ea2e491be712b21e0df9cd02c72aea8fa620dd167a337087e8",
+      "bytes": 66508,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-HankenGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "HankenGrotesk-Italic.ttf",
+      "family": "Hanken Grotesk",
+      "subfamily": "Italic",
+      "typographic": "Hanken Grotesk",
+      "weight": 400,
+      "italic": true,
+      "ass_scale": 1.303,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "46ff8f25a03419360b8a88287e36240815db60e2903d9eb4e3441fac48de540b",
+      "bytes": 71036,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-HankenGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "HankenGrotesk-Medium.ttf",
+      "family": "Hanken Grotesk Medium",
+      "subfamily": "Regular",
+      "typographic": "Hanken Grotesk",
+      "weight": 500,
+      "italic": false,
+      "ass_scale": 1.303,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "1b4861c0873a080a5fee9497686ece54341d55d19c469f39b624690ee93b7eab",
+      "bytes": 66576,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-HankenGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "HankenGrotesk-Regular.ttf",
+      "family": "Hanken Grotesk",
+      "subfamily": "Regular",
+      "typographic": "Hanken Grotesk",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.303,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "315cda587038b4d21cb4899df306fef5c15b34b6b9470352eba9a3dfce72f380",
+      "bytes": 66576,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-HankenGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "HankenGrotesk-SemiBold.ttf",
+      "family": "Hanken Grotesk SemiBold",
+      "subfamily": "Regular",
+      "typographic": "Hanken Grotesk",
+      "weight": 600,
+      "italic": false,
+      "ass_scale": 1.303,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "4f70ae1dd1c951e80603732344f18507d6a6932a3df9f7f6d8a91d4495d41e17",
+      "bytes": 66520,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-HankenGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Inter-Black.ttf",
+      "family": "Inter Black",
+      "subfamily": "Regular",
+      "typographic": "Inter",
+      "weight": 900,
+      "italic": false,
+      "ass_scale": 1.21,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "greek",
+        "vietnamese"
+      ],
+      "sha256": "6342d3ea6dc088b43867f615e807d898adf100c93edb978b8e52c5eb71a264da",
+      "bytes": 419968,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Inter.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Inter-Bold.ttf",
+      "family": "Inter",
+      "subfamily": "Bold",
+      "typographic": "Inter",
+      "weight": 700,
+      "italic": false,
+      "ass_scale": 1.21,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "greek",
+        "vietnamese"
+      ],
+      "sha256": "288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+      "bytes": 420428,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Inter.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Inter-Italic.ttf",
+      "family": "Inter",
+      "subfamily": "Italic",
+      "typographic": "Inter",
+      "weight": 400,
+      "italic": true,
+      "ass_scale": 1.21,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "greek",
+        "vietnamese"
+      ],
+      "sha256": "bbc051dd204b5019a1aa0bc0ae2aa8a05ab13e7a3f979fa357631dc7feb6833a",
+      "bytes": 417388,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Inter.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Inter-Regular.ttf",
+      "family": "Inter",
+      "subfamily": "Regular",
+      "typographic": "Inter",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.21,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "greek",
+        "vietnamese"
+      ],
+      "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+      "bytes": 411640,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Inter.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Inter-SemiBold.ttf",
+      "family": "Inter SemiBold",
+      "subfamily": "Regular",
+      "typographic": "Inter",
+      "weight": 600,
+      "italic": false,
+      "ass_scale": 1.21,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "greek",
+        "vietnamese"
+      ],
+      "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+      "bytes": 419744,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Inter.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "KosugiMaru-Regular.ttf",
+      "family": "Kosugi Maru",
+      "subfamily": "Regular",
+      "typographic": "Kosugi Maru",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.0,
+      "scripts": [],
+      "sha256": "4b8d0022c8dadd090ef67cd1f71f130714767af7806cba2eb4ebe4b0271c1d68",
+      "bytes": 3565716,
+      "licence": "Apache-2.0",
+      "licence_file": "LICENSE-KosugiMaru.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Lobster-Regular.ttf",
+      "family": "Lobster",
+      "subfamily": "Regular",
+      "typographic": "Lobster",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.49,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "vietnamese"
+      ],
+      "sha256": "d6568e697fd50cedc0be04d8aae4127fe95add607e7bff954ca88604be80c205",
+      "bytes": 406076,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Lobster.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "LondrinaSolid-Black.ttf",
+      "family": "Londrina Solid",
+      "subfamily": "Black",
+      "typographic": "Londrina Solid",
+      "weight": 900,
+      "italic": false,
+      "ass_scale": 1.156,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "8c63a15e3fa34e0b362abeb903944a2bd45e71b1efa122486c0a47e295eae06f",
+      "bytes": 93408,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-LondrinaSolid.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "LondrinaSolid-Regular.ttf",
+      "family": "Londrina Solid",
+      "subfamily": "Regular",
+      "typographic": "Londrina Solid",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.156,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "e82b9b3ee21ccf153dcf67e5f4226a210474591a6ad31b5f17f2f14dc2524514",
+      "bytes": 92132,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-LondrinaSolid.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Montserrat-Black.ttf",
+      "family": "Montserrat Black",
+      "subfamily": "Regular",
+      "typographic": "Montserrat",
+      "weight": 900,
+      "italic": false,
+      "ass_scale": 1.562,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "vietnamese"
+      ],
+      "sha256": "ea67b37f8776eebea135cd1fe9adeaf6f9427683e8dc11ab8398b6be5f102c60",
+      "bytes": 462844,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Montserrat.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Montserrat-Bold.ttf",
+      "family": "Montserrat",
+      "subfamily": "Bold",
+      "typographic": "Montserrat",
+      "weight": 700,
+      "italic": false,
+      "ass_scale": 1.562,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "vietnamese"
+      ],
+      "sha256": "bc6e854971cea46b463be6f9eef4d9cd52f51cfc1fc0dd90c9d3e6483dc0ec61",
+      "bytes": 454864,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Montserrat.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Montserrat-ExtraBold.ttf",
+      "family": "Montserrat ExtraBold",
+      "subfamily": "Regular",
+      "typographic": "Montserrat",
+      "weight": 800,
+      "italic": false,
+      "ass_scale": 1.562,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "vietnamese"
+      ],
+      "sha256": "d3ac6a843d3ba6d5cafd44cf39e437055c8aed7e261010f595f57d3c7b3e2c1b",
+      "bytes": 455468,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Montserrat.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Montserrat-Regular.ttf",
+      "family": "Montserrat",
+      "subfamily": "Regular",
+      "typographic": "Montserrat",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.562,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "cyrillic",
+        "cyrillic-ext",
+        "vietnamese"
+      ],
+      "sha256": "3e8abe50c44c82e2242e97d1ec8c0d385c4890cdc50447bcdb8605c81a38cfb2",
+      "bytes": 445928,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Montserrat.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "MysteryQuest-Regular.ttf",
+      "family": "Mystery Quest",
+      "subfamily": "Regular",
+      "typographic": "Mystery Quest",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.375,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "fc3fba61be98d7de03964b41175ee5629bcc6958b251f8037ef13eabb5431eb2",
+      "bytes": 42124,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-MysteryQuest.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "NotoSansArabicUI-Concat.ttf",
+      "family": "Noto Sans Arabic UI",
+      "subfamily": "Regular",
+      "typographic": "Noto Sans Arabic UI",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.362,
+      "scripts": [],
+      "sha256": "9187fa244db5f50201cfb0ede30ae7269651d090290f164c0703403fd0fab1b2",
+      "bytes": 77088,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-NotoSansArabicUI.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "NotoSansBengali-Concat.ttf",
+      "family": "Noto Sans Bengali",
+      "subfamily": "Regular",
+      "typographic": "Noto Sans Bengali",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.403,
+      "scripts": [],
+      "sha256": "8cfa11ff109b6598f3b816c46e1d3a8e1068054b42bf6919920ee5d610d14981",
+      "bytes": 87584,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-NotoSansBengali.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "NotoSansCJKsc-Concat.otf",
+      "family": "Noto Sans CJK SC",
+      "subfamily": "Regular",
+      "typographic": "Noto Sans CJK SC",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.448,
+      "scripts": [],
+      "sha256": "6931a4a090bd566870f64013cb9b7c47c608fc38c5d01de5f66effb6eb25fe51",
+      "bytes": 2739080,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-NotoSansCJK.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "NotoSansDevanagari-Concat.ttf",
+      "family": "Noto Sans Devanagari",
+      "subfamily": "Regular",
+      "typographic": "Noto Sans Devanagari",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.906,
+      "scripts": [],
+      "sha256": "ea31ed07e201fdedd846241925f5db70e1c223e7f0742c2e4cb7f9064df0c3a2",
+      "bytes": 157072,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-NotoSansDevanagari.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "NotoSansHebrew-Concat.ttf",
+      "family": "Noto Sans Hebrew",
+      "subfamily": "Regular",
+      "typographic": "Noto Sans Hebrew",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.36,
+      "scripts": [],
+      "sha256": "c82874befbc9b013beedd3cca13ebed23bd34f32c8dc9239ca87a4e4a4219cac",
+      "bytes": 14856,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-NotoSansHebrew.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "NotoSansThai-Concat.ttf",
+      "family": "Noto Sans Thai",
+      "subfamily": "Regular",
+      "typographic": "Noto Sans Thai",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.511,
+      "scripts": [
         "thai"
       ],
+      "sha256": "477fffbe192432f1b768e3ebbbda2965d3fea47bdb1fd7610b35b06235ac15ad",
+      "bytes": 18184,
       "licence": "OFL-1.1",
-      "licence_file": "kanit/OFL.txt",
-      "copyright": "Copyright 2020 The Kanit Project Authors (https://github.com/cadsondemak/kanit)",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/kanit/Kanit-ExtraBold.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-NotoSansThai.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     },
     {
-      "family": "Lilita One",
+      "file": "Pacifico-Regular.ttf",
+      "family": "Pacifico",
+      "subfamily": "Regular",
+      "typographic": "Pacifico",
       "weight": 400,
-      "file": "lilitaone/LilitaOne-Regular.ttf",
-      "sha256": "f5b641c45c69d772ee4eda687bc9fda411d5cad6b0b45371491da4580cbc8d59",
-      "bytes": 28092,
+      "italic": false,
+      "ass_scale": 1.935,
       "scripts": [
-        "latin"
+        "latin",
+        "cyrillic",
+        "cyrillic-ext",
+        "vietnamese"
       ],
+      "sha256": "5b6c0d5334a7bf77dea52b975c5a0c408878c0f7115ed5b6fb151f634b7bf701",
+      "bytes": 329380,
       "licence": "OFL-1.1",
-      "licence_file": "lilitaone/OFL.txt",
-      "copyright": "Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Name Lilita",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/lilitaone/LilitaOne-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-Pacifico.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     },
     {
-      "family": "Passion One Black",
-      "weight": 900,
-      "file": "passionone/PassionOne-Black.ttf",
-      "sha256": "c954dbac8835bf16f938f8d97fe1627d47aa122d60246169ff55cec772949e96",
-      "bytes": 24288,
-      "scripts": [
-        "latin"
-      ],
-      "licence": "OFL-1.1",
-      "licence_file": "passionone/OFL.txt",
-      "copyright": "Copyright (c) 2011 Fontstage (info@fontstage.com), with Reserved Font Names, 'Passion'",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/passionone/PassionOne-Black.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
-    },
-    {
-      "family": "Poppins ExtraBold",
-      "weight": 800,
-      "file": "poppins/Poppins-ExtraBold.ttf",
-      "sha256": "f2ab17c1a63a0ecc12c2461848fc8a469395e3cd2d641803e889c643d9f958e1",
-      "bytes": 154836,
-      "scripts": [
-        "latin"
-      ],
-      "licence": "OFL-1.1",
-      "licence_file": "poppins/OFL.txt",
-      "copyright": "Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins)",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/poppins/Poppins-ExtraBold.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
-    },
-    {
-      "family": "Russo One",
+      "file": "PermanentMarker-Regular.ttf",
+      "family": "Permanent Marker",
+      "subfamily": "Regular",
+      "typographic": "Permanent Marker",
       "weight": 400,
-      "file": "russoone/RussoOne-Regular.ttf",
-      "sha256": "bc0abcc660bd8b7ad3000ecb2898a27c58a29a50f7ec81652fa12e75148d09df",
-      "bytes": 39124,
+      "italic": false,
+      "ass_scale": 1.4268,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "28f82c8a7943cb8e9d599f8554da1d4fc75dbcf69b9885ad6c0611d20c6946c5",
+      "bytes": 74632,
+      "licence": "Apache-2.0",
+      "licence_file": "LICENSE-PermanentMarker.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "PixelifySans-Variable.ttf",
+      "family": "Pixelify Sans",
+      "subfamily": "Regular",
+      "typographic": "Pixelify Sans",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.211,
+      "scripts": [
+        "latin",
+        "latin-ext"
+      ],
+      "sha256": "9ba86cd010a4de309d263ceff8e8044092c9db7efda869620cb9ff1c4389e8a5",
+      "bytes": 79160,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-PixelifySans.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "RubikScribble-Regular.ttf",
+      "family": "Rubik Scribble",
+      "subfamily": "Regular",
+      "typographic": "Rubik Scribble",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.281,
       "scripts": [
         "latin",
         "cyrillic"
       ],
+      "sha256": "341d083481febe704791212f560a0898039d6a5744c8819102f3ce7a7f8fc2d4",
+      "bytes": 583828,
       "licence": "OFL-1.1",
-      "licence_file": "russoone/OFL.txt",
-      "copyright": "Copyright (c) 2011-2012, Jovanny Lemonad (jovanny.ru), with Reserved Font Name \"Russo\"",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/russoone/RussoOne-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-RubikScribble.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     },
     {
-      "family": "Titan One",
+      "file": "SecularOne-Regular.ttf",
+      "family": "Secular One",
+      "subfamily": "Regular",
+      "typographic": "Secular One",
       "weight": 400,
-      "file": "titanone/TitanOne-Regular.ttf",
-      "sha256": "563ff6de179bbd44bcd7d2a6c448d6dc3bf935834237cf1250e506e65cd86ff1",
-      "bytes": 55712,
+      "italic": false,
+      "ass_scale": 1.455,
       "scripts": [
         "latin"
       ],
+      "sha256": "2f45092a521db5042887941edfef73178ed7c5ba7fdfc5b6f581d44aab7b0234",
+      "bytes": 83916,
       "licence": "OFL-1.1",
-      "licence_file": "titanone/OFL.txt",
-      "copyright": "Copyright (c) 2011, Rodrigo Fuenzalida (www.rfuenzalida.com|hello@rfuenzalida.com), with Reserved Font Name Titan.",
-      "source_url": "https://github.com/google/fonts/blob/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/titanone/TitanOne-Regular.ttf",
-      "commit": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"
+      "licence_file": "LICENSE-SecularOne.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "ShadowsIntoLightTwo-Regular.ttf",
+      "family": "Shadows Into Light Two",
+      "subfamily": "Regular",
+      "typographic": "Shadows Into Light Two",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.4512,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "d2540170b1b1df3094de433b4632755ba91ecb65626202a3c8affd2245e08405",
+      "bytes": 39396,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-ShadowsIntoLightTwo.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "SpaceGrotesk-Bold.ttf",
+      "family": "Space Grotesk",
+      "subfamily": "Bold",
+      "typographic": "Space Grotesk",
+      "weight": 700,
+      "italic": false,
+      "ass_scale": 1.276,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "42c2abe5fddba9a6da76fabab653246fcf48daa3ae3fc6251e61f8215fdda006",
+      "bytes": 140452,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-SpaceGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "SpaceGrotesk-Medium.ttf",
+      "family": "Space Grotesk Medium",
+      "subfamily": "Regular",
+      "typographic": "Space Grotesk",
+      "weight": 500,
+      "italic": false,
+      "ass_scale": 1.276,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "5ac7805812bc1ab17c7c8483f1665a52eefe54e3cefaf991ee0ba587d1f8ffff",
+      "bytes": 141520,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-SpaceGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "SpaceGrotesk-Regular.ttf",
+      "family": "Space Grotesk",
+      "subfamily": "Regular",
+      "typographic": "Space Grotesk",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.276,
+      "scripts": [
+        "latin",
+        "latin-ext",
+        "vietnamese"
+      ],
+      "sha256": "77152b2ff1e6420ee7e27fa95ea2491a86f91b7c35ed71521fa16c16ef8aa010",
+      "bytes": 142024,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-SpaceGrotesk.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "Staatliches-Regular.ttf",
+      "family": "Staatliches",
+      "subfamily": "Regular",
+      "typographic": "Staatliches",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.312,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "8395212aa4c6c3534bd39a745d956305ff080c3f3ed73ba61e4fbaae951e55cc",
+      "bytes": 63316,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-Staatliches.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
+    },
+    {
+      "file": "ZenTokyoZoo-Regular.ttf",
+      "family": "Zen Tokyo Zoo",
+      "subfamily": "Regular",
+      "typographic": "Zen Tokyo Zoo",
+      "weight": 400,
+      "italic": false,
+      "ass_scale": 1.325,
+      "scripts": [
+        "latin"
+      ],
+      "sha256": "9dd9dc1a5eba800aca9b0bf4671bda880b7caa6d19174c82776256f6732d604a",
+      "bytes": 92176,
+      "licence": "OFL-1.1",
+      "licence_file": "LICENSE-ZenTokyoZoo.txt",
+      "source": "94aa48ffac8a983e1fde6f305f3788cb424f7850"
     }
   ]
 }

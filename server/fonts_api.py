@@ -1,12 +1,14 @@
 """The bundled caption fonts and the caption presets, for the UI.
 
-- GET /fonts lists the fonts that ship with the app (video/fonts.py): each
-  family's name, weight, the writing systems it covers, and its files' URLs.
+- GET /fonts lists the fonts that ship with the app, Clips Kitty Editor's own
+  (video/fonts.py): each family as the editor's presets name it, its files
+  with their weight and italic, the writing systems it covers, and the URLs.
 - GET /fonts/{file} serves one of those files, so the caption preview shows
   the very file the render burns. Only a bare file name the manifest lists,
   present and matching its sha256; anything else, a path included, is 404.
-- GET /caption-presets returns config/caption_presets.json: named looks, each
-  a caption_style.
+- GET /caption-presets returns config/caption_presets.json: the editor's text
+  presets in its order, each with its whole resolved style
+  (video/caption_presets.py).
 
 Read-only and public, like the clip media routes: they serve files that ship
 inside the app and nothing a person made.

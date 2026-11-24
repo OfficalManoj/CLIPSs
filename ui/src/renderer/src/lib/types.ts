@@ -275,49 +275,72 @@ export interface LiveOverlay {
   burnedHook?: { seconds: number } | null
 }
 
+/** A clip's caption style: one of Clips Kitty Editor's text presets, at the
+ *  size and place the editor's Captions sheet offers (video/caption_presets.py). */
 export interface CaptionStyle {
-  font?: string
-  font_size?: number
-  color?: string
+  /** The editor's preset id, e.g. "concat.bold-caption". */
+  preset?: string
+  size?: CaptionSize
   position?: 'bottom' | 'middle' | 'top'
   words_per_caption?: number
-  uppercase?: boolean
-  /** Light up each word as it is spoken (the short-form caption look). */
-  highlight?: boolean
-  highlight_color?: string
   /** Another colour for whoever isn't the main speaker (#126). */
   second_speaker?: boolean
   second_speaker_color?: string
-  /** How each caption comes on screen (video/captions.py ANIMATIONS). "none"
-   *  is today's look. "karaoke" fills each word with highlight_color as it
-   *  is said, and takes the place of `highlight`. */
-  animation?: CaptionAnimation
-  /** Keep captions clear of an app's own buttons and text. "off" is today's
-   *  margins. */
+  /** Keep captions clear of an app's own buttons and text. "off" keeps the
+   *  editor's place. */
   safe_zone?: CaptionSafeZone
 }
 
-export type CaptionAnimation = 'none' | 'pop' | 'fade' | 'bounce' | 'karaoke' | 'slide'
+export type CaptionSize = 'small' | 'medium' | 'large'
 
 export type CaptionSafeZone = 'off' | 'tiktok' | 'reels' | 'shorts'
 
-/** One bundled caption font, from GET /fonts. `family` is the name to put in
- *  CaptionStyle.font and in a CSS font-family; `urls` are engine paths to
- *  prefix with the engine's address for @font-face. */
+/** One font file of the app's (the editor's own fonts), from GET /fonts. */
+export interface BundledFace {
+  file: string
+  weight: number
+  italic: boolean
+}
+
+/** One family of the app's fonts, from GET /fonts, named as the editor's
+ *  presets name it. `urls` are engine paths, one per face, in `faces` order. */
 export interface BundledFont {
   family: string
   weight: number | null
   scripts: string[]
   files: string[]
+  faces?: BundledFace[]
   urls: string[]
   licence: string
 }
 
-/** One named look from GET /caption-presets. */
+/** A preset's whole look, as the editor resolves it (concat/src/presets.rs).
+ *  Sizes are shares of the frame's height. */
+export interface PresetLook {
+  fontFamily: string
+  fontSize: number
+  fontWeight: number
+  italic: boolean
+  color: string
+  opacity: number
+  strokeWidth: number
+  strokeColor: string
+  shadow: boolean
+  background: string
+  backgroundRadius: number
+  backgroundPaddingX: number
+  backgroundPaddingY: number
+  lineHeight: number
+  tracking: number
+}
+
+/** One of the editor's text presets, from GET /caption-presets. */
 export interface CaptionPreset {
   id: string
   name: string
-  style: Required<CaptionStyle>
+  language: string
+  sample: string
+  style: PresetLook
 }
 
 export type FilterName =

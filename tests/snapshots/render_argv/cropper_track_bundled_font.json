@@ -1,5 +1,5 @@
 {
-  "about": "Editor suite step 3: following the subject, captions in a bundled font that bounce, in the TikTok safe zone: the font staged beside them and fontsdir=fonts in the burn.",
+  "about": "Editor suite step KF: following the subject, captions in the editor's Comic preset, in the TikTok safe zone: the font staged beside them and fontsdir=fonts in the burn.",
   "cpu": {
     "commands": [
       {
@@ -60,19 +60,19 @@
             "",
             "[V4+ Styles]",
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-            "Style: Default,Bangers,84,&H00FFFFFF,&H00FFFFFF,&H00000000,&H7F000000,0,0,0,0,100,100,0,0,1,7,2,2,199,199,440,1",
+            "Style: Default,Bangers,169,&H004AE1FF,&H004AE1FF,&H00111111,&H69000000,0,0,0,0,100,100,38.4,0,1,13.44,0,5,210,210,0,1",
             "",
             "[Events]",
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}SO THIS IS",
-            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}THE PART WHERE",
-            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}IT ALL GOES",
-            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}WRONG WATCH THE",
-            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}LEFT SIDE, RIGHT",
-            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}THERE. NO WAY",
-            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}THAT JUST HAPPENED!",
-            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}CHAT DID YOU",
-            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}SEE"
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}see"
           ]
         },
         "stdin_bytes": 5890320
@@ -173,19 +173,19 @@
             "",
             "[V4+ Styles]",
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-            "Style: Default,Bangers,84,&H00FFFFFF,&H00FFFFFF,&H00000000,&H7F000000,0,0,0,0,100,100,0,0,1,7,2,2,199,199,440,1",
+            "Style: Default,Bangers,169,&H004AE1FF,&H004AE1FF,&H00111111,&H69000000,0,0,0,0,100,100,38.4,0,1,13.44,0,5,210,210,0,1",
             "",
             "[Events]",
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}SO THIS IS",
-            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}THE PART WHERE",
-            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}IT ALL GOES",
-            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}WRONG WATCH THE",
-            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}LEFT SIDE, RIGHT",
-            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}THERE. NO WAY",
-            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}THAT JUST HAPPENED!",
-            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}CHAT DID YOU",
-            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\fscx80\\fscy80\\t(0,120,\\fscx110\\fscy110)\\t(120,200,\\fscx100\\fscy100)}SEE"
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(540,1422)\\xshad4.8\\yshad6.72}see"
           ]
         },
         "stdin_bytes": 5890320

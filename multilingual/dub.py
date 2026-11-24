@@ -310,8 +310,14 @@ def dub(
     workers: int | None = None,
     data_dir: Path | None = None,
     problems: list[str] | None = None,
+    voice_only: bool = False,
 ) -> Path | None:
     """A copy of `base_video` speaking `lines` in `language`, or None.
+
+    voice_only: only the spoken lines, each at its time from 0, as a sound
+    file (`out_path`, .m4a) with no video and none of the clip's own sound
+    (`base_video` is not read): a language tab's voice lane in the editor
+    (step KF).
 
     voice_id picks WHICH voice ("es_MX-claude-high", or "fr_FR-upmc-medium#1"
     for a specific speaker inside a multi-speaker voice; "kokoro:af_heart" or
@@ -422,6 +428,9 @@ def dub(
     if not pieces:
         return None
 
+    if voice_only:
+        return _voice_track(pieces, out_path)
+
     # Original audio ducked underneath, each utterance delayed to its slot.
     inputs: list[str] = ["-i", str(base_video.resolve())]
     for wav, _ in pieces:
@@ -452,5 +461,28 @@ def dub(
         discard(wav)
     if r.returncode != 0:
         print(f"      (dub mix failed: {(r.stderr or '')[-200:]})")
+        return None
+    return out_path
+
+
+def _voice_track(pieces: list[tuple[Path, float]], out_path: Path) -> Path | None:
+    """The spoken pieces alone, each delayed to its time, in one AAC file."""
+    inputs: list[str] = []
+    chains: list[str] = []
+    labels: list[str] = []
+    for n, (wav, start) in enumerate(pieces):
+        inputs += ["-i", str(wav.resolve())]
+        ms = int(start * 1000)
+        chains.append(f"[{n}:a]adelay={ms}|{ms},volume=1.6[v{n}]")
+        labels.append(f"[v{n}]")
+    chains.append(f"{''.join(labels)}amix=inputs={len(labels)}:normalize=0:dropout_transition=0[aout]")
+    cmd = [ffmpeg(), "-y", "-v", "error", *inputs, "-filter_complex", ";".join(chains),
+           "-map", "[aout]", "-vn", "-c:a", "aac", "-b:a", "160k", str(out_path.resolve())]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    for wav, _ in pieces:
+        discard(wav)
+    if r.returncode != 0:
+        print(f"      (voice track failed: {(r.stderr or '')[-200:]})")
         return None
     return out_path

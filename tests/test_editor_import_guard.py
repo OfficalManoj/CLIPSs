@@ -239,8 +239,8 @@ PACKAGE_FILES = ("__init__.py", "env.py", "importer.py", "migrate.py", "model.py
 # inside the function that needs it: what the operations ask the app
 # (env.py), and the edit as the render reads it (importer.py).
 ASKED_INSIDE_A_FUNCTION = {
-    "env.py": {"video.audio_library", "video.export_presets", "video.filters", "core.modes", "video.captions",
-               "video.encoding"},
+    "env.py": {"video.audio_library", "video.export_presets", "video.filters", "core.modes", "video.caption_presets",
+               "video.fonts", "video.encoding"},
     "importer.py": {"video_editor.timeline"},
 }
 
@@ -324,19 +324,21 @@ def test_the_worker_and_the_database_never_import_the_package():
 # worker asks it one thing, inside the function that re-renders a clip).
 
 KITTY = ROOT / "kitty_editor"
-KITTY_FILES = ("__init__.py", "automation.py", "build.py", "fastbase.py", "intake.py", "registry.py")
+KITTY_FILES = ("__init__.py", "automation.py", "build.py", "fastbase.py", "intake.py", "languages.py", "registry.py")
 KITTY_ASKS_INSIDE_A_FUNCTION = {
     "registry.py": {"core.binaries"},
     # core.modes, video.encoding: the base's layout and its encoder settings; video.asd and
     # video.tracker: the full render's models loaded while it cuts (K-D24).
     "build.py": {"core.binaries", "core.models", "core.modes", "core.paths", "core.pipeline", "video.asd",
-                 "video.captions", "video.encoding", "video.tracker", "video_editor.captions",
+                 "video.caption_presets", "video.encoding", "video.tracker", "video_editor.captions",
                  "video_editor.timeline"},
     # The clip's framing read back from its file (K-D24): numpy and OpenCV, as the tracker uses them.
     "fastbase.py": {"core.binaries", "core.modes", "core.pipeline", "cv2", "numpy", "numpy.lib.stride_tricks",
                     "video.encoding", "video.filters"},
     # core.remake: file_in_use, so an export never deletes a file another clip plays (K-D16).
-    "intake.py": {"core.paths", "core.remake", "core.state", "server.jobs"},
+    "intake.py": {"core.paths", "core.remake", "core.state", "multilingual.languages", "server.jobs"},
+    # Language tabs (KF): language names and the caption font for a language's letters.
+    "languages.py": {"multilingual.languages", "video.caption_presets"},
 }
 
 

@@ -119,7 +119,7 @@ def test_quick_edit_is_gone():
             assert not re.search(rf"from '[./]+(?:components/|lib/)?{name}'", text), (path.name, name)
     # Shared pieces stay (queue settings, Creators, the add-videos form).
     for rel in ("components/CaptionStyleControls.tsx", "components/GamingLayoutEditor.tsx",
-                "components/WatermarkControls.tsx", "components/LiveTextOverlay.tsx"):
+                "components/WatermarkControls.tsx"):
         assert (UI / rel).exists(), rel
 
 
@@ -460,25 +460,27 @@ def test_f1_regression_round_page_rules():
 
 def test_other_languages_is_a_window_from_the_editor_strip():
     """KC (the owner's call): "Other languages…" sits next to Publish in the
-    Editor page's strip, for clip projects only, and opens today's
-    MultilingualExport unchanged in a window of its own: modal, the editor
-    hidden while it is open, the keyboard inside it, Escape closes it and
-    the focus goes back to the button."""
+    Editor page's strip, for clip projects only, and opens a window of its
+    own: modal, the editor hidden while it is open, the keyboard inside it,
+    Escape closes it and the focus goes back to the button. KF: the window
+    makes language tabs in the editor; no video, style picker or preview."""
     view = _project_view(_read(PAGE))
     strip = view[view.index("{/* Publish and the project's state"):]
     strip = strip[:strip.index("{/* An export's start")]
     assert strip.index("{t('Other languages…')}") < strip.index("{t('Publish')}")
     assert strip.count("{publish !== 'none' && (") == 2      # clip projects whose clip is there
-    assert "useEditorCover(languagesClip !== null)" in view
-    assert re.search(r"<OtherLanguagesDialog\s+clip=\{languagesClip\}\s+onClose=\{\(\) => setLanguagesClip\(null\)\}"
+    assert "useEditorCover(languagesOpen)" in view
+    assert re.search(r"<OtherLanguagesDialog\s+projectId=\{shownProject.id\}[^/]*onClose=\{\(\) => setLanguagesOpen\(false\)\}"
                      r"\s+returnFocus=\{languagesButton\}", view)
     window = _read(UI / "components" / "editor" / "OtherLanguagesDialog.tsx")
     assert 'role="dialog"' in window and 'aria-modal="true"' in window
     assert "useDialogFocus(" in window and "returnFocus" in window
     assert "if (!typing()) onClose()" in window       # Escape in a text field is the field's
-    # Today's panel, unchanged, with the translated preview over the clip (moved from Quick edit).
-    assert "<MultilingualExport clipId={clip.id} videoId={clip.video_id} onPreview={setTranslated} />" in window
-    assert "<LiveTextOverlay videoRef={videoRef} overlay={overlay} />" in window
+    assert "makeLanguageTabs(" in window and "{t('Make language tabs')}" in window
+    for gone in ("<video", "CaptionStyleControls", "LiveTextOverlay", "MultilingualExport"):
+        assert gone not in window, gone
+    for rel in ("MultilingualExport.tsx", "TranslationReview.tsx", "LiveTextOverlay.tsx"):
+        assert not (UI / "components" / rel).exists(), rel
     # The Clips page gets no new button for it.
     assert "OtherLanguages" not in _read(UI / "pages" / "ClipStudio.tsx")
     assert "{t('Other languages…')}" not in _read(UI / "components" / "ClipEditor.tsx")

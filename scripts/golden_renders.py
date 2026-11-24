@@ -30,7 +30,7 @@ data folder pointed inside DIR: the end card is built there, and nothing of
 the app's own data is read or written.
 
 The cases (CASES below): plain_vertical, the shipped settings with nothing
-chosen (tracked 9:16, default captions, the end card); captions_highlight;
+chosen (tracked 9:16, default captions, the end card); captions_preset;
 cuts_music (its music is not ducked: the ducked mix differs from run to run,
 see _cuts_music); landscape (the 16:9 Longform profile).
 
@@ -95,8 +95,8 @@ def _plain(_music: Path, _seconds: float) -> dict | None:
     return None
 
 
-def _highlight(_music: Path, _seconds: float) -> dict | None:
-    return {"caption_style": {"highlight": True}}
+def _preset(_music: Path, _seconds: float) -> dict | None:
+    return {"caption_style": {"preset": "concat.block", "size": "large", "position": "middle"}}
 
 
 def _cuts_music(music: Path, seconds: float) -> dict | None:
@@ -122,7 +122,8 @@ def _landscape(_music: Path, _seconds: float) -> dict | None:
 
 CASES: tuple[Case, ...] = (
     Case("plain_vertical", "shipped settings, nothing chosen: tracked 9:16, default captions, end card", _plain),
-    Case("captions_highlight", "as plain, with the word being said lit up (caption_style.highlight)", _highlight),
+    Case("captions_preset", "as plain, in another of the editor's presets (a plate), large, in the middle",
+         _preset),
     Case("cuts_music", "as plain, with two keep ranges (the middle cut out) and music, not ducked", _cuts_music),
     Case("landscape", "the 16:9 Longform profile (short_clips): 1920x1080, captions, end card", _landscape),
 )

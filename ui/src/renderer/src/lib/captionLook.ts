@@ -1,25 +1,31 @@
-/** What the caption previews need to look like the burned captions: the
- *  fonts that ship with the app, the named caption looks, and where a
- *  caption stands once an app's safe zone is kept clear.
+/** What the caption previews need to look like the burned captions, which
+ *  are Clips Kitty Editor's own text presets in its own fonts
+ *  (video/caption_presets.py):
  *
- *  - Fonts: GET /fonts lists the bundled families (assets/fonts). Each file is
- *    registered with the FontFace API from the engine's own URL, so the
- *    preview draws with the very file the render burns. `display: swap`
- *    shows the fallback font while a face loads.
- *  - Presets: GET /caption-presets (config/caption_presets.json).
- *  - Layout: video/captions.py _layout, at the preview's scale. The safe
- *    zones come from gaming/layouts.json (lib/gamingLayouts.ts), which
- *    video/captions.py SAFE_ZONES equals (tests keep both the same). */
+ *  - Fonts: GET /fonts lists the app's font families, each with its files.
+ *    Each file is registered with the FontFace API at its own weight and
+ *    style, from the engine's own URL, so the preview draws with the very
+ *    file the render burns. `display: swap` shows the fallback font while a
+ *    face loads.
+ *  - Presets: GET /caption-presets (config/caption_presets.json), in the
+ *    editor's order.
+ *  - Size and place: the editor's Captions sheet (Small 0.04, Medium 0.05,
+ *    Large 0.065 of the frame's height; Bottom 0.35, Middle 0, Top -0.35 from
+ *    its centre), moved clear of an app's buttons with a safe zone, as
+ *    video/caption_presets.py _offset does. The safe zones come from
+ *    gaming/layouts.json (lib/gamingLayouts.ts), which
+ *    video/caption_presets.py SAFE_ZONES equals (tests keep both the same). */
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { api, API_BASE } from './api'
 import { LAYOUTS } from './gamingLayouts'
-import type { BundledFont, CaptionPreset, CaptionStyle } from './types'
+import type { BundledFont, CaptionPreset, CaptionStyle, PresetLook } from './types'
 
 let fonts: BundledFont[] = []
 let fontsLoading: Promise<BundledFont[]> | null = null
 const fontListeners = new Set<(f: BundledFont[]) => void>()
 
-/** Fetch the bundled fonts once and register their faces. A failure (the
+/** Fetch the app's fonts once and register their faces. A failure (the
  *  engine not up yet) is not remembered, so the next caller tries again. */
 export function loadBundledFonts(): Promise<BundledFont[]> {
   if (!fontsLoading) {
@@ -28,18 +34,20 @@ export function loadBundledFonts(): Promise<BundledFont[]> {
       .then((res) => {
         const list = Array.isArray(res?.fonts) ? res.fonts : []
         for (const f of list) {
-          for (const url of f.urls ?? []) {
+          ;(f.urls ?? []).forEach((url, i) => {
+            const face = f.faces?.[i]
             try {
-              const face = new FontFace(f.family, `url("${API_BASE}${url}")`, {
-                weight: String(f.weight ?? 400),
+              const ff = new FontFace(f.family, `url("${API_BASE}${url}")`, {
+                weight: String(face?.weight ?? f.weight ?? 400),
+                style: face?.italic ? 'italic' : 'normal',
                 display: 'swap'
               })
-              document.fonts.add(face)
-              face.load().catch(() => undefined) // the name stays in the fallback font
+              document.fonts.add(ff)
+              ff.load().catch(() => undefined) // the name stays in the fallback font
             } catch {
-              // An odd name or URL: that one font previews in the fallback.
+              // An odd name or URL: that one face previews in the fallback.
             }
-          }
+          })
         }
         fonts = list
         fontListeners.forEach((fn) => fn(list))
@@ -53,7 +61,7 @@ export function loadBundledFonts(): Promise<BundledFont[]> {
   return fontsLoading
 }
 
-/** The bundled fonts, [] until they have loaded (or with no engine). */
+/** The app's fonts, [] until they have loaded (or with no engine). */
 export function useBundledFonts(): BundledFont[] {
   const [list, setList] = useState<BundledFont[]>(fonts)
   useEffect(() => {
@@ -66,19 +74,10 @@ export function useBundledFonts(): BundledFont[] {
   return list
 }
 
-/** The CSS weight a caption font is drawn at. Windows fonts burn bold (700);
- *  a bundled family burns at its own weight, and one that comes in a single
- *  regular weight is not made bold (video/captions.py _header). */
-export function captionFontWeight(font: string, list: BundledFont[] = fonts): number {
-  const f = list.find((b) => b.family === font)
-  if (!f) return 700
-  const w = f.weight ?? 400
-  return w < 600 ? 400 : w
-}
-
 let presets: CaptionPreset[] = []
 let presetsLoading: Promise<CaptionPreset[]> | null = null
 
+/** The editor's text presets, in its order ([] until loaded). */
 export function useCaptionPresets(): CaptionPreset[] {
   const [list, setList] = useState<CaptionPreset[]>(presets)
   useEffect(() => {
@@ -120,28 +119,59 @@ export function safeZoneArea(zone: string | undefined): SafeZoneArea | null {
   return { top: z.top, bottom: z.bottom, right: z.right }
 }
 
-const SAFE_CLEARANCE = 20 // video/captions.py _SAFE_CLEARANCE
-const INK_SPREAD = 9 // video/captions.py _INK_SPREAD: the outline and shadow past the letters
-const SLIDE_PX = 40 // video/captions.py _SLIDE_PX: how far below its place a sliding caption starts
-const MARGIN_V = { bottom: 440, middle: 0, top: 140 } // video/captions.py _POSITIONS
+export const CAPTION_SIZES = { small: 0.04, medium: 0.05, large: 0.065 } // captions.rs CAPTION_SIZES
+const PLACES = { bottom: 0.35, middle: 0, top: -0.35 } // captions.rs CAPTION_OFFSETS
+const SAFE_CLEARANCE = 20 // video/caption_presets.py SAFE_CLEARANCE
+const INK_SPREAD = 9 // video/caption_presets.py INK_SPREAD
+const SIDE_MARGIN = 60 // video/caption_presets.py SIDE_MARGIN
 
-/** Where a caption stands on a w x h frame, in that frame's pixels, as
- *  video/captions.py _layout places it: the side margins (null = today's
- *  60 px, scaled as the caller always has) and the bottom or top margin. */
-export function captionLayout(
-  style: Pick<CaptionStyle, 'position' | 'safe_zone'> & Partial<Pick<CaptionStyle, 'animation'>>,
+/** A caption's em and where its block's centre sits on a w x h frame, as
+ *  shares of the height (offset from the centre, down is positive), and the
+ *  side margin in that frame's pixels: video/caption_presets.py look(). */
+export function captionPlace(
+  style: Pick<CaptionStyle, 'size' | 'position' | 'safe_zone'>,
   w: number,
   h: number
-): { position: 'bottom' | 'middle' | 'top'; side: number | null; margin: number } {
+): { em: number; offset: number; side: number } {
+  const em = CAPTION_SIZES[style.size ?? 'medium'] ?? CAPTION_SIZES.medium
   const position = style.position === 'top' || style.position === 'middle' ? style.position : 'bottom'
-  let margin = MARGIN_V[position]
-  let side: number | null = null
+  let offset = PLACES[position]
+  let side = SIDE_MARGIN
   const zone = h > w ? safeZoneArea(style.safe_zone) : null
   if (zone) {
-    const rise = style.animation === 'slide' ? SLIDE_PX : 0
-    if (position === 'bottom') margin = Math.max(margin, zone.bottom + SAFE_CLEARANCE + rise)
-    else if (position === 'top') margin = Math.max(margin, zone.top + SAFE_CLEARANCE)
-    side = Math.round(((Math.max(60, zone.right) + INK_SPREAD) * w) / 1080)
+    if (position !== 'middle') {
+      const edge = position === 'bottom' ? zone.bottom : zone.top
+      const inside = 0.5 - (edge + SAFE_CLEARANCE) / 1920 - 0.6 * em
+      offset = position === 'bottom' ? Math.min(offset, inside) : Math.max(offset, -inside)
+    }
+    side = Math.round(((Math.max(SIDE_MARGIN, zone.right) + INK_SPREAD) * w) / 1080)
   }
-  return { position, side, margin: (margin * h) / 1920 }
+  return { em, offset, side }
+}
+
+/** A preset drawn in CSS at `emPx` pixels to the em, `h` the frame's height
+ *  in pixels: the editor's font, weight, colour, outline (only its outer
+ *  half shows), shadow (0.05 em across, 0.07 em down, black at 150/255),
+ *  plate and letter spacing (concat-text/src/lib.rs). */
+export function presetCss(look: PresetLook, emPx: number, h: number): CSSProperties {
+  const stroke = (look.strokeWidth || 0) * h
+  const css: CSSProperties = {
+    fontFamily: `'${look.fontFamily}', sans-serif`,
+    fontWeight: look.fontWeight || 400,
+    fontStyle: look.italic ? 'italic' : 'normal',
+    fontSize: `${emPx}px`,
+    lineHeight: look.lineHeight || 1.2,
+    color: look.color || '#ffffff',
+    opacity: look.opacity ?? 1,
+    letterSpacing: look.tracking ? `${look.tracking * h}px` : undefined,
+    WebkitTextStroke: stroke > 0 ? `${stroke}px ${look.strokeColor || '#000000'}` : undefined,
+    paintOrder: 'stroke fill',
+    textShadow: look.shadow ? `${0.05 * emPx}px ${0.07 * emPx}px ${0.04 * emPx}px rgba(0,0,0,0.59)` : undefined
+  }
+  if (look.background) {
+    css.background = look.background
+    css.borderRadius = `${(look.backgroundRadius || 0) * h}px`
+    css.padding = `${(look.backgroundPaddingY || 0) * h}px ${(look.backgroundPaddingX || 0) * h}px`
+  }
+  return css
 }

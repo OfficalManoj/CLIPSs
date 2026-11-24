@@ -85,64 +85,34 @@ def _request(method: str, path: str, body: dict | None = None, timeout: float = 
 # ever sees these words. docs/API.md documents the same traps for humans.
 
 
-# Kept in step with video/captions.py FONTS and CaptionStyleControls.tsx: the
-# name is written into the ASS header, and anything else silently renders as
-# something else entirely. mcp.py stays stdlib-only, so this is a copy rather
-# than an import of the render path.
-CAPTION_FONTS = [
-    "Arial", "Arial Black", "Impact", "Verdana", "Tahoma",
-    "Trebuchet MS", "Segoe UI", "Georgia", "Comic Sans MS", "Courier New",
-]
+def _caption_presets() -> list[tuple[str, str]]:
+    """(id, name) of every caption look: Clips Kitty Editor's text presets,
+    config/caption_presets.json (video/caption_presets.py). Read here with
+    the standard library, as mcp.py stays stdlib-only."""
+    import json
+    from pathlib import Path
 
-
-def _bundled_fonts() -> list[str]:
-    """The caption fonts that ship with the app (video/fonts.py reads their
-    list, standard library only). None when this copy has no fonts folder."""
     try:
-        from video import fonts
+        data = json.loads((Path(__file__).resolve().parent.parent / "config" / "caption_presets.json")
+                          .read_text(encoding="utf-8"))
+        found = [(str(p["id"]), str(p.get("name") or p["id"])) for p in data.get("presets") or ()
+                 if isinstance(p, dict) and p.get("id")]
+    except (OSError, ValueError, AttributeError, KeyError):
+        found = []
+    return found or [("concat.bold-caption", "Bold caption")]
 
-        return [f for f in fonts.families() if f not in CAPTION_FONTS]
-    except Exception:
-        return []
 
-
-CAPTION_FONTS += _bundled_fonts()
-
+CAPTION_PRESETS = _caption_presets()
+CAPTION_SIZES = ("small", "medium", "large")
 CAPTION_POSITIONS = ("bottom", "middle", "top")
-
-# Kept in step with video/captions.py ANIMATIONS and SAFE_ZONE_CHOICES.
-CAPTION_ANIMATIONS = ("none", "pop", "fade", "bounce", "karaoke", "slide")
+# Kept in step with video/caption_presets.py SAFE_ZONE_CHOICES.
 CAPTION_SAFE_ZONES = ("off", "tiktok", "reels", "shorts")
-
-# People say "yellow", not "#FFE600". Refusing a colour name would make the
-# obvious phrasing the wrong one.
-COLOUR_NAMES = {
-    "black": "#000000", "white": "#FFFFFF", "red": "#FF0000",
-    "orange": "#FF8A00", "yellow": "#FFE600", "gold": "#FFD700",
-    "green": "#22C55E", "lime": "#A3E635", "blue": "#3B82F6",
-    "cyan": "#22D3EE", "purple": "#A855F7", "pink": "#EC4899",
-    "magenta": "#FF00FF", "grey": "#9CA3AF", "gray": "#9CA3AF",
-}
-
-
-def _colour(value: str, field: str) -> str:
-    """A hex colour from a hex colour or an ordinary colour word."""
-    text = str(value).strip()
-    if text.startswith("#") and len(text) == 7:
-        return text.upper()
-    named = COLOUR_NAMES.get(text.casefold())
-    if named:
-        return named
-    raise ValueError(
-        f"{field}: {value!r} is not a colour I can use. Give a hex value like "
-        f"#FFE600, or one of: {', '.join(sorted(COLOUR_NAMES))}."
-    )
 
 
 def _caption_style(raw: dict) -> dict:
     """Validate what the model asked for against what the renderer accepts.
 
-    Wrong values here are not obvious later: an unknown font falls back
+    Wrong values here are not obvious later: an unknown look falls back
     silently, so every clip of a stream renders in the wrong one. Saying no now
     lets the model correct itself, which it cannot do once the clips exist.
     """
@@ -150,17 +120,21 @@ def _caption_style(raw: dict) -> dict:
         raise ValueError("caption_style must be an object.")
     style: dict = {}
 
-    if raw.get("font") is not None:
-        wanted = str(raw["font"]).strip().casefold()
-        match = next((f for f in CAPTION_FONTS if f.casefold() == wanted), None)
-        if match is None:
-            match = next((f for f in CAPTION_FONTS if wanted and wanted in f.casefold()), None)
+    if raw.get("preset") is not None:
+        wanted = str(raw["preset"]).strip().casefold()
+        match = next((i for i, n in CAPTION_PRESETS if wanted in (i.casefold(), n.casefold())), None)
         if match is None:
             raise ValueError(
-                f"No font called {raw['font']!r}. Choose one of: "
-                f"{', '.join(CAPTION_FONTS)}."
+                f"No caption look called {raw['preset']!r}. Choose one of: "
+                f"{', '.join(i for i, _ in CAPTION_PRESETS)}."
             )
-        style["font"] = match
+        style["preset"] = match
+
+    if raw.get("size") is not None:
+        size = str(raw["size"]).strip().casefold()
+        if size not in CAPTION_SIZES:
+            raise ValueError(f"Caption size {raw['size']!r} is not one of: {', '.join(CAPTION_SIZES)}.")
+        style["size"] = size
 
     if raw.get("position") is not None:
         pos = str(raw["position"]).strip().casefold()
@@ -172,26 +146,8 @@ def _caption_style(raw: dict) -> dict:
             )
         style["position"] = pos
 
-    for field in ("color", "highlight_color"):
-        if raw.get(field) is not None:
-            style[field] = _colour(raw[field], field)
-
-    if raw.get("font_size") is not None:
-        style["font_size"] = max(24, min(160, int(raw["font_size"])))
     if raw.get("words_per_caption") is not None:
         style["words_per_caption"] = max(1, min(6, int(raw["words_per_caption"])))
-    for flag in ("uppercase", "highlight"):
-        if raw.get(flag) is not None:
-            style[flag] = bool(raw[flag])
-
-    if raw.get("animation") is not None:
-        animation = str(raw["animation"]).strip().casefold()
-        if animation not in CAPTION_ANIMATIONS:
-            raise ValueError(
-                f"Caption animation {raw['animation']!r} is not one of: "
-                f"{', '.join(CAPTION_ANIMATIONS)}."
-            )
-        style["animation"] = animation
 
     if raw.get("safe_zone") is not None:
         zone = str(raw["safe_zone"]).strip().casefold()
@@ -1103,36 +1059,20 @@ TOOLS: list[dict] = [
                         "for; anything left out keeps the saved setting."
                     ),
                     "properties": {
-                        "font": {"type": "string", "enum": CAPTION_FONTS},
-                        "font_size": {
-                            "type": "integer",
-                            "description": "24-160. 84 is the default.",
-                        },
-                        "color": {
+                        "preset": {
                             "type": "string",
-                            "description": "Hex like #FFFFFF, or a colour word.",
+                            "enum": [i for i, _ in CAPTION_PRESETS],
+                            "description": (
+                                "The caption look: one of Clips Kitty Editor's text presets. "
+                                "concat.bold-caption is the default."
+                            ),
                         },
+                        "size": {"type": "string", "enum": list(CAPTION_SIZES),
+                                 "description": "medium is the default."},
                         "position": {"type": "string", "enum": list(CAPTION_POSITIONS)},
                         "words_per_caption": {
                             "type": "integer",
                             "description": "1-6 words on screen at once. 3 is default.",
-                        },
-                        "uppercase": {"type": "boolean"},
-                        "highlight": {
-                            "type": "boolean",
-                            "description": "Light each word up as it is spoken",
-                        },
-                        "highlight_color": {
-                            "type": "string",
-                            "description": "Hex, or a colour word. Default #FFE600.",
-                        },
-                        "animation": {
-                            "type": "string",
-                            "enum": list(CAPTION_ANIMATIONS),
-                            "description": (
-                                "How each caption appears. none is the default. karaoke fills "
-                                "each word with highlight_color as it is said, in place of highlight."
-                            ),
                         },
                         "safe_zone": {
                             "type": "string",
