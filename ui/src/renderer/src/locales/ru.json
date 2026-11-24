@@ -1,5 +1,4 @@
 {
-  "Clip Editor": "Clip Editor",
   "Dashboard": "Главная",
   "Queue": "Очередь",
   "Creators": "Авторы",
@@ -238,7 +237,6 @@
   "A YouTube video, docs page…": "Видео на YouTube, страница документации…",
   "Which part of the app is this about? (optional)": "К какой части приложения это относится? (необязательно)",
   "The app’s look & controls": "Внешний вид и управление",
-  "The clip editor": "Редактор клипов",
   "AI results (clips picked, captions, titles)": "Результаты ИИ (выбранные клипы, субтитры, названия)",
   "Speed / freezes": "Скорость и зависания",
   "YouTube videos": "Видео YouTube",

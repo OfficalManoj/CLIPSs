@@ -209,10 +209,10 @@ konservatif: sebuah slogan khas harus benar-benar berulang sebelum dihitung, pen
 tidak lagi disebut menjadi tidak aktif, dan setiap kontribusi skor darinya bersifat tambahan,
 dibatasi, dan bisa dimatikan.
 
-**Editor video.** Non-destruktif: pemangkasan, potongan internal, pembisuan, kata yang dibisukan, volume,
-fade, kecepatan, teks hook, musik, dan watermark disimpan sebagai operasi dan diterapkan saat
-render. Ada juga chat edit AI (*"buat 5 detik lebih panjang"*, *"di caption
-tertulis gost, seharusnya ghost"*), di mana model mengusulkan dan kode yang tervalidasi menerapkannya.
+**Editor video.** Clips Kitty Editor, yang dibangun di atas editor open source Concat,
+membuka setiap klip di timeline: potongan, pembisuan, volume, fade, kecepatan, caption,
+musik, tampilan warna, judul, dan gambar di atas video. Subtitle dan sulih suara dalam
+bahasa lain juga ada di sana. Chat edit AI kembali di pembaruan berikutnya.
 
 **Pemrosesan format panjang.** Jalur 16:9 opsional yang memakai analisis yang sama: klip
 horizontal, potongan seukuran X/Twitter, highlight reel berisi momen terbaik, atau stream lengkap dengan
@@ -265,7 +265,7 @@ melalui Ollama.
   posisi, jumlah kata per baris, huruf besar/kecil, atau dimatikan). Perbaiki kesalahan transkripsi baris demi baris
   sebelum ekspor. Saat dua orang berbicara, caption pembicara kedua bisa memakai
   warna lain, dan caption yang salah dikenali bisa ditukar secara manual.
-- **Chat edit AI**: jelaskan apa yang salah dengan bahasa sehari-hari dan aplikasi ini mengedit ulang.
+- **Chat edit AI** (kembali di pembaruan berikutnya): jelaskan apa yang salah dengan bahasa sehari-hari dan aplikasi ini mengedit ulang.
 - **Ask Clips Kitty**: kotak teks di bagian bawah dasbor. Katakan apa yang kamu mau dalam
   satu kalimat, misalnya *"klip stream ini, pastikan kamu menyertakan saat aku mati melawan bos,
   dengan caption kuning besar"*, dan aplikasi ini memasukkan video ke antrean, memberi tahu pemilih klip apa yang harus
@@ -282,7 +282,7 @@ melalui Ollama.
 - **Profil watermark dan branding**: pengaturan bawaan per kreator yang diterapkan otomatis.
 - **Pengelola model**: ganti otak AI dari dalam aplikasi; unduh, hapus, dan
   ganti model dengan bilah progres dan tanpa terminal.
-- **Publikasikan ke YouTube dari editor**: judul, deskripsi, tag, thumbnail,
+- **Publikasikan ke YouTube dari jendela Publish**: judul, deskripsi, tag, thumbnail,
   playlist, audiens, dan visibilitas, lalu Upload now atau jadwalkan. Opsional, nonaktif
   secara bawaan, dan memakai kunci Google API milikmu sendiri.
 - **Masukan dari dalam aplikasi**: laporan bug dengan diagnostik yang dikumpulkan otomatis, tanpa perlu akun.
@@ -381,7 +381,7 @@ npm install
 npm run dev        # opens the Clips Kitty desktop app
 ```
 
-Aplikasi memulai engine Python-nya sendiri secara otomatis. Tempel tautan di **Clip Editor**,
+Aplikasi memulai engine Python-nya sendiri secara otomatis. Tempel tautan di **Dashboard**,
 tekan *Generate clips*, dan pantau progresnya secara langsung.
 
 Membangun installer sendiri cukup dengan satu perintah. Lihat
@@ -567,11 +567,11 @@ Ingin bahasa yang belum ada di sini? [#61](https://github.com/ColinGPT9/clips-st
 
 ## Publikasikan ke YouTube
 
-Nonaktif secara bawaan. Nyalakan di **Settings → Publish to YouTube** dan tab **YouTube**
-akan muncul di editor: isi judul, deskripsi, tag, thumbnail,
-playlist, audiens, dan visibilitas, lalu tekan **Upload now**. Clips Kitty merender
-klipnya jika ada suntingan yang belum disimpan dan mengunggahnya langsung ke channel kamu. Tidak
-ada langkah ekspor dan tidak ada halaman publikasi terpisah. Kamu tidak pernah meninggalkan editor.
+Nonaktif secara bawaan. Nyalakan di **Settings → Publish to YouTube** dan jendela
+**Publish** sebuah klip (di halaman Clips atau di editor) mendapat bagian **YouTube (direct
+upload)**: isi judul, deskripsi, tag, thumbnail, playlist, audiens, dan visibilitas, lalu
+tekan **Upload now**. Clips Kitty mengunggah klipnya langsung ke channel kamu. Tidak ada
+langkah ekspor dan tidak ada halaman publikasi terpisah.
 
 Jika kamu membiarkannya nonaktif, tidak ada yang berubah di bagian mana pun dari aplikasi.
 
@@ -649,12 +649,12 @@ sendiri yang mengklasifikasikan video sebagai Short dari bentuk dan durasinya.
 
 ## Publikasikan ke semua platform sekaligus
 
-Juga nonaktif secara bawaan. Nyalakan di **Settings → Publish through WoopSocial**
-dan tab **Publish** muncul di editor: pilih platformmu — atau tekan
-**Everywhere** (Di mana-mana) — tulis judul dan deskripsi sekali saja, dan satu unggahan dikirim ke
-YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest, dan
-Bluesky sekaligus. **Publish all** di Clip Editor memproses satu batch penuh,
-dengan jeda supaya selusin klip tidak terunggah pada detik yang sama.
+Juga nonaktif secara bawaan. Nyalakan di **Settings → Publish through WoopSocial** dan di
+jendela **Publish** sebuah klip (di halaman Clips atau di editor) pilih platformmu — atau
+tekan **Everywhere** (Di mana-mana) — dan satu unggahan dikirim ke YouTube, TikTok,
+Instagram, Facebook, X, Threads, LinkedIn, Pinterest, dan Bluesky sekaligus. **Publish all**
+di halaman Clips memproses satu batch penuh, dengan jeda supaya selusin klip tidak terunggah
+pada detik yang sama.
 
 Yang ini **tidak lokal**. Klip dan detailnya dikirim ke layanan
 publikasi, yang mengirimkannya dan menyimpan koneksi ke akun media sosialmu,

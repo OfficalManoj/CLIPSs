@@ -144,10 +144,10 @@ MAX_CROP = 32
 EDIT_NUMBERS = {"volume": (0, 2), "fade_in": (0, 3), "fade_out": (0, 3), "speed": (0.5, 3)}
 TITLE_OVERLAY_SECONDS = (1, 10)
 DEFAULT_TITLE_OVERLAY_SECONDS = 3
-# The timeline editor's own choices (TimelineEditor.tsx), which Clips Kitty
-# sets a suggested fade, speed and hook title length to: the nearest one, a
-# tie going toward no change. tests/test_plugin_sdk_edit.py reads the
-# editor's lists, so the two can't drift apart.
+# The choices the old timeline editor offered (Quick edit, gone since the
+# editor suite's step KC), which Clips Kitty still sets a suggested fade,
+# speed and hook title length to: the nearest one, a tie going toward no
+# change. The render takes any of them.
 FADE_CHOICES = (0, 0.3, 0.5, 1)
 SPEED_CHOICES = (0.75, 1, 1.25, 1.5, 2)
 HOOK_SECONDS_CHOICES = (2, 3, 5, 8)

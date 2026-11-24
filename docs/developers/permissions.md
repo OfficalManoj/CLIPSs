@@ -29,7 +29,7 @@ A moment's `title`, `reason` and `context` are taken from the transcript, so sen
 
 **Suggesting edits needs no permission.** An edit run hands over the clips as moments, and what earlier edit plugins suggested for them (`suggested`); their reasons and hook titles are plugin text that may come from what was said, so they reach a plugin only with `transcript.read`. What Clips Kitty does with the answer is the same for every plugin:
 
-> Clips Kitty doesn’t put a suggestion into a clip until you use it in the editor and apply your edits (Apply edits, or Apply edits & upload).
+> Clips Kitty doesn’t put a suggestion into a clip by itself. Using one in the editor comes in a later update.
 
 That sentence says what Clips Kitty does with a suggestion, not what a plugin is able to do. A plugin runs as the user, so nothing stops its own code from changing clip files or posting by itself, as with any program the user installs; that is why `filesystem.write` and `project.write` are declared, not enforced ([Steps](steps.md#suggest-edits-the-edit-step)).
 

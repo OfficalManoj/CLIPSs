@@ -21,7 +21,8 @@ export default function ClipCard({
   onDelete,
   onToggleExported,
   onPublish,
-  onEdit
+  onEdit,
+  editReady = true
 }: {
   clip: Clip
   selected: boolean
@@ -32,8 +33,10 @@ export default function ClipCard({
   onToggleExported?: () => void
   /** Publish this one clip, without opening the editor first. */
   onPublish?: () => void
-  /** Open this clip in Clips Kitty Editor. Absent while the editor is not found. */
+  /** Open this clip in Clips Kitty Editor (KC: the one editor). */
   onEdit?: () => void
+  /** False while the editor is not found: Edit is off and says why. */
+  editReady?: boolean
 }): JSX.Element {
   // A clip made in Clips Kitty Editor: its file's own length, not the AI's window.
   const duration = Math.round(clip.editor_export?.seconds || clip.end_s - clip.start_s)
@@ -111,7 +114,7 @@ export default function ClipCard({
           {suggested && (
             <span
               className="absolute top-9 left-2 bg-accent/90 text-black px-1.5 py-0.5 rounded text-[10px] font-bold"
-              title={t("A Marketplace plugin suggested an edit for this clip. Open it in the editor to see it.")}
+              title={t("A Marketplace plugin suggested an edit for this clip. Using it in the editor comes in a later update.")}
             >
               Suggested edit
             </span>
@@ -194,18 +197,24 @@ export default function ClipCard({
               Publish ↗
             </button>
           )}
-          {/* Clips Kitty Editor, beside Publish: the other corners are taken. */}
+          {/* Clips Kitty Editor, beside Publish: the other corners are taken.
+              Off while the editor is not found, with the reason. */}
           {onEdit && (
             <button
-              aria-label={`${t('Open in editor')}: ${name}`}
-              title={t('Open this clip in the editor')}
+              aria-label={`${t('Edit')}: ${name}`}
+              aria-disabled={!editReady}
+              title={
+                editReady
+                  ? t('Open this clip in Clips Kitty Editor')
+                  : t('Clips Kitty Editor wasn’t found with this copy of Clips Kitty, so clips can’t be edited here.')
+              }
               onClick={(e) => {
                 e.stopPropagation()
-                onEdit()
+                if (editReady) onEdit()
               }}
-              className="px-2 py-1 rounded-md bg-black/70 text-white/90 text-[10px] font-semibold opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-accent hover:text-black transition"
+              className="px-2 py-1 rounded-md bg-black/70 text-white/90 text-[10px] font-semibold opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-accent hover:text-black aria-disabled:hover:bg-black/70 aria-disabled:hover:text-white/90 aria-disabled:cursor-not-allowed transition"
             >
-              {t('Open in editor')}
+              {t('Edit')}
             </button>
           )}
         </div>

@@ -584,7 +584,14 @@ def install(app, *, config, db, data_dir, worker, publish_worker) -> None:
             raise HTTPException(404, "this clip has no rendered file")
 
         at = max(0.0, t)
-        target = _thumb_path(clip_id, str(int(at * 1000)))
+        # The file's stamp is in the name: an editor export keeps the clip's
+        # id (step KC), so a still kept from the old video is not shown again.
+        try:
+            st = source.stat()
+            stamp = f"{st.st_mtime_ns:x}{st.st_size:x}"
+        except OSError:
+            stamp = "0"
+        target = _thumb_path(clip_id, f"{int(at * 1000)}_{stamp}")
         if not target.exists():
             _extract_frame(source, at, target)
         return FileResponse(str(target), media_type="image/jpeg")

@@ -213,10 +213,10 @@ diễn ra. Bối cảnh đó giúp nó viết tiêu đề chính xác và nhận
 thức không còn được nhắc đến sẽ chuyển sang trạng thái ngủ, và mọi phần điểm nó đóng góp đều
 chỉ cộng thêm, có giới hạn và có thể tắt đi.
 
-**Trình chỉnh sửa video.** Không phá hủy: cắt đầu đuôi, cắt giữa, tắt tiếng, tắt tiếng từng
-từ, âm lượng, fade, tốc độ, chữ mở đầu (hook), nhạc và watermark được lưu dưới dạng thao tác
-và áp dụng lúc render. Còn có cả khung chat chỉnh sửa bằng AI (*"làm dài thêm 5 giây"*,
-*"phụ đề ghi gost, phải là ghost"*), trong đó mô hình đề xuất và mã đã được kiểm tra sẽ áp dụng.
+**Trình chỉnh sửa video.** Clips Kitty Editor, xây trên trình chỉnh sửa mã nguồn mở Concat,
+mở từng clip trên một dòng thời gian: cắt, tắt tiếng, âm lượng, fade, tốc độ, phụ đề, nhạc,
+màu sắc, tiêu đề và hình ảnh trên video. Phụ đề và lồng tiếng sang ngôn ngữ khác cũng có ở
+đó. Chat chỉnh sửa bằng AI sẽ quay lại trong một bản cập nhật sau.
 
 **Xử lý video dài.** Một nhánh 16:9 tùy chọn dùng cùng phân tích đó: clip ngang, đoạn cắt độ
 dài cho X/Twitter, video tổng hợp khoảnh khắc hay nhất, hoặc toàn bộ buổi stream đã bỏ các
@@ -270,7 +270,7 @@ bằng phần cứng qua NVENC/AMF/QSV (tự phát hiện, có dự phòng CPU),
   vị trí, số từ mỗi dòng, chữ hoa/thường, hoặc tắt). Sửa lỗi chuyển giọng nói thành văn bản
   từng dòng trước khi xuất. Khi có hai người nói, phụ đề của người thứ hai có thể dùng màu
   khác, và câu nào bị gán sai có thể đổi bằng tay.
-- **Chat chỉnh sửa bằng AI**: mô tả chỗ chưa ổn bằng lời thường và nó sẽ dựng lại.
+- **Chat chỉnh sửa bằng AI** (sẽ quay lại trong một bản cập nhật sau): mô tả chỗ chưa ổn bằng lời thường và nó sẽ dựng lại.
 - **Ask Clips Kitty** (Hỏi Clips Kitty): ô văn bản ở cuối bảng điều khiển. Nói điều bạn muốn
   trong một câu, chẳng hạn *"cắt clip buổi stream này, nhớ có đoạn tôi chết dưới tay boss, phụ
   đề to màu vàng"*, và nó sẽ đưa video vào hàng đợi, chỉ cho bộ chọn clip biết cần tìm gì và
@@ -288,7 +288,7 @@ bằng phần cứng qua NVENC/AMF/QSV (tự phát hiện, có dự phòng CPU),
   tự động.
 - **Trình quản lý mô hình**: đổi "bộ não" AI ngay trong ứng dụng; tải về, gỡ bỏ và chuyển đổi
   mô hình với thanh tiến trình, không cần terminal.
-- **Đăng lên YouTube từ trình chỉnh sửa**: tiêu đề, mô tả, thẻ, ảnh thu nhỏ, danh sách phát,
+- **Đăng lên YouTube từ cửa sổ Publish**: tiêu đề, mô tả, thẻ, ảnh thu nhỏ, danh sách phát,
   đối tượng người xem và chế độ hiển thị, rồi tải lên ngay hoặc lên lịch. Tùy chọn, mặc định
   tắt, và dùng khóa Google API của chính bạn.
 - **Phản hồi trong ứng dụng**: báo lỗi kèm thông tin chẩn đoán tự thu thập, không cần tài khoản.
@@ -389,8 +389,7 @@ npm install
 npm run dev        # opens the Clips Kitty desktop app
 ```
 
-Ứng dụng tự khởi động engine Python của nó. Dán một đường link vào **Clip Editor** (Trình
-chỉnh sửa clip), nhấn *Generate clips* (Tạo clip), và theo dõi tiến trình trực tiếp.
+Ứng dụng tự khởi động engine Python của nó. Dán một đường link vào **Dashboard** (Bảng điều khiển), nhấn *Generate clips* (Tạo clip), và theo dõi tiến trình trực tiếp.
 
 Tự build bộ cài đặt chỉ cần một lệnh. Xem
 [CONTRIBUTING.md](../../CONTRIBUTING.md#building-the-windows-installer).
@@ -577,10 +576,11 @@ Muốn một ngôn ngữ chưa có ở đây? [#61](https://github.com/ColinGPT9
 ## Đăng lên YouTube
 
 Mặc định tắt. Bật nó trong **Settings → Publish to YouTube** (Cài đặt → Đăng lên YouTube) và
-một tab **YouTube** sẽ xuất hiện trong trình chỉnh sửa: điền tiêu đề, mô tả, thẻ, ảnh thu nhỏ,
-danh sách phát, đối tượng người xem và chế độ hiển thị, rồi nhấn **Upload now** (Tải lên ngay).
-Clips Kitty sẽ render clip nếu bạn có chỉnh sửa chưa lưu và tải thẳng lên kênh của bạn. Không
-có bước xuất, không có trang đăng bài riêng. Bạn không cần rời trình chỉnh sửa.
+cửa sổ **Publish** (Đăng) của một clip (ở trang Clips hoặc trong trình chỉnh sửa) sẽ có mục
+**YouTube (direct upload)** (YouTube, tải lên trực tiếp): điền tiêu đề, mô tả, thẻ, ảnh thu
+nhỏ, danh sách phát, đối tượng người xem và chế độ hiển thị, rồi nhấn **Upload now** (Tải
+lên ngay). Clips Kitty tải clip thẳng lên kênh của bạn. Không có bước xuất, không có trang
+đăng bài riêng.
 
 Nếu bạn để tắt, không có gì thay đổi ở bất cứ đâu trong ứng dụng.
 
@@ -657,12 +657,12 @@ phân loại video là Short dựa trên tỉ lệ khung hình và độ dài.
 
 ## Đăng lên mọi nền tảng cùng lúc
 
-Cũng tắt theo mặc định. Bật nó trong **Settings → Publish through WoopSocial** (Cài đặt → Đăng
-qua WoopSocial) và một tab **Publish** (Đăng) sẽ xuất hiện trong trình chỉnh sửa: chọn các nền
-tảng — hoặc nhấn **Everywhere** (Mọi nơi) — viết tiêu đề và mô tả một lần, và một lần tải lên
-sẽ đến YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest và Bluesky cùng
-lúc. **Publish all** (Đăng tất cả) trong Clip Editor xử lý cả một loạt, giãn cách ra để cả chục
-clip không lên cùng một giây.
+Cũng tắt theo mặc định. Bật nó trong **Settings → Publish through WoopSocial** (Cài đặt →
+Đăng qua WoopSocial) và trong cửa sổ **Publish** (Đăng) của một clip (ở trang Clips hoặc
+trong trình chỉnh sửa), chọn các nền tảng — hoặc nhấn **Everywhere** (Mọi nơi) — và một lần
+tải lên sẽ đến YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest và
+Bluesky cùng lúc. **Publish all** (Đăng tất cả) ở trang Clips xử lý cả một loạt, giãn cách
+ra để cả chục clip không lên cùng một giây.
 
 Tính năng này **không chạy cục bộ**. Clip và thông tin của nó được gửi tới một dịch vụ đăng
 bài, dịch vụ này phân phối chúng và giữ kết nối tới các tài khoản mạng xã hội của bạn, nên

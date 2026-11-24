@@ -1,16 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LiveOverlay } from '../lib/types'
 import { captionFontWeight, captionLayout, useBundledFonts } from '../lib/captionLook'
-import { bakedToOrig } from './TimelineEditor'
 
-/** Live DOM rendition of PENDING burned-in text — the hook title and
- *  restyled/corrected captions — drawn over the editor video in the same
- *  place and proportions the render will burn them (ASS styles are
+/** A time in the shown file to the clip's own timeline, through the ranges
+ *  already burned into that file (none: the same time). */
+export function bakedToOrig(t: number, bakedKeep: [number, number][] | undefined): number {
+  if (!bakedKeep) return t
+  let offset = 0
+  for (const [a, b] of bakedKeep) {
+    if (t - offset <= b - a) return a + (t - offset)
+    offset += b - a
+  }
+  return bakedKeep[bakedKeep.length - 1]?.[1] ?? t
+}
+
+/** Live DOM rendition of burned-in text drawn over a clip's video in the
+ *  same place and proportions the render will burn it (ASS styles are
  *  calibrated on a 1920-tall canvas; everything here scales by
- *  boxHeight/1920, which holds for portrait and landscape alike).
- *  Shown only while those changes are pending, so users see caption style,
- *  text fixes, censoring and hooks instantly instead of waiting for the
- *  ~1 minute Update-preview render. */
+ *  boxHeight/1920, which holds for portrait and landscape alike). Used by
+ *  the Other languages window (step KC) to show a translated language over
+ *  the clip, with the burned captions masked underneath. */
 export default function LiveTextOverlay({
   videoRef,
   overlay
@@ -60,7 +69,7 @@ export default function LiveTextOverlay({
 
   const line = overlay.captions?.lines.find((l) => t >= l.start && t <= l.end)
   const st = overlay.captions?.style
-  // The other speaker's line, in their colour (lib/speakerTurns.ts marks it).
+  // The other speaker's line, in their colour (a line marked with `speaker`).
   const lineColor = st && line?.speaker && st.second_speaker ? st.second_speaker_color : st?.color
   const capSize = st ? Math.max(40, Math.min(140, st.font_size)) * s : 0
   // Where the burn puts it (video/captions.py _layout): today's margins, or

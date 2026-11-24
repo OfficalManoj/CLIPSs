@@ -116,7 +116,7 @@ const TOGGLES: { key: ToggleKey; label: string; hint: string; title: string }[] 
     label: 'Gaming / Reaction',
     hint: '(split-screen)',
     title:
-      'For game streams and reaction videos: the streamer’s webcam in the top half, the game (or the video they’re reacting to) in the bottom half. With no webcam, the game fills the screen. The streamer is whoever is talking, never the biggest face. Fix a clip in the editor by drawing the webcam and game area.'
+      'For game streams and reaction videos: the streamer’s webcam in the top half, the game (or the video they’re reacting to) in the bottom half. With no webcam, the game fills the screen. The streamer is whoever is talking, never the biggest face. Drawing the webcam and game areas yourself in the editor comes in a later update.'
   },
   {
     key: 'sport',
@@ -144,7 +144,7 @@ const TOGGLES: { key: ToggleKey; label: string; hint: string; title: string }[] 
     label: 'Suggest edits',
     hint: '(Marketplace)',
     title:
-      'Plugins you installed from the Marketplace look at each clip Clips Kitty is about to make and suggest edits: cuts, mutes, fades, speed, a hook title or the layout. Suggestions wait for you in the editor. Clips Kitty doesn’t put a suggestion into a clip until you use it in the editor and apply your edits (Apply edits, or Apply edits & upload). Not with Longform.'
+      'Plugins you installed from the Marketplace look at each clip Clips Kitty is about to make and suggest edits: cuts, mutes, fades, speed, a hook title or the layout. Suggestions are kept with each clip. Clips Kitty doesn’t put a suggestion into a clip by itself. Using one in the editor comes in a later update. Not with Longform.'
   },
   {
     key: 'watermark',

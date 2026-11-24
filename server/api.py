@@ -958,7 +958,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
 
     kitty_editor_api.install(app, db=db, data_dir=data_dir, session_secret=desktop_session,
                              broadcaster=broadcaster, config=config,
-                             clip_captions=lambda row: _clip_captions(row))
+                             clip_captions=lambda row: _clip_captions(row, as_burned=True))
 
     # Settings → Voice and speech on request (voice/, editor suite step V1):
     # the built-in voice, or the person's own Voicebox, VoiceStudio or other
@@ -2617,12 +2617,15 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
         if stage == "export" and not body.folder:
             raise HTTPException(400, "choose an export folder")
         if stage == "export" and (body.burn or body.dub or body.subtitles):
-            # Burned subtitles, a dub and subtitle files are made from the
-            # clip's own window and caption lines: ask first for a clip whose
-            # file is an editor export (K2, E5).
+            # Burned subtitles and a dub are made from the clip's own window:
+            # ask first for a clip whose file is an editor export (K2, E5).
+            # Subtitle files alone are made from the clip's caption lines at
+            # their own times: asked too, unless the clip's last editor
+            # export kept every caption in place (KC, subtitles_follow).
             d = db()
             try:
-                project_edits_left_out(d, body.clip_ids[:50], body.without_project_edits)
+                project_edits_left_out(d, body.clip_ids[:50], body.without_project_edits,
+                                       files_only=not (body.burn or body.dub))
             finally:
                 d.close()
         # Held until the job naming them is queued (core/in_use.py).
@@ -3996,10 +3999,14 @@ def project_edits_kept(d, clip_id: int, replace: bool) -> None:
                               "project_id": _editor_project_of(d, clip_id)})
 
 
-def project_edits_left_out(d, clip_ids, go_ahead: bool) -> None:
-    """Refuse to make a SEPARATE file (a translation, a dub, subtitle files)
-    from the clip's own window when the clip's file is an editor export,
-    unless the person chose "Make it anyway" (editor suite step K2, E5).
+def project_edits_left_out(d, clip_ids, go_ahead: bool, files_only: bool = False) -> None:
+    """Refuse to make a SEPARATE file (burned subtitles, a dub, subtitle
+    files) from the clip's own window or caption lines when the clip's file
+    is an editor export, unless the person chose "Make it anyway" (editor
+    suite step K2, E5). `files_only` (subtitle files, nothing burned or
+    dubbed): a clip whose last editor export kept every caption in place
+    is not asked about, since its caption lines fit the export (KC,
+    kitty_editor.intake.subtitles_follow).
     project_edits_kept's sibling: that one guards renders that replace the
     clip's file; this one guards new files made beside it, which would be
     the clip as the AI made it, without the editor's changes. A batch is
@@ -4011,6 +4018,10 @@ def project_edits_left_out(d, clip_ids, go_ahead: bool) -> None:
         return
     ids = list(clip_ids or [])
     found = d.project_export_clips(ids)
+    if files_only:
+        from kitty_editor.intake import captions_moved
+
+        found = captions_moved(d, found)
     if not found:
         return
     if len(found) == 1:

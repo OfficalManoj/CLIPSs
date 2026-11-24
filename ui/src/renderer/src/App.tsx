@@ -39,10 +39,11 @@ const NAV: { id: Page; label: string; icon: string }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: '◧' },
   { id: 'queue', label: 'Queue', icon: '≡' },
   { id: 'watch', label: 'Watched channels', icon: '◎' },
-  // Renamed in 1.1.3. The previous label matched an existing product closely
-  // enough to block the Microsoft Store listing, so do not change it back —
-  // "Clip Editor" is also just what the page is.
-  { id: 'studio', label: 'Clip Editor', icon: '✂' },
+  // "Clips" since step KC (the owner's call): the page lists the clips, and
+  // editing happens in the Editor. Named "Clip Editor" from 1.1.3; the label
+  // before that matched an existing product closely enough to block the
+  // Microsoft Store listing, so never go back to that one.
+  { id: 'studio', label: 'Clips', icon: '✂' },
   // Clips Kitty Editor (editor suite K2). Only shown while the engine says
   // the editor is found (lib/editorStatus.ts); otherwise the app is as before.
   { id: 'editor', label: 'Editor', icon: '▶' },

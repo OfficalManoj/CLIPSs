@@ -36,8 +36,8 @@ import { t } from '../../lib/i18n'
  *  channel (`channel`) has its options replaced on every save, so the kept
  *  choices are sent back each time.
  *
- *  The Library's Make clips again dialog uses it too, for a video's last
- *  settings: its Save queues the video (`saveLabel`), beside a Cancel, and
+ *  The Library's Make clips again dialog used it too (that window was
+ *  removed from the Clips page in KC), for a video's last settings: its Save queues the video (`saveLabel`), beside a Cancel, and
  *  with no Longform switch. When that video was made as one whole clip, the
  *  dialog shows a Whole video switch (`offerWhole`), to keep or turn off. */
 export default function QueueItemSettings({
@@ -434,8 +434,8 @@ export default function QueueItemSettings({
                 }
               },
               channel
-                ? 'Marketplace plugins suggest edits for this channel’s clips, as chosen for this channel. Suggestions wait for you in the editor. Here they can only be kept or turned off. Longform makes its clips its own way, so turning it on turns these off.'
-                : 'Marketplace plugins suggest edits for this video’s clips, as chosen when it was added. Suggestions wait for you in the editor. Here they can only be kept or turned off. Longform makes its clips its own way, so turning it on turns these off.'
+                ? 'Marketplace plugins suggest edits for this channel’s clips, as chosen for this channel. Suggestions are kept with each clip; using one in the editor comes in a later update. Here they can only be kept or turned off. Longform makes its clips its own way, so turning it on turns these off.'
+                : 'Marketplace plugins suggest edits for this video’s clips, as chosen when it was added. Suggestions are kept with each clip; using one in the editor comes in a later update. Here they can only be kept or turned off. Longform makes its clips its own way, so turning it on turns these off.'
             )
           ))}
         {toggle(

@@ -306,7 +306,7 @@ Where only the best few clips go out, scores decide which ones: a watched channe
 
 An edit plugin never changes a clip. It **suggests** an edit for each clip, and the suggestion waits on that clip for the creator. In the timeline editor the creator can **Use** it, **Hide** it, or later **Take it back**. The Suggest edits switch, the Marketplace and these pages say it in the same sentence:
 
-> Clips Kitty doesn’t put a suggestion into a clip until you use it in the editor and apply your edits (Apply edits, or Apply edits & upload).
+> Clips Kitty doesn’t put a suggestion into a clip by itself. Using one in the editor comes in a later update.
 
 So a video's first run renders every clip with exactly the options it would have without the plugin (a test pins that), and Clips Kitty's own automatic posting posts what it would post without it. That describes what Clips Kitty does with your answer; it is not a sandbox. A plugin runs as the user, like any program, so nothing stops one from changing clip files or posting by itself ([Security](security.md)).
 
@@ -519,7 +519,7 @@ Each edit plugin makes the clips wait for its answer, up to its time limit, befo
 
 - **No run changes a clip's saved edit, layout or any other choice the creator made.**
 - **Decisions carry over.** On a forced re-run, a suggestion with the same id keeps the creator's decision: a hidden one stays hidden and a used one stays used. A suggestion that changed, even slightly, has a new id and is new again. A used suggestion the run no longer makes is kept, so the creator can still take it back; new and hidden ones it no longer makes are dropped, as old ratings are.
-- **A re-run makes a clip the creator edited with their edits** (D33): the saved edit and layout and the clip's other saved choices (a Sports job keeps its own look), as **Make it again with my edits** does, so a used suggestion stays in the clip. Its used suggestions carry `remade` only if the clip's file still comes out without the saved edit, when the edit was saved while the run was making the clip. The card then says "This clip was made again without your saved edits, so its file doesn’t have them." with **Make it again with my edits**.
+- **A re-run makes a clip the creator edited with their edits** (D33): the saved edit and layout and the clip's other saved choices (a Sports job keeps its own look), as **Make it again with my edits** does, so a used suggestion stays in the clip. Its used suggestions carry `remade` only if the clip's file still comes out without the saved edit, when the edit was saved while the run was making the clip. In older versions the card then said "This clip was made again without your saved edits, so its file doesn’t have them." with **Make it again with my edits**; suggestion cards come back in Clips Kitty Editor in a later update.
 - **A clip the creator trimmed since.** Times stay in seconds of the video and are turned into the clip's own seconds when the creator presses Use, so a suggestion still lands in the right place. When the clip's start or end moved since a suggestion with cuts or mutes was made, its card says "Made before you changed this clip’s start or end. Check the cuts before you apply."
 - **Titles are never touched.** Suggestions don't reach the title writer; only notes do.
 

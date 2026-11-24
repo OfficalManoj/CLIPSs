@@ -6,29 +6,22 @@ import PluginStepsNote from '../components/PluginStepsNote'
 import SportsNote from '../components/SportsNote'
 import ClipCard from '../components/ClipCard'
 import ClipEditor from '../components/ClipEditor'
-import EditorView from '../components/EditorModal'
 import ProcessingBar from '../components/ProcessingBar'
 import PublishAllDialog from '../components/PublishAllDialog'
-import RemakeDialog from '../components/RemakeDialog'
 import ScheduleView from '../components/ScheduleView'
 import ExportProgress from '../components/ExportProgress'
 import { api } from '../lib/api'
 import type { Provider } from '../lib/uploadpost'
 import { getExportFolder } from '../lib/exportFolder'
 import { isActive } from '../lib/exportJobs'
-import { remakeBlocked, remakeResultText } from '../lib/remake'
 import { useEvents } from '../lib/useEvents'
 import { useExportJobs } from '../lib/useExportJobs'
 import { useJobWatch } from '../lib/useJobWatch'
 import { openInEditor } from '../lib/editor'
-import { readPublishSetup } from '../lib/publishSetup'
+import { readPublishSetup, type PublishSetup } from '../lib/publishSetup'
 import { useEditorFound } from '../lib/editorStatus'
 import type { StudioTarget } from '../App'
-import type { Clip, ExportJob, RemakePreview, StudioEvent, Video } from '../lib/types'
-
-// How often Make clips again is read again while one of the open video's
-// clips is in use (below).
-const REMAKE_BUSY_RECHECK_MS = 4000
+import type { Clip, ExportJob, StudioEvent, Video } from '../lib/types'
 
 /** Browse and edit the clips of processed videos. New videos are started from
  *  the Dashboard; clicking a clip there navigates here with it selected. */
@@ -48,30 +41,34 @@ export default function ClipStudio({
   // do not need a second implementation.
   const [publishOne, setPublishOne] = useState<Clip | null>(null)
   const [showSchedule, setShowSchedule] = useState(false)
-  const [editingClipId, setEditingClipId] = useState<number | null>(null)
-  // Clips Kitty Editor (editor suite K2): offered only when it is found.
+  // Clips Kitty Editor: every Edit opens it (Quick edit is gone, KC). While
+  // it is not found, Edit is off and says why.
   const editorFound = useEditorFound()
   const [videoSearch, setVideoSearch] = useState('')
-  // Publishing is only offered once Upload-Post is switched on AND a key
-  // is stored — the same rule the editor tab follows.
-  const [publishReady, setPublishReady] = useState(false)
+  // Publishing (lib/publishSetup.ts), as the Editor page's Publish: Publish
+  // and Publish all are always there, and the setup is read again when one
+  // is clicked. With nothing set up, the window says how to connect an
+  // account (and holds YouTube's direct upload for one clip when it is on).
+  const [publishSetup, setPublishSetup] = useState<PublishSetup>({
+    ready: false,
+    provider: 'woopsocial',
+    youtube: false
+  })
+  const publishReady = publishSetup.ready
   // Which provider a batch goes through. WoopSocial when it is set up.
-  const [publishProvider, setPublishProvider] = useState<Provider>('woopsocial')
+  const publishProvider: Provider = publishSetup.provider
+  const openPublish = async (open: () => void): Promise<void> => {
+    try {
+      setPublishSetup(await readPublishSetup())
+    } catch {
+      /* not read: the window says how to set one up */
+    }
+    open()
+  }
   const [publishing, setPublishing] = useState(false)
   const [clipType, setClipType] = useState<'all' | 'shorts' | 'longform'>('all')
   const [exportingAll, setExportingAll] = useState(false)
   const [exportNotice, setExportNotice] = useState<string | null>(null)
-  // Make clips again (#190): whether the open video's clips can be made
-  // again right now, and the video whose dialog is open. Read when the video
-  // changes and whenever the queue does, since waiting or being made in it
-  // is what turns the action off. Only the latest read counts.
-  const [remake, setRemake] = useState<RemakePreview | null>(null)
-  const [remakeOpen, setRemakeOpen] = useState<string | null>(null)
-  const remakeRead = useRef(0)
-  // What the open video's Make clips again did, once it's done: with its
-  // clips from before still there, a run that made nothing new would
-  // otherwise look as if nothing had happened.
-  const [remakeNotice, setRemakeNotice] = useState<string | null>(null)
   const pendingClip = useRef<number | null>(null)
   // A re-rendered clip's old id and its new one (clip_replaced, below).
   const moved = useRef(new Map<number, number>())
@@ -113,17 +110,14 @@ export default function ClipStudio({
     try {
       const c = await api.clips(videoId)
       setClips(c)
-      // A re-rendered clip (clip_replaced, below): the open editor and the
-      // selected card move to its new id with the list that has it, in the
-      // same update. Every refresh does it, as the job's own 'done' can
-      // bring that list before the one clip_replaced asked for; moved by
-      // that one alone, the editor looked for its clip by the old id in
-      // the new list and closed until it came.
+      // A re-rendered clip (clip_replaced, below): the selected card moves
+      // to its new id with the list that has it, in the same update. Every
+      // refresh does it, as the job's own 'done' can bring that list before
+      // the one clip_replaced asked for.
       const follow = (id: number | null): number | null => {
         const to = id === null ? undefined : moved.current.get(id)
         return to !== undefined && c.some((x) => x.id === to) ? to : id
       }
-      setEditingClipId(follow)
       setSelectedClip(follow)
       if (pendingClip.current !== null) {
         if (c.some((x) => x.id === pendingClip.current)) setSelectedClip(pendingClip.current)
@@ -134,39 +128,32 @@ export default function ClipStudio({
     }
   }
 
-  const refreshRemake = async (videoId: string): Promise<void> => {
-    const read = ++remakeRead.current
-    try {
-      const preview = await api.remakePreview(videoId)
-      if (read === remakeRead.current) setRemake(preview)
-    } catch {
-      // Not known: the action stays on, and its dialog says what went wrong.
-      if (read === remakeRead.current) setRemake(null)
+  useEffect(() => {
+    // Which provider the windows send through (lib/publishSetup.ts): read
+    // when the page is shown, again when the app window regains focus or
+    // becomes visible (an account connected in Settings, or in the browser
+    // for WoopSocial, then shows Schedule at once), and on each click.
+    let gone = false
+    const read = (): void => {
+      readPublishSetup()
+        .then((setup) => {
+          if (!gone) setPublishSetup(setup)
+        })
+        .catch(() => {
+          /* not read: kept as it was */
+        })
     }
-  }
-
-  useEffect(() => {
-    if (activeVideo) void refreshRemake(activeVideo)
-  }, [activeVideo])
-
-  // Off because one of the open video's clips is being published, exported
-  // or edited: most of those send no event when they end, so it's read again
-  // every few seconds until that changes or another video is opened.
-  const remakeBusy = remake !== null && remake.video_id === activeVideo && remake.blocked === 'busy'
-  useEffect(() => {
-    if (!remakeBusy || !activeVideo) return
-    const video = activeVideo
-    const timer = window.setInterval(() => void refreshRemake(video), REMAKE_BUSY_RECHECK_MS)
-    return () => window.clearInterval(timer)
-  }, [remakeBusy, activeVideo])
-
-  useEffect(() => {
-    // Either provider makes batch publishing available (the same rule as
-    // the Editor page's Publish: lib/publishSetup.ts).
-    void readPublishSetup().then((setup) => {
-      setPublishReady(setup.ready)
-      setPublishProvider(setup.provider)
-    })
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') read()
+    }
+    read()
+    window.addEventListener('focus', read)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      gone = true
+      window.removeEventListener('focus', read)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   useEffect(() => {
@@ -196,7 +183,6 @@ export default function ClipStudio({
     if (activeVideo) refreshClips(activeVideo)
     if (pendingClip.current === null) setSelectedClip(null)
     setExportNotice(null)
-    setRemakeNotice(null)
     exports.clearFinishedBatch()
   }, [activeVideo])
 
@@ -210,27 +196,13 @@ export default function ClipStudio({
       }
     }
     if (e.type === 'job' && e.status === 'done' && activeVideo) refreshClips(activeVideo)
-    if (e.type === 'job' && e.status === 'done' && e.result && e.video_id === activeVideo)
-      setRemakeNotice(`${t('Make clips again:')} ${remakeResultText(e.result, t)}`)
-    if (e.type === 'queue' && activeVideo) void refreshRemake(activeVideo)
     // Clips Kitty Editor's export taken in as a clip's video: its card and
     // player show the new file.
     if ((e.type as string) === 'clip_file_replaced' && activeVideo) refreshClips(activeVideo)
-    // A publish or an export starting or ending: Make clips again is off
-    // while one of the video's clips is being sent or exported.
-    if (
-      activeVideo &&
-      ((e.type === 'publish' && (e.phase === 'prepare' || e.terminal !== undefined)) ||
-        (e.type === 'export' && e.export !== undefined && e.export.status !== 'running'))
-    )
-      void refreshRemake(activeVideo)
     // A re-render puts the clip back under a new id (server/jobs.py
-    // _rerender_clip). The open editor and the selected card follow it:
-    // looked for by the old one, the editor lost its clip as soon as the
-    // list was read again (#147). The move is noted at once: the event
-    // comes ahead of the job's 'done', so whichever refresh brings the new
-    // list first moves them with it (refreshClips). Moved here, before any
-    // list has the new id, the editor would close until one did.
+    // _rerender_clip). The selected card follows it (#147). The move is
+    // noted at once: the event comes ahead of the job's 'done', so
+    // whichever refresh brings the new list first moves it (refreshClips).
     if (e.type === 'clip_replaced') {
       if (e.old === undefined || e.new === undefined) return
       moved.current.set(e.old, e.new)
@@ -257,14 +229,6 @@ export default function ClipStudio({
   const activeMatch = videos.find((v) => v.video_id === activeVideo)?.outcome?.sport ?? null
   // Rate & understand: what the Marketplace plugins chosen for it did.
   const activeOutcome = videos.find((v) => v.video_id === activeVideo)?.outcome ?? null
-  const editingClip = useMemo(
-    () => clips.find((c) => c.id === editingClipId) ?? null,
-    [clips, editingClipId]
-  )
-  // Why Make clips again is off for the open video, or null when it's on
-  // (and while it's being read: its dialog reads again and says then).
-  const remakeWhy =
-    remake !== null && remake.video_id === activeVideo ? remakeBlocked(remake, t) : null
 
   const shownVideos = useMemo(() => {
     const q = videoSearch.trim().toLowerCase()
@@ -350,29 +314,12 @@ export default function ClipStudio({
       setExportNotice(`Export failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setExportingAll(false)
-      // The copies are done: Make clips again may be on again.
-      if (activeVideo) void refreshRemake(activeVideo)
     }
-  }
-
-  if (editingClip) {
-    return (
-      <div className="p-6">
-        <EditorView
-          clip={editingClip}
-          onClose={() => setEditingClipId(null)}
-          onChanged={() => activeVideo && refreshClips(activeVideo)}
-          onOpenInEditor={
-            editorFound ? () => void openInEditor({ kind: 'clip', clip_id: editingClip.id }) : undefined
-          }
-        />
-      </div>
-    )
   }
 
   return (
     <div className="p-6 space-y-5">
-      <h2 className="text-2xl font-bold">Clip Editor</h2>
+      <h2 className="text-2xl font-bold">{t('Clips')}</h2>
 
       <ProcessingBar />
 
@@ -484,16 +431,15 @@ export default function ClipStudio({
                   Export writes files you can delete; this posts publicly and
                   cannot be undone, so it is quieter to look at and opens a
                   confirm rather than acting on the click. */}
+              <button
+                className="btn-ghost !py-1 !px-3 text-xs"
+                onClick={() => void openPublish(() => setPublishing(true))}
+                disabled={shownClips.length === 0}
+                title={`Publish the ${shownClips.length} clip${shownClips.length === 1 ? '' : 's'} shown here to your social accounts`}
+              >
+                {`Publish all (${shownClips.length}) ↗`}
+              </button>
               {publishReady && (
-                <>
-                <button
-                  className="btn-ghost !py-1 !px-3 text-xs"
-                  onClick={() => setPublishing(true)}
-                  disabled={shownClips.length === 0}
-                  title={`Publish the ${shownClips.length} clip${shownClips.length === 1 ? '' : 's'} shown here to your social accounts`}
-                >
-                  {`Publish all (${shownClips.length}) ↗`}
-                </button>
                 <button
                   className="btn-ghost !py-1 !px-3 text-xs"
                   onClick={() => setShowSchedule(true)}
@@ -501,27 +447,9 @@ export default function ClipStudio({
                 >
                   Schedule
                 </button>
-                </>
               )}
-              {/* The whole video again, with other settings (#190). Off, with
-                  the reason in its tooltip, while the video waits or is made
-                  in the queue, when its source is gone, or the queue is full. */}
-              <button
-                className="btn-ghost !py-1 !px-3 text-xs"
-                onClick={() => activeVideo && setRemakeOpen(activeVideo)}
-                disabled={!activeVideo || remakeWhy !== null}
-                title={
-                  remakeWhy ??
-                  t(
-                    'Make this video’s clips again with other settings, without adding it again. Clips you edited, published or scheduled are kept; the others are replaced once the new clips are ready.'
-                  )
-                }
-              >
-                {t('Make clips again…')}
-              </button>
             </div>
             {exportNotice && <p className="text-sm text-accent">{exportNotice}</p>}
-            {remakeNotice && <p className="text-sm text-accent">{remakeNotice}</p>}
             {exports.batch && batchJobs.length > 0 && (
               <ExportProgress jobs={batchJobs} onCancel={exports.cancel} batch={exports.batch} />
             )}
@@ -537,8 +465,9 @@ export default function ClipStudio({
                   onClick={() => setSelectedClip(clip.id)}
                   onDelete={() => deleteClip(clip.id)}
                   onToggleExported={() => toggleExported(clip)}
-                  onPublish={() => setPublishOne(clip)}
-                  onEdit={editorFound ? () => void openInEditor({ kind: 'clip', clip_id: clip.id }) : undefined}
+                  onPublish={() => void openPublish(() => setPublishOne(clip))}
+                  onEdit={() => void openInEditor({ kind: 'clip', clip_id: clip.id })}
+                  editReady={editorFound}
                 />
               ))}
               {clips.length === 0 && (
@@ -559,11 +488,9 @@ export default function ClipStudio({
               <ClipEditor
                 clip={current}
                 onChanged={() => activeVideo && refreshClips(activeVideo)}
-                onOpenEditor={() => setEditingClipId(current.id)}
-                onOpenInEditor={
-                  editorFound ? () => void openInEditor({ kind: 'clip', clip_id: current.id }) : undefined
-                }
-                onPublish={publishReady ? () => setPublishOne(current) : undefined}
+                onEdit={() => void openInEditor({ kind: 'clip', clip_id: current.id })}
+                editReady={editorFound}
+                onPublish={() => void openPublish(() => setPublishOne(current))}
                 exports={exports}
               />
             ) : (
@@ -579,10 +506,11 @@ export default function ClipStudio({
         <PublishAllDialog
           clips={[publishOne]}
           provider={publishProvider}
+          providerReady={publishReady}
+          youtube={publishSetup.youtube}
           onClose={() => {
             setPublishOne(null)
             if (activeVideo) refreshClips(activeVideo)
-            if (activeVideo) void refreshRemake(activeVideo)
           }}
         />
       )}
@@ -591,23 +519,10 @@ export default function ClipStudio({
         <PublishAllDialog
           clips={shownClips}
           provider={publishProvider}
+          providerReady={publishReady}
           onClose={() => {
             setPublishing(false)
             if (activeVideo) refreshClips(activeVideo)
-            if (activeVideo) void refreshRemake(activeVideo)
-          }}
-        />
-      )}
-
-      {remakeOpen && (
-        <RemakeDialog
-          videoId={remakeOpen}
-          title={videos.find((v) => v.video_id === remakeOpen)?.title || remakeOpen}
-          onClose={() => setRemakeOpen(null)}
-          onQueued={() => {
-            setRemakeOpen(null)
-            setRemakeNotice(null) // the last run's, until this one is done
-            if (activeVideo) void refreshRemake(activeVideo)
           }}
         />
       )}

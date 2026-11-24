@@ -196,10 +196,10 @@ export function editPostingLines(
   if (channel.mode === 'auto')
     out.push(
       tr(
-        'This channel posts clips as Clips Kitty made them, without waiting for you. Suggested edits wait in the editor, and Clips Kitty doesn’t put one into a clip until you use it and apply your edits. Using one later changes the clip in Clips Kitty. Posts that already went out stay as they were, and a later re-send of that clip sends the edited one.'
+        'This channel posts clips as Clips Kitty made them, without waiting for you. Suggested edits are kept with each clip, and Clips Kitty doesn’t put one into a clip by itself. Using one in the editor comes in a later update.'
       )
     )
-  else if (channel.mode === 'ask') out.push(tr('Suggested edits wait for you in the editor. Check them before you publish.'))
+  else if (channel.mode === 'ask') out.push(tr('Suggested edits are kept with each clip. Using one in the editor comes in a later update.'))
   out.push(
     tr(
       'Clips are made after every plugin has answered. Each one can add up to its time limit (shown in the Marketplace) before this channel’s clips are ready.'

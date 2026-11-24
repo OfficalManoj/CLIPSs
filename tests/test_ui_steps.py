@@ -289,15 +289,14 @@ def test_the_watch_editor_sends_kept_edit_plugins_back_and_clears_them_when_off(
 
 def test_edit_posting_lines_say_suggestions_wait_and_clips_wait_for_every_plugin(tmp_path):
     """A watched channel with Suggest edits: an automatic one posts clips as
-    they were made, so it says the suggestions wait and what a later Use
-    does; one that asks says to check them; each says the clips wait for
+    they were made, so it says the suggestions are kept and never put in by
+    themselves; one that asks says they are kept; each says the clips wait for
     every plugin's answer. Through t(), like the steps' posting lines."""
     kept = {"edit": [{"id": "fixture-dev/trimmer"}]}
-    auto = ("This channel posts clips as Clips Kitty made them, without waiting for you. Suggested edits wait in "
-            "the editor, and Clips Kitty doesn’t put one into a clip until you use it and apply your edits. Using "
-            "one later changes the clip in Clips Kitty. Posts that already went out stay as they were, and a later "
-            "re-send of that clip sends the edited one.")
-    ask = "Suggested edits wait for you in the editor. Check them before you publish."
+    auto = ("This channel posts clips as Clips Kitty made them, without waiting for you. Suggested edits are kept "
+            "with each clip, and Clips Kitty doesn’t put one into a clip by itself. Using one in the editor comes in "
+            "a later update.")
+    ask = "Suggested edits are kept with each clip. Using one in the editor comes in a later update."
     wait = ("Clips are made after every plugin has answered. Each one can add up to its time limit (shown in the "
             "Marketplace) before this channel’s clips are ready.")
     cases = [

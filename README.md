@@ -190,10 +190,10 @@ conservative: a catchphrase has to actually repeat before it counts, knowledge t
 stops being mentioned goes dormant, and every score contribution from it is additive,
 capped, and can be switched off.
 
-**Video editor.** Non-destructive: trims, internal cuts, mutes, muted words, volume,
-fades, speed, hook text, music, and watermark are stored as operations and applied at
-render time. There's an AI edit chat too (*"make it 5 seconds longer"*, *"the caption
-says gost, it should say ghost"*), where the model proposes and validated code applies.
+**Video editor.** Clips Kitty Editor, built on the open-source Concat editor, opens each
+clip on a timeline: cuts, mutes, volume, fades, speed, captions, music, colour looks,
+titles and images over the video. Subtitles and dubbing in other languages are there too.
+The AI edit chat comes back in a later update.
 
 **Long-form processing.** An opt-in 16:9 path using the same analysis: horizontal
 clips, X/Twitter-length cuts, a best-of highlight reel, or the full stream with dead
@@ -244,7 +244,8 @@ through Ollama.
   position, words per line, casing, or off). Fix a transcription mistake line by line
   before export. With two people talking, the second speaker's captions can take
   another colour, and one it gets wrong can be switched by hand.
-- **AI edit chat**: describe what's wrong in plain language and it re-edits.
+- **AI edit chat** (coming back in a later update): describe what's wrong in plain
+  language and it re-edits.
 - **Ask Clips Kitty**: the text box at the bottom of the dashboard. Say what you want in
   a sentence, such as *"clip this stream, make sure you include when I died to the boss,
   with big yellow captions"*, and it queues the video, tells the clip picker what to look
@@ -261,7 +262,7 @@ through Ollama.
 - **Watermark and branding profiles**: per-creator defaults applied automatically.
 - **Model manager**: swap the AI brain from inside the app; download, remove, and
   switch models with progress bars and no terminal.
-- **Publish to YouTube from the editor**: title, description, tags, thumbnail,
+- **Publish to YouTube from the Publish window**: title, description, tags, thumbnail,
   playlist, audience and visibility, then Upload now or schedule it. Optional, off
   by default, and it uses your own Google API key.
 - **In-app feedback**: bug reports with auto-collected diagnostics, no account needed.
@@ -352,7 +353,7 @@ npm install
 npm run dev        # opens the Clips Kitty desktop app
 ```
 
-The app starts its own Python engine automatically. Paste a link in **Clip Editor**,
+The app starts its own Python engine automatically. Paste a link on the **Dashboard**,
 press *Generate clips*, and watch the progress live.
 
 Building the installer yourself is one command. See
@@ -522,11 +523,11 @@ Want a language that isn't here? [#61](../../issues/61).
 
 ## Publish to YouTube
 
-Off by default. Turn it on in **Settings → Publish to YouTube** and a **YouTube**
-tab appears in the editor: fill in the title, description, tags, thumbnail,
-playlist, audience and visibility, then press **Upload now**. Clips Kitty renders
-the clip if you have unsaved edits and uploads it straight to your channel. There
-is no export step and no separate publishing page. You never leave the editor.
+Off by default. Turn it on in **Settings → Publish to YouTube** and a clip's
+**Publish** window (on the Clips page or in the editor) gets a **YouTube (direct
+upload)** section: fill in the title, description, tags, thumbnail, playlist,
+audience and visibility, then press **Upload now**. Clips Kitty uploads the clip
+straight to your channel. There is no export step and no separate publishing page.
 
 If you leave it switched off, nothing changes anywhere in the app.
 
@@ -595,10 +596,10 @@ classifies a video as a Short from its shape and length on its own.
 ## Publish to every platform at once
 
 Also off by default. Turn it on in **Settings → Publish through WoopSocial**
-and a **Publish** tab appears in the editor: pick your platforms — or press
-**Everywhere** — write the title and description once, and one upload goes to
+and a clip's **Publish** window (on the Clips page or in the editor) lets you
+pick your platforms — or press **Everywhere** — and one upload goes to
 YouTube, TikTok, Instagram, Facebook, X, Threads, LinkedIn, Pinterest and
-Bluesky together. **Publish all** in the Clip Editor does a whole batch,
+Bluesky together. **Publish all** on the Clips page does a whole batch,
 spaced out so a dozen clips do not land at the same second.
 
 This one is **not local**. The clip and its details are sent to a publishing

@@ -575,7 +575,7 @@ export default function Dashboard({
                                   <button
                                     className="text-left text-accent hover:underline"
                                     onClick={() => onOpenInStudio(v.video_id, c.id)}
-                                    title={t("Open this clip in Clip Editor")}
+                                    title={t("Open this clip in Clips")}
                                   >
                                     {c.title || c.hook || 'Untitled'}
                                   </button>{' '}

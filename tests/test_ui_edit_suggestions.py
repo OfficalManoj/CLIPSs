@@ -4,8 +4,9 @@ The TypeScript runs under Node here, as tests/test_ui_steps.py runs
 lib/steps.ts, and is checked against the engine's own code: the shared cases
 in tests/fixtures/edit_marks/ that plugins/edit_marks.py records a render
 by, and video_editor/timeline.py, which renders the edit. The editor has no
-React test harness, so the parts that live in TimelineEditor.tsx and the
-job form are checked in their source.
+React test harness, so the parts that live in the job form are checked in
+their source. Quick edit (TimelineEditor.tsx), which drew the suggestion
+cards, is gone since step KC; they come back in the editor's panel (KP2).
 
 Times in a suggestion are seconds of the video; the editor's are seconds of
 the clip. The clip here is 100-130 s of a Quarkbloom Arena (a made-up game)
@@ -128,9 +129,7 @@ def test_a_suggestion_reads_in_the_editors_own_words(tmp_path):
     lib = (LIB / "editSuggestions.ts").read_text(encoding="utf-8")
     names = re.search(r"const LAYOUTS: Record<string, string> = \{(.*?)\}", lib).group(1)
     layouts = dict(re.findall(r"(\w+): '([^']+)'", names))
-    buttons = dict(re.findall(r"\['(\w+)', '([^']+)',", _source("TimelineEditor.tsx")))
     assert layouts == {"track": "Auto (AI)", "letterbox": "Letterbox", "center": "Center"}
-    assert all(buttons.get(key) == name for key, name in layouts.items())
     card = got[6]
     assert card["title"] == "Suggested by Quarkbloom Trimmer 1.0.0"
     assert card["parts"] == got[0]
@@ -262,9 +261,6 @@ def test_a_suggested_mute_hides_the_words_inside_it(tmp_path):
     assert got[5] == ["Mutes 1 part · captions are unchanged"]
     # "burst" (9.0-9.4) starts inside this span but its middle doesn't: not hidden, and the card agrees.
     assert got[6] == [] and got[7] == ["Mutes 1 part · captions are unchanged"]
-    editor = _source("TimelineEditor.tsx")
-    assert "const wordMuted = (w: Word): boolean => isWordMuted(edit, w)" in editor
-    assert "const toggleWord = (w: Word): void => push(toggledWord(edit, w, duration))" in editor
 
 
 def test_a_hand_word_mute_still_toggles_off_after_a_use_over_it(tmp_path):
@@ -353,9 +349,6 @@ def test_a_layout_is_never_set_on_gaming_vertical_live_or_landscape_clips(tmp_pa
         # The rest of the suggestion is used; the layout stays as it is, and Take it back never sets one.
         assert answer == {"layout": "track", "crop": False, "fade": 0.5, "notes": [note], "useOff": "",
                           "onlyOff": "Nothing in this suggestion can be used on this clip.", "back": "center"}
-    editor = _source("TimelineEditor.tsx")
-    assert ("noLayout: isLandscape ? 'landscape' : isVerticalLive ? 'vertical_live' : gaming ? 'gaming' : undefined"
-            in editor)
 
 
 def test_an_unrounded_window_gives_no_made_before_note(tmp_path):
@@ -416,12 +409,6 @@ def test_use_is_off_under_one_second_and_warns_under_the_shortest_clip(tmp_path)
         [off, []],
         [off, []],
     ]
-    cards = _source("EditSuggestions.tsx")
-    assert "disabled={busy || Boolean(card.useOff)}" in cards
-    # The editor never draws a suggestion its card turns Use off for, so it never writes an empty keep.
-    editor = _source("TimelineEditor.tsx")
-    assert re.search(r"const off = suggestionView\.cards\.find\(\(c\) => c\.id === id\)\?\.useOff\s*"
-                     r"if \(off\) \{\s*setNotice\(off\)\s*return", editor)
 
 
 def test_use_waits_for_the_clips_words_when_the_suggestion_mutes(tmp_path):
@@ -442,10 +429,6 @@ def test_use_waits_for_the_clips_words_when_the_suggestion_mutes(tmp_path):
     assert read["useOff"] == "" and read["parts"] == ["Mutes 1 part · hides 1 word in the captions"]
     assert none["useOff"] == "" and none["parts"] == ["Mutes 1 part · captions are unchanged"]
     assert fade["useOff"] == ""
-    editor = _source("TimelineEditor.tsx")
-    assert "words: wordsRead ? words : undefined," in editor
-    assert re.search(r"setWords\(r\.words\)\s*setWordsRead\(true\)", editor)
-    assert re.search(r"setWordsRead\(false\)\s*api\s*\.clipWords\(clip\.id\)", editor)
 
 
 # ---- Take it back, Undo and Reset ------------------------------------------------------------------
@@ -489,9 +472,6 @@ def test_take_it_back_takes_out_only_the_suggestions_parts_after_a_mixed_session
     assert got["held"] == {"removed": [], "mutes": [], "muted_words": [], "values": {}}
     # Straight after the Use, Take it back gives the creator's edit back exactly.
     assert got["right"] == got["start"]
-    editor = _source("TimelineEditor.tsx")
-    assert "pushSuggestion(back.state.edit, back.state.layout, { id, kind: 'take_back', delta: session })" in editor
-    assert "fromApplied(entry.applied, clip.start_s)" in editor
 
 
 def test_take_it_back_puts_back_a_suggested_trim_of_either_end(tmp_path):
@@ -575,18 +555,6 @@ def test_a_used_suggestion_taken_back_but_not_applied_offers_no_hide(tmp_path):
     sid = case["entries"][0]["id"]
     assert edit_marks.still_held(case["entries"], sid, case["before"], case["window"]) is True
     assert edit_marks.still_held(case["entries"], sid, case["after"], case["window"]) is False
-    editor = _source("TimelineEditor.tsx")
-    assert "edit: { ...defaultEdit(duration), ...(baked ?? {}) }," in editor
-
-
-def test_a_suggestion_step_holds_the_layout_only_when_it_changes_it():
-    """Layout buttons push no Undo step, so a Use or Take it back that left the
-    layout alone mustn't hold one: its Undo would take back a layout the
-    creator chose by hand since."""
-    editor = _source("TimelineEditor.tsx")
-    step = "const step: Past = nextLayout !== layout ? { edit, layout, suggestion: mark } : { edit, suggestion: mark }"
-    assert step in editor
-    assert "setHistory((h) => pushed<Past>(h, step))" in editor
 
 
 def test_reset_and_undo_clear_the_use_mark_and_later_edits_keep_it(tmp_path):
@@ -622,15 +590,6 @@ def test_reset_and_undo_clear_the_use_mark_and_later_edits_keep_it(tmp_path):
     assert got["reset"][0]["layout"] == "track" and got["reset"][1]["edit"]["keep"] == [[0, 2], [6.5, 30]]
     assert got["kept"] is True  # the history it was given is left as it was
     assert got["afterReset"] is None
-    editor = _source("TimelineEditor.tsx")
-    assert ("type Past = { edit: EditData; layout?: string; suggestion?: UseMark } | { speakers: SpeakerTurn[] | null }"
-            in editor)
-    assert "setHistory((h) => pushed<Past>(h, { edit }))" in editor
-    assert "setUses((u) => marksAfterUndo(u, mark))" in editor
-    assert "if (last.layout !== undefined) setLayout(last.layout)" in editor
-    assert re.search(r"setUses\(\{\}\)\s*"
-                     r"setHistory\(\(h\) => withoutMarks\(h\.filter\(\(step\) => 'edit' in step\)\)\)", editor)
-    assert re.search(r"setHistory\(\[\]\)\s*setUses\(\{\}\)", editor)  # another clip starts with none
 
 
 # ---- what Apply records ------------------------------------------------------------------------------
@@ -656,9 +615,6 @@ def test_apply_sends_what_each_use_added_and_the_api_takes_it(tmp_path):
     assert got[2] is None and got[3] is None
     for sent in got[:2]:
         assert _norm(edit_marks.clean_used(sent)) == _norm(sent)
-    editor = _source("TimelineEditor.tsx")
-    assert "await api.rerenderClip(clip.id, undefined, renderOpts, usedSuggestions())" in editor
-    assert "pendingRender={dirty ? { render_opts: buildRenderOpts(), suggestions: usedSuggestions() } : null}" in editor
     assert "render_first: pendingRender ?? null" in _source("YouTubePanel.tsx")
     api = (LIB / "api.ts").read_text(encoding="utf-8")
     assert "...(suggestions ? { suggestions } : {})" in api
@@ -781,8 +737,6 @@ def test_the_cards_read_every_state_a_rerun_leaves(tmp_path):
                 assert actions in (["take_back"], ["hide"]) and not remade
             seen.add("remade" if e.get("remade") else e["state"])
     assert seen == {"new", "used", "hidden", "remade"}
-    editor = _source("TimelineEditor.tsx")
-    assert "await api.rerenderClip(clip.id)\n" in editor  # Make it again: the saved options, no new ones
 
 
 # ---- the clip's length, as the render makes it -------------------------------------------------------
@@ -838,8 +792,8 @@ def test_the_promise_sentence_is_in_the_switch_title():
     marketplace = (LIB / "marketplace.ts").read_text(encoding="utf-8")
     promise = re.search(r"export const SUGGESTION_PROMISE =\s*'([^']*)'", marketplace)
     assert promise
-    assert promise.group(1) == ("Clips Kitty doesn’t put a suggestion into a clip until you use it in the editor and "
-                                "apply your edits (Apply edits, or Apply edits & upload).")
+    assert promise.group(1) == ("Clips Kitty doesn’t put a suggestion into a clip by itself. Using one in the editor "
+                                "comes in a later update.")
     form = _source("queue/AddVideos.tsx")
     switch = re.search(r"key: 'edit',\s*label: 'Suggest edits',\s*hint: '\(Marketplace\)',\s*title:\s*'([^']*)'", form)
     assert switch and promise.group(1) in switch.group(1)

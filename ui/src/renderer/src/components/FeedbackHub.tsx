@@ -20,7 +20,7 @@ type Kind = 'bug' | 'feature' | 'improvement'
 
 const AREAS = [
   ['ui', 'The app’s look & controls'],
-  ['video-editor', 'The clip editor'],
+  ['video-editor', 'Clips Kitty Editor'],
   ['ai', 'AI results (clips picked, captions, titles)'],
   ['performance', 'Speed / freezes'],
   ['youtube', 'YouTube videos'],

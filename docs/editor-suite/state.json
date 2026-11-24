@@ -2789,6 +2789,69 @@
           "evidence": "ruff and compileall clean on the changed Python; the CI light suite (PYTHONUTF8=1) has the same 3 failures as the baseline before any change (test_plugin_docs 1, test_plugin_sdk_new 2); tests/test_kitty_editor_routes.py passes with FastAPI (system Python; the light venv skips it); npm run typecheck and npm run build pass"
         }
       ]
+    },
+    {
+      "id": "KC",
+      "title": "One editor: Clips, subtitles and dubbing in the editor, YouTube in the Publish window, Quick edit deleted (plan steps KC and KR's removal)",
+      "size": "M",
+      "scope": "From the owner's F1 click-through (\"it still says clip editor when it should say clips and the old editor is still there i don't need anymore if you put the stuff that is missing into the new editor subbing and dubbing\"; \"the subs and dubs should be in the editor and not clog the clips menu\"): rename the page to Clips; \"Other languages...\" in the Editor page's strip opens MultilingualExport unchanged; the caption lines follow the editor's words on export; YouTube direct upload and Published links inside the one-clip Publish window; delete Quick edit. Concat's own features count as parity",
+      "closes": [],
+      "depends_on": [
+        "FL3"
+      ],
+      "status": "in_progress",
+      "user_visible": true,
+      "acceptance": [
+        "The sidebar and the page's title say Clips; no UI string names the Clip Editor",
+        "TimelineEditor, EditorModal and every component and lib file used only by them are gone; the card's and the side panel's Edit open Clips Kitty Editor, and are off with \"Clips Kitty Editor wasn't found...\" in the tooltip when it is not found",
+        "Other languages... shows beside Publish for clip projects whose clip exists; it opens a modal window with MultilingualExport unchanged and the translated preview over the clip; the editor is hidden while it is open; Escape closes it and the focus goes back to the button",
+        "An export that replaces the clip saves the editor's caption words as the clip's caption lines when each recorded caption is found again one for one; otherwise the lines stay and the notice says so; the take-in never fails because of it",
+        "The one-clip Publish window has YouTube (direct upload) while it is on, with a frame picker for the thumbnail over the clip file's own length, and Published links",
+        "The Clips page's Make clips again... button and RemakeDialog are gone (his ask); the remake routes, core/remake.py and lib/remake.ts stay. The Clips page's Publish and Publish all are always shown, as the Editor page's Publish is; with no account connected the same window says how to connect one (his ask)",
+        "A caption line is matched only when its start and end both match within 0.05 s; a hook or text watermark at 0 s, a trimmed or split title, a missing line or every title emptied gives kept; followed removes the translations made from the old words",
+        "No engine route removed; plain auto-clipping unchanged"
+      ],
+      "files": [
+        "kitty_editor/build.py",
+        "kitty_editor/intake.py",
+        "server/kitty_editor_api.py",
+        "ui/src/renderer/src/App.tsx",
+        "ui/src/renderer/src/pages/ClipStudio.tsx",
+        "ui/src/renderer/src/pages/Editor.tsx",
+        "ui/src/renderer/src/pages/Dashboard.tsx",
+        "ui/src/renderer/src/components/ClipCard.tsx",
+        "ui/src/renderer/src/components/ClipEditor.tsx",
+        "ui/src/renderer/src/components/ApprovalCard.tsx",
+        "ui/src/renderer/src/components/SetupWizard.tsx",
+        "ui/src/renderer/src/components/LiveTextOverlay.tsx",
+        "ui/src/renderer/src/components/PublishAllDialog.tsx",
+        "ui/src/renderer/src/components/YouTubePanel.tsx",
+        "ui/src/renderer/src/components/YouTubeThumbnail.tsx",
+        "ui/src/renderer/src/components/editor/OtherLanguagesDialog.tsx",
+        "ui/src/renderer/src/lib/api.ts",
+        "ui/src/renderer/src/lib/editor.ts",
+        "ui/src/renderer/src/lib/publishSetup.ts",
+        "ui/src/renderer/src/lib/useDialogFocus.ts",
+        "tests/test_ui_editor_page.py",
+        "tests/test_kitty_editor_engine.py",
+        "tests/test_kitty_editor_routes.py",
+        "ui/src/renderer/src/components/RemakeDialog.tsx (deleted)",
+        "tests/test_ui_remake.py",
+        "tests/test_youtube_frame_cache.py",
+        "server/youtube_api.py"
+      ],
+      "notes": [
+        "Plan: the 2026-11-23 editor plan, rows KC and KR (his calls); evidence inv-parity.md, verify-code.md, mockups 03 and 05; his later call puts Other languages in the editor strip, not on the Clips page",
+        "Contract: docs/editor-suite/api/k2-editor.md, section KC",
+        "Deleted with Quick edit: TimelineEditor, EditorModal, ColorControls, FilterPicker, EditChat, EditSuggestions, FreeMusicPicker, UploadPostPanel, lib/captionEdits.ts, lib/speakerTurns.ts",
+        "Deferred: gaming layout switching and Remember for this creator (KG), Automatic framing (RF), Letterbox/Center, word tools, Swap speakers and the Vertical Live note (KP1), plugin suggested edits, the free music picker and Duck under voice (KP2), the AI edit chat (K6 with HyperFrames); Concat has none natively (Sharpen is not missing: the fork ships the Sharpen effect, concat.sharpen)",
+        "No plan step yet: Quick edit's per-clip Publish tab extras (per-platform text, first comment, per-platform status with refresh and retry, the Through switch), for the lead or the owner; Other languages burned onto the editor's export (the burn and dub are made from the clip as the AI made it; subtitle files follow the editor's words)",
+        "Release order: do not package before K3 bundles the editor; without it every Edit is off and subtitles and dubbing cannot be reached",
+        "Caption words are read from the project's saved concat.json: a word typed in the last moment before Export could be missed until the next export",
+        "README.md and its translations: links are pasted on the Dashboard; YouTube upload and the platforms are in the Publish window; the AI edit chat comes back later (fix round 1)",
+        "Fix round 4 (review r3, qc r3, his asks 3 and 4): both-ends caption match, all emptied is kept, followed removes stale translations, Sharpen dropped from the deferred lists, frame picker over the file's own length, stale docs; Make clips again... removed from the Clips page; Publish and Publish all always shown on the Clips page"
+      ],
+      "results": []
     }
   ]
 }

@@ -346,6 +346,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
             raise Failure("This clip's video could not be read.")
         canvas = {"width": info["width"], "height": info["height"],
                   "fps_num": info["fps_num"], "fps_den": info["fps_den"]}
+        captions = None
         if plain is not None:
             plan = {"pieces": [{"in": 0.0, "out": info["seconds"], "muted": False}], "speed": 1.0, "volume": 1.0,
                     "fade_in": 0.0, "fade_out": 0.0, "length": info["seconds"], "captions": [], "hook": None,
@@ -355,9 +356,10 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
             # Whether the clip burns captions: core.pipeline.captions_on's rule.
             wants = bool(clips_cfg.get("captions", True) and opts.get("captions", opts.get("job_captions", True)))
             style = opts.get("caption_style") or clips_cfg.get("caption_style")
-            lines = []
+            lines, own_lines = [], []
             if wants and clip_captions is not None:
-                lines = _spoken_by(clip_captions(row), opts, style)
+                own_lines = clip_captions(row)
+                lines = _spoken_by(own_lines, opts, style)
             watermark = opts["watermark"] if "watermark" in opts else clips_cfg.get("watermark")
             plan = build.plan_clip(
                 opts=opts, window=float(row["end_s"]) - float(row["start_s"]), base_seconds=info["seconds"],
@@ -365,6 +367,10 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                 captions=wants, music_file=_own_copy(_music_file(opts), home, "music"),
                 watermark=watermark if isinstance(watermark, dict) else None,
                 watermark_image=_own_copy(_logo_file(watermark), home, "watermark"))
+            if plan["captions"]:
+                # Kept so an export carries the retyped words back to the
+                # clip (KC); "follow" is None when they can't be matched.
+                captions = {"follow": build.caption_record(own_lines, plan)}
         with build.open_session(exe, home, [base.parent]) as editor_session:
             progress(0.9, force=True)
             project_dir = build.apply_clip_plan(editor_session, home, manifest["name"], canvas, base, plan)
@@ -372,7 +378,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         _drop_old_video(manifest, base)
         return {"canvas": canvas, "shape": _shape_of(info["width"], info["height"]), "project_dir": project_dir,
                 "notes": plan["notes"], "media": [], "clip": {**manifest["clip"], **stood_on},
-                "video_file": str(base), **made}
+                "video_file": str(base), "captions": captions, **made}
 
     def _kept_base(manifest: dict, key: str, target: Path) -> bool:
         """The clip's video made before from the same window, framing and

@@ -830,3 +830,234 @@ def test_a_clip_is_an_editor_export_by_where_its_file_is(lib):
     assert lib.db.project_export_of(2**70) is None and lib.db.project_export_of(999) is None
     assert core_state.in_project_exports(str(exports / ".." / "projects" / "a.mp4"), lib.data_dir)
     assert not core_state.in_project_exports(str(exports / "a.mp4"), None)
+
+
+# ---- KC: the words typed on the editor's captions go back to the clip ---------------------------
+
+
+def test_the_captions_given_to_a_project_are_recorded_one_for_one():
+    record = build.caption_record(LINES, plan({}))
+    ordered = sorted(LINES, key=lambda line: line["start"])
+    assert record["source"] == [{k: float(v) if k != "text" else v for k, v in line.items()} for line in ordered]
+    assert [line["text"] for line in record["lines"]] == [line["text"] for line in ordered]
+    # Cuts or a speed move the captions: they can't be matched safely, so none is recorded.
+    assert build.caption_record(LINES, plan({"edit": {"keep": [[0.0, 10.0], [15.0, 40.0]]}})) is None
+    assert build.caption_record(LINES, plan({"edit": {"speed": 1.5}})) is None
+    assert build.caption_record(LINES, plan({}, lines=[])) is None
+    assert build.caption_record(LINES[:2], plan({})) is None            # not one for one
+
+
+def _titles(manifest, lines, *, changes=None, moved=(), dropped=()):
+    """The editor's saved project: one text item per caption (its words
+    changed, moved or taken out), plus a hook title at 0 s."""
+    folder = Path(manifest["project_dir"])
+    folder.mkdir(parents=True, exist_ok=True)
+    items = [{"id": "c1", "kind": "video", "start": 0.0, "duration": 45.4, "trackId": "T1"},
+             {"id": "hook", "kind": "text", "start": 0.0, "duration": 3.0, "trackId": "t9",
+              "text": {"content": "WATCH THIS"}}]
+    for i, line in enumerate(lines):
+        if i in dropped:
+            continue
+        start = line["start"] + (2.0 if i in moved else 0.0)
+        items.append({"id": f"c{i + 10}", "kind": "text", "start": start, "duration": line["end"] - line["start"],
+                      "trackId": "t3", "text": {"content": (changes or {}).get(i, line["text"])}})
+    project = {"activeTimelineId": "tl1", "clips": [], "timelines": [{"id": "tl1", "clips": items}]}
+    (folder / "concat.json").write_text(json.dumps(project), encoding="utf-8")
+
+
+def _with_captions(lib, manifest):
+    record = build.caption_record(LINES, plan({}))
+    registry.update(lib.data_dir, manifest["id"], lambda m: m.update(captions={"follow": record}))
+    return registry.load(lib.data_dir, manifest["id"]), record
+
+
+def test_retyped_caption_words_become_the_clips_caption_lines(lib, fake_editor):
+    clip_id, old = lib.clip()
+    manifest, record = _with_captions(lib, lib.project(clip=(clip_id, old)))
+    _titles(manifest, record["lines"], changes={1: "  second  line, fixed "})
+    lib.export(manifest)
+    answer = lib.take(manifest)
+    assert answer["result"] == "replaced_clip" and answer["captions"] == "followed"
+    saved = json.loads(lib.row(clip_id)["render_opts"])["caption_lines"]
+    assert [line["text"] for line in saved] == ["first line", "second line, fixed", "across the cut", "cut away",
+                                                "after the cut"]
+    assert [(line["start"], line["end"]) for line in saved] == [(line["start"], line["end"])
+                                                                 for line in record["source"]]
+    assert registry.load(lib.data_dir, manifest["id"])["exports"][0]["captions"] == "followed"
+    assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is True
+    # A second export of the same project follows the clip's words from the first.
+    # (a title emptied in the editor takes its line out)
+    _titles(manifest, record["lines"], changes={0: " ", 1: "second line, fixed", 4: "after it all"})
+    lib.export(manifest, name="My clip 2.mp4")
+    assert lib.take(manifest, name="My clip 2.mp4")["captions"] == "followed"
+    saved = json.loads(lib.row(clip_id)["render_opts"])["caption_lines"]
+    assert [line["text"] for line in saved] == ["second line, fixed", "across the cut", "cut away", "after it all"]
+
+
+def test_captions_moved_or_taken_out_in_the_editor_keep_the_clips_lines(lib, fake_editor):
+    for n, case in enumerate(({"moved": (2,)}, {"dropped": (3,)})):
+        clip_id, old = lib.clip(name=f"clip_{n}.mp4", start=100.0 + n, end=140.0 + n)
+        manifest, record = _with_captions(lib, lib.project(clip=(clip_id, old)))
+        _titles(manifest, record["lines"], changes={0: "new words"}, **case)
+        lib.export(manifest)
+        answer = lib.take(manifest)
+        assert answer["result"] == "replaced_clip" and answer["captions"] == "kept", case
+        assert lib.row(clip_id)["render_opts"] == ""                    # the clip's lines as they were
+        assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is False, case
+
+
+def test_nothing_is_said_or_saved_when_the_words_are_the_same_or_there_were_no_captions(lib, fake_editor):
+    clip_id, old = lib.clip()
+    manifest, record = _with_captions(lib, lib.project(clip=(clip_id, old)))
+    _titles(manifest, record["lines"])
+    lib.export(manifest)
+    assert "captions" not in lib.take(manifest)
+    assert lib.row(clip_id)["render_opts"] == ""
+    # The record keeps "same" (every caption in place), so subtitle files need no question.
+    assert registry.load(lib.data_dir, manifest["id"])["exports"][-1]["captions"] == "same"
+    assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is True
+    # A project whose captions never matched the clip's lines (its own cuts or
+    # speed had moved them) says nothing: the person never touched them.
+    clip_id, old = lib.clip(name="clip_b.mp4", start=200.0, end=240.0)
+    manifest = lib.project(clip=(clip_id, old))
+    registry.update(lib.data_dir, manifest["id"], lambda m: m.update(captions={"follow": None}))
+    lib.export(manifest)
+    answer = lib.take(manifest)
+    assert answer["result"] == "replaced_clip" and "captions" not in answer
+    assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is False    # no record: asked
+    # No file to read (the editor never saved): kept, and the export is still the clip's video.
+    clip_id, old = lib.clip(name="clip_c.mp4", start=300.0, end=340.0)
+    manifest, record = _with_captions(lib, lib.project(clip=(clip_id, old)))
+    lib.export(manifest)
+    answer = lib.take(manifest)
+    assert answer["result"] == "replaced_clip" and answer["captions"] == "kept"
+
+
+# ---- KC: a title that is not a caption is never taken for one (review r3) ----------------------
+
+_TWO = [{"start": 0.0, "end": 2.0, "text": "first line"}, {"start": 2.2, "end": 5.0, "text": "second line"}]
+
+
+def _two_lines(lib, n):
+    clip_id, old = lib.clip(name=f"two_{n}.mp4", start=500.0 + n, end=540.0 + n)
+    manifest = lib.project(clip=(clip_id, old))
+    record = build.caption_record(_TWO, plan({}, lines=_TWO))
+    assert record is not None
+    registry.update(lib.data_dir, manifest["id"], lambda m: m.update(captions={"follow": record}))
+    return clip_id, registry.load(lib.data_dir, manifest["id"])
+
+
+def _texts(manifest, items):
+    folder = Path(manifest["project_dir"])
+    folder.mkdir(parents=True, exist_ok=True)
+    base = [{"id": "v", "kind": "video", "start": 0.0, "duration": 45.4, "trackId": "T1"}]
+    texts = [{"id": i, "kind": "text", "start": s, "duration": d, "text": {"content": words}}
+             for i, s, d, words in items]
+    (folder / "concat.json").write_text(json.dumps({"clips": base + texts}), encoding="utf-8")
+
+
+def test_a_watermark_or_hook_at_0s_never_becomes_the_first_caption(lib, fake_editor):
+    for n, other in enumerate((("wm", 0.0, 45.4, "@myhandle"), ("hook", 0.0, 3.0, "WATCH THIS"))):
+        clip_id, manifest = _two_lines(lib, n)
+        # The first caption title deleted; the watermark (or hook) starts at 0 s.
+        _texts(manifest, [other, ("c2", 2.2, 2.8, "second line")])
+        lib.export(manifest)
+        assert lib.take(manifest)["captions"] == "kept", other
+        assert lib.row(clip_id)["render_opts"] == ""
+        assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is False, other
+
+
+def test_every_caption_title_emptied_keeps_the_clips_lines(lib, fake_editor):
+    clip_id, manifest = _two_lines(lib, 10)
+    _texts(manifest, [("c1", 0.0, 2.0, " "), ("c2", 2.2, 2.8, "")])
+    lib.export(manifest)
+    assert lib.take(manifest)["captions"] == "kept"                   # never "followed" with no lines
+    assert lib.row(clip_id)["render_opts"] == ""
+    assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is False
+
+
+def test_a_split_caption_title_keeps_the_clips_lines(lib, fake_editor):
+    for n, halves in enumerate((("first line", "first line"), ("first", "line"))):
+        clip_id, manifest = _two_lines(lib, 20 + n)
+        _texts(manifest, [("c1", 0.0, 1.0, halves[0]), ("c1b", 1.0, 1.0, halves[1]),
+                          ("c2", 2.2, 2.8, "second line")])
+        lib.export(manifest)
+        assert lib.take(manifest)["captions"] == "kept", halves
+        assert lib.row(clip_id)["render_opts"] == ""
+
+
+def test_followed_words_remove_the_translations_made_before(lib, fake_editor):
+    clip_id, manifest = _two_lines(lib, 30)
+    lib.db.save_translation(clip_id, "de", json.dumps([{"start": 0.0, "end": 2.0, "text": "erste Zeile"}]))
+    lib.db.save_translation(clip_id, "fr", json.dumps([{"start": 0.0, "end": 2.0, "text": "x"}]), edited=True)
+    _texts(manifest, [("c1", 0.0, 2.0, "first line, fixed"), ("c2", 2.2, 2.8, "second line")])
+    lib.export(manifest)
+    assert lib.take(manifest)["captions"] == "followed"
+    assert list(lib.db.translations_for(clip_id)) == []
+    # Words that stay the same keep the translations.
+    clip_id, manifest = _two_lines(lib, 31)
+    lib.db.save_translation(clip_id, "de", "[]")
+    _texts(manifest, [("c1", 0.0, 2.0, "first line"), ("c2", 2.2, 2.8, "second line")])
+    lib.export(manifest)
+    assert "captions" not in lib.take(manifest)
+    assert [r["language"] for r in lib.db.translations_for(clip_id)] == ["de"]
+
+
+# ---- KC: review r5's minors -------------------------------------------------------------------
+
+
+def test_a_hook_with_the_same_span_as_a_deleted_caption_never_becomes_it(lib, fake_editor):
+    """Review r5 #3: the hook (0-2.0 s) has the first caption's exact span.
+    With that caption title deleted, the hook is never taken for it; with
+    both kept, the clip keeps its lines too (the two can't be told apart)."""
+    made = plan({"edit": {"hook": {"text": "WATCH THIS", "seconds": 2.0}}}, lines=_TWO)
+    record = build.caption_record(_TWO, made)
+    assert record is not None and record["titles"] == [[0.0, 2.0]]
+    for n, items in enumerate(([("hook", 0.0, 2.0, "WATCH THIS"), ("c2", 2.2, 2.8, "second line, fixed")],
+                               [("hook", 0.0, 2.0, "WATCH THIS"), ("c1", 0.0, 2.0, "first line, fixed"),
+                                ("c2", 2.2, 2.8, "second line")])):
+        clip_id, old = lib.clip(name=f"hook_{n}.mp4", start=600.0 + n, end=640.0 + n)
+        manifest = lib.project(clip=(clip_id, old))
+        registry.update(lib.data_dir, manifest["id"], lambda m: m.update(captions={"follow": record}))
+        manifest = registry.load(lib.data_dir, manifest["id"])
+        _texts(manifest, items)
+        lib.export(manifest)
+        assert lib.take(manifest)["captions"] == "kept", n
+        assert lib.row(clip_id)["render_opts"] == ""
+        assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is False
+    # A text watermark over the whole clip is recorded the same way; a hook
+    # of another length leaves the captions free to follow.
+    marked = plan({}, lines=_TWO, watermark={"type": "text", "text": "@me"})
+    assert build.caption_record(_TWO, marked)["titles"] == [[0.0, marked["length"]]]
+    other = build.caption_record(_TWO, plan({"edit": {"hook": {"text": "x", "seconds": 3.0}}}, lines=_TWO))
+    assert other["titles"] == [[0.0, 3.0]]
+    clip_id, old = lib.clip(name="hook_9.mp4", start=650.0, end=690.0)
+    manifest = lib.project(clip=(clip_id, old))
+    registry.update(lib.data_dir, manifest["id"], lambda m: m.update(captions={"follow": other}))
+    manifest = registry.load(lib.data_dir, manifest["id"])
+    _texts(manifest, [("hook", 0.0, 3.0, "x"), ("c1", 0.0, 2.0, "first line, fixed"), ("c2", 2.2, 2.8, "second line")])
+    lib.export(manifest)
+    assert lib.take(manifest)["captions"] == "followed"
+
+
+def test_a_difference_in_spaces_alone_is_never_followed(lib, fake_editor):
+    """Review r5 #4: the clip's saved line has a double space (or a line
+    break); the title carries the same words. Nothing is saved and the
+    translations stay."""
+    spaced = [{"start": 0.0, "end": 2.0, "text": "first  line"}, {"start": 2.2, "end": 5.0, "text": "second\nline"}]
+    for n, titles in enumerate((("first  line", "second\nline"), ("first line", "second line"))):
+        clip_id, old = lib.clip(name=f"spaces_{n}.mp4", start=700.0 + n, end=740.0 + n)
+        lib.db.set_clip(clip_id, render_opts=json.dumps({"caption_lines": spaced}))
+        manifest = lib.project(clip=(clip_id, old))
+        record = build.caption_record(spaced, plan({}, lines=spaced))
+        assert record is not None
+        registry.update(lib.data_dir, manifest["id"], lambda m, record=record: m.update(captions={"follow": record}))
+        manifest = registry.load(lib.data_dir, manifest["id"])
+        lib.db.save_translation(clip_id, "fr", json.dumps([{"start": 0.0, "end": 2.0, "text": "corrige"}]),
+                                edited=True)
+        _texts(manifest, [("c1", 0.0, 2.0, titles[0]), ("c2", 2.2, 2.8, titles[1])])
+        lib.export(manifest)
+        assert "captions" not in lib.take(manifest), titles
+        assert json.loads(lib.row(clip_id)["render_opts"])["caption_lines"] == spaced
+        assert [r["language"] for r in lib.db.translations_for(clip_id)] == ["fr"]
+        assert intake.subtitles_follow(lib.data_dir, lib.row(clip_id)["path"]) is True

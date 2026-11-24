@@ -238,8 +238,8 @@ export function wordsInside(words: Word[] | undefined, mutes: Range[]): Word[] {
 }
 
 // ---- the editor's own word mute ------------------------------------------------------
-// Here, not in TimelineEditor.tsx, so tests can check that a Use never stops
-// a hand word mute toggling.
+// Kept for the editor's word tools (step KP1; Quick edit, which used it,
+// is gone), so tests can check that a Use never stops a hand word mute toggling.
 
 /** Whether the creator has muted this transcript word. */
 export function wordMuted(edit: Pick<EditData, 'muted_words'>, w: Word): boolean {
@@ -613,7 +613,8 @@ export function usedForRender(
 
 // ---- Use marks and the Undo history ------------------------------------------------------
 
-/** How many steps Undo keeps (TimelineEditor.tsx push). Use marks live
+/** How many steps Undo keeps (Quick edit's history, gone in KC; kept for
+ *  the suggestions' return in KP2). Use marks live
  *  outside the history, so a mark outlives its step. */
 export const UNDO_STEPS = 30
 

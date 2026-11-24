@@ -25,7 +25,7 @@ import type { FrameBox, GamingSettings } from '../lib/types'
 
 /** The Gaming / Reaction layout editor: pick a layout, mark the webcam and the
  *  game on real frames of the video, and see the 9:16 result before anything
- *  is processed (or, in the clip editor, before one clip is re-rendered).
+ *  is processed.
  *
  *  Every number in the preview comes from lib/gamingLayout.ts, a checked copy
  *  of the renderer's own geometry, so what it shows is what the clip will be:
@@ -34,7 +34,7 @@ import type { FrameBox, GamingSettings } from '../lib/types'
  *  platform's own UI.
  *
  *  Nothing is saved here: the result goes back to the caller, which sends it
- *  with the job (Generate bar) or as a pending edit (clip editor). */
+ *  with the job (Generate bar). */
 
 type BoxRole = 'cam' | 'cam2' | 'game' | 'ui'
 type CamMode = 'auto' | 'draw' | 'none'
@@ -336,8 +336,7 @@ export default function GamingLayoutEditor({
   }, [])
   useEffect(() => {
     // Esc belongs to this editor while it's open: out of fullscreen first,
-    // then closed. Without this, inside the clip editor Esc closed the whole
-    // clip editor underneath.
+    // then closed. Without this, Esc also closed whatever window holds it.
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape' || mini) return
       e.stopImmediatePropagation()

@@ -3,8 +3,8 @@
  *  way, the keyboard goes back to what opened it, so a keyboard user keeps
  *  their place.
  *
- *  First written for Make clips again (RemakeDialog), and used by the
- *  Publish window too (F1 U-1), which opens over the editor's area on the
+ *  First written for Make clips again's window (removed from the Clips page
+ *  in KC), and used by the Publish window (F1 U-1), which opens over the editor's area on the
  *  Editor page: Tab must never reach that hidden area behind it. */
 import { useEffect, useRef, type RefObject } from 'react'
 
@@ -29,6 +29,16 @@ export function useDialogFocus(
       returnTo?.current ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
     box.current?.focus()
     const key = (e: KeyboardEvent): void => {
+      // A window of its own opened over this one (the "changed in the
+      // editor" question over Other languages, KC) keeps its own keys.
+      const target = e.target
+      if (
+        target instanceof Element &&
+        box.current &&
+        !box.current.contains(target) &&
+        target.closest('[aria-modal="true"]')
+      )
+        return
       if (e.key === 'Escape') {
         escape.current()
         return

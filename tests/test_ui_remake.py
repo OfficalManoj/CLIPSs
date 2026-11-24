@@ -1,15 +1,18 @@
-"""Make clips again on screen (#190, editor-suite step 2): the Library's action
-and its dialog, built on the engine's contract in
-docs/editor-suite/api/step2-remake.md.
+"""Make clips again (#190, editor-suite step 2), built on the engine's
+contract in docs/editor-suite/api/step2-remake.md.
 
-- lib/remake.ts decides what the dialog starts from and posts, why the action
-  is off, and the words of its count. It runs under Node here, as
+The Clips page's "Make clips again..." button and its dialog are gone (his
+call, step KC: he never asked for them). The engine's routes, core/remake.py
+and the Queue row that says what a run did stay.
+
+- lib/remake.ts decides what a run starts from and posts, why it is off,
+  and the words of its count and result. It runs under Node here, as
   tests/test_ui_steps.py runs lib/steps.ts, and is held to the engine's own
   lists (core/remake.py REASONS and OPTIONS).
 - The screens have no React test harness, so what they must keep doing is
-  checked in their source: the action and its dialog, the Queue page's own
-  settings panel (which the dialog reuses) left as it was, Add videos'
-  Process again left as it was, and nothing new on screen bypassing t().
+  checked in their source: no button or dialog on the Clips page, the Queue
+  page's own settings panel left as it was, and Add videos' Process again
+  left as it was.
 """
 
 import json
@@ -232,110 +235,52 @@ def test_the_api_calls_match_the_routes():
     assert "method: 'POST'" in post and "body: JSON.stringify(options)" in post
 
 
-def test_the_library_offers_it_for_the_open_video_and_says_why_when_it_is_off():
+def test_the_clips_page_no_longer_offers_make_clips_again():
+    """Removed on his word (step KC): no button, no dialog, nothing reading
+    whether it could be used. The engine's routes stay (other callers, MCP,
+    tests), and so does lib/api.ts's client for them."""
+    assert not (UI / "components" / "RemakeDialog.tsx").exists()
     studio = _source("pages/ClipStudio.tsx")
-    action = studio[studio.index("onClick={() => activeVideo && setRemakeOpen(activeVideo)}"):]
-    action = action[: action.index("</button>")]
-    assert "{t('Make clips again…')}" in action
-    assert "disabled={!activeVideo || remakeWhy !== null}" in action
-    # Styled as the page's other video-level actions (Publish all).
-    assert re.search(r'<button\n\s*className="btn-ghost !py-1 !px-3 text-xs"\n'
-                     r"\s*onClick=\{\(\) => activeVideo && setRemakeOpen\(activeVideo\)\}", studio)
-    # Its tooltip: what is kept and what is replaced, or why it is off.
-    assert re.search(r"title=\{\s*remakeWhy \?\?\s*t\(\s*'Make this video’s clips again with other settings, "
-                     r"without adding it again\. Clips you edited, published or scheduled are kept; the others are "
-                     r"replaced once the new clips are ready\.'", action)
-    assert ("remake !== null && remake.video_id === activeVideo ? remakeBlocked(remake, t) : null" in studio)
-    # Read again when the video changes and whenever the queue does; only the
-    # latest read counts.
-    assert "if (e.type === 'queue' && activeVideo) void refreshRemake(activeVideo)" in studio
-    assert re.search(r"useEffect\(\(\) => \{\n\s*if \(activeVideo\) void refreshRemake\(activeVideo\)\n"
-                     r"\s*\}, \[activeVideo\]\)", studio)
-    assert "if (read === remakeRead.current) setRemake(preview)" in studio
+    for gone in ("Make clips again", "RemakeDialog", "refreshRemake", "remakePreview", "remakeNotice",
+                 "REMAKE_BUSY_RECHECK_MS", "../lib/remake"):
+        assert gone not in studio, gone
+    for screen in (UI / "components").rglob("*.tsx"):
+        assert "RemakeDialog" not in screen.read_text(encoding="utf-8"), screen
     # The clip list is still read again when a run ends (the replaced clips
-    # go, and an editor open on one closes), as it always was.
+    # go), as it always was.
     assert "if (e.type === 'job' && e.status === 'done' && activeVideo) refreshClips(activeVideo)" in studio
-    assert re.search(r"<RemakeDialog\s+videoId=\{remakeOpen\}", studio)
+    server = (ROOT / "server" / "api.py").read_text(encoding="utf-8")
+    assert '"/videos/{video_id}/remake"' in server
 
 
-def test_the_library_reads_it_again_when_a_publish_or_an_export_starts_or_ends():
-    """It is off while one of the video's clips is being published or
-    exported (blocked 'busy'): read again as one starts or ends, not at every
-    progress event."""
-    studio = _source("pages/ClipStudio.tsx")
-    assert re.search(r"if \(\n\s*activeVideo &&\n\s*\(\(e\.type === 'publish' && \(e\.phase === 'prepare' \|\| "
-                     r"e\.terminal !== undefined\)\) \|\|\n\s*\(e\.type === 'export' && e\.export !== undefined && "
-                     r"e\.export\.status !== 'running'\)\)\n\s*\)\n\s*void refreshRemake\(activeVideo\)", studio)
-    types = _source("lib/types.ts")
-    assert "blocked: 'running' | 'queued' | 'source_gone' | 'busy' | 'queue_full' | null" in types
 
 
-def test_the_library_reads_it_again_until_a_clip_in_use_is_free():
-    """Off as 'busy': most of what makes it busy sends no event when it ends
-    (a WoopSocial or Upload-Post publish, one clip or a batch, a watched
-    channel's publish, an Original export, a preview). So while it is busy
-    and that video is open, it is read again every few seconds, stopping
-    when the state or the video changes; closing either Publish dialog, and
-    Export all ending, read it again at once."""
-    studio = _source("pages/ClipStudio.tsx")
-    assert ("const remakeBusy = remake !== null && remake.video_id === activeVideo && remake.blocked === 'busy'"
-            in studio)
-    assert re.search(r"useEffect\(\(\) => \{\n\s*if \(!remakeBusy \|\| !activeVideo\) return\n"
-                     r"\s*const video = activeVideo\n"
-                     r"\s*const timer = window\.setInterval\(\(\) => void refreshRemake\(video\), "
-                     r"REMAKE_BUSY_RECHECK_MS\)\n"
-                     r"\s*return \(\) => window\.clearInterval\(timer\)\n"
-                     r"\s*\}, \[remakeBusy, activeVideo\]\)", studio)
-    every = int(re.search(r"^const REMAKE_BUSY_RECHECK_MS = (\d+)$", studio, re.M).group(1))
-    assert 1000 <= every <= 10000
-    closes = re.findall(r"<PublishAllDialog.*?onClose=\{\(\) => \{(.*?)\n\s*\}\}", studio, re.S)
-    assert len(closes) == 2 and all("if (activeVideo) void refreshRemake(activeVideo)" in c for c in closes)
-    export = studio[studio.index("const exportAll = async"):]
-    export = export[: export.index("\n  }\n")]
-    assert "if (activeVideo) void refreshRemake(activeVideo)" in export[export.index("} finally {"):]
+
+
 
 
 def test_a_clips_players_load_its_video_as_it_is_now():
     """A clip made again in place keeps its id: its /media URL carries the
     engine's media_version, which changes with its file, so the card, the
-    details panel and an open editor load the new video without a reload."""
+    details panel and the Other languages window load the new video without a reload."""
     api = _source("lib/api.ts")
     assert ("mediaUrl: (clipId: number, version?: string) =>\n    version\n"
             "      ? `${API_BASE}/media/${clipId}?v=${encodeURIComponent(version)}`\n"
             "      : `${API_BASE}/media/${clipId}`,") in api
     assert "media_version?: string" in _source("lib/types.ts")
-    for screen in ("components/ClipCard.tsx", "components/ClipEditor.tsx", "components/EditorModal.tsx"):
+    for screen in ("components/ClipCard.tsx", "components/ClipEditor.tsx", "components/editor/OtherLanguagesDialog.tsx"):
         source = _source(screen)
         assert "api.mediaUrl(clip.id, clip.media_version)" in source, screen
         assert "api.mediaUrl(clip.id)" not in source, screen
 
 
-def test_the_dialog_reuses_the_queue_pages_panel_without_longform():
-    dialog = _source("components/RemakeDialog.tsx")
-    panel = dialog[dialog.index("<QueueItemSettings"):]
-    panel = panel[: panel.index("/>")]
-    for prop in ("save={queue}", "onSaved={onQueued}", 'saveLabel="Make clips again"', 'savingLabel="Starting…"',
-                 "onCancel={onClose}", "noLongform"):
-        assert prop in panel, prop
-    assert "remakeStart(preview, seedOptions)" in dialog
-    assert "await api.remakeVideo(videoId, remakeOptions(start, patch))" in dialog
-    # The engine's own sentence when it refuses, not the raw response.
-    assert "throw new Error(errorText(e))" in dialog
-    # A stopped queue starts, as Add videos starts it; a running one is left.
-    assert "if (now?.paused) await api.resumeQueue()" in dialog
-    # "N will be replaced, M kept", with why in its tooltip.
-    assert "title={remakeCountTitle(counts, t)}" in dialog
-    assert "{t('will be replaced')}" in dialog and "{t('kept')}" in dialog
-    assert 'aria-modal="true"' in dialog and "aria-label={t('Make clips again')}" in dialog
 
 
-def test_the_keyboard_stays_in_the_dialog_and_goes_back_to_the_button():
-    """aria-modal is kept true: Tab and Shift+Tab cycle inside the dialog box,
-    never to the Library behind it, and closing it (Escape, Cancel, a click
-    outside or Make clips again) puts the keyboard back on what opened it."""
-    dialog = _source("components/RemakeDialog.tsx")
-    # The rule lives in lib/useDialogFocus.ts, shared with the Publish window (F1 U-1).
-    assert "useDialogFocus(box, onClose)" in dialog
+
+def test_the_keyboard_stays_in_a_window_and_goes_back_to_the_button():
+    """lib/useDialogFocus.ts (first made for Make clips again's dialog, now
+    the Publish window's): Tab and Shift+Tab cycle inside the window, and
+    closing it puts the keyboard back on what opened it."""
     hook = _source("lib/useDialogFocus.ts")
     assert "returnTo?.current ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)" in hook
     assert "if (opener && opener.isConnected && !(opener as HTMLButtonElement).disabled) opener.focus()" in hook
@@ -372,15 +317,11 @@ def test_the_queue_pages_panel_is_as_it_was_unless_asked():
 # ---- a video made as one whole clip (black-box S3) -------------------------------------------
 
 
-def test_a_whole_video_shows_as_a_switch_in_the_dialog():
+def test_a_whole_video_shows_as_a_switch_when_asked():
     """A video whose last run made the whole video one clip (a watched
-    channel's Twitch clips) has `whole` in its options. The dialog shows it,
-    on, as a switch to keep or turn off, so the run never uses a setting the
-    person can't see; off, the AI picks the moments. Only the dialog asks for
-    it: the Queue page and a watched channel's panel are as they were."""
-    dialog = _source("components/RemakeDialog.tsx")
-    panel = dialog[dialog.index("<QueueItemSettings"):]
-    assert "offerWhole" in panel[: panel.index("/>")]
+    channel's Twitch clips) has `whole` in its options. The panel shows it,
+    on, as a switch to keep or turn off, only when asked (offerWhole): the
+    Queue page and a watched channel's panel are as they were."""
     settings = _source("components/queue/QueueItemSettings.tsx")
     assert "const wholeShown = offerWhole && Boolean(s.whole)" in settings
     assert re.search(r"\{wholeShown &&\n\s*toggle\(\n\s*'Whole video',\n\s*'\(one clip\)',\n\s*whole,", settings)
@@ -477,20 +418,12 @@ def test_the_result_type_holds_what_the_engine_says():
     assert "result?: RemakeResult" in types[types.index("export interface StudioEvent {"):]
 
 
-def test_the_queue_row_and_the_library_say_what_it_did():
+def test_the_queue_row_says_what_it_did():
     item = _source("components/queue/QueueItem.tsx")
     start = item.index("{job.status === 'done' && job.result && (")
     row = item[start: item.index("\n          )}", start) + len("\n          )}")]
     assert "{t('Make clips again:')} {remakeResultText(job.result, t)}" in row
     assert untranslated(f"const A = () => (<div>{row}</div>)") == []
-    studio = _source("pages/ClipStudio.tsx")
-    assert re.search(r"if \(e\.type === 'job' && e\.status === 'done' && e\.result && e\.video_id === activeVideo\)\n"
-                     r"\s*setRemakeNotice\(`\$\{t\('Make clips again:'\)\} \$\{remakeResultText\(e\.result, t\)\}`\)",
-                     studio)
-    assert "{remakeNotice && <p className=\"text-sm text-accent\">{remakeNotice}</p>}" in studio
-    # Another video, or a new run of this one, and it goes.
-    assert re.search(r"setExportNotice\(null\)\n\s*setRemakeNotice\(null\)", studio)
-    assert "setRemakeNotice(null) // the last run's, until this one is done" in studio
 
 
 def test_process_again_in_add_videos_is_as_it_was():
@@ -499,11 +432,3 @@ def test_process_again_in_add_videos_is_as_it_was():
             "alongside them.')}") in form
     assert "onClick={() => generate(true, alreadyDone)}" in form and "{t('Process again')}" in form
     assert "remake" not in form.lower()
-
-
-def test_nothing_new_on_screen_bypasses_t():
-    assert untranslated(_source("components/RemakeDialog.tsx")) == []
-    studio = _source("pages/ClipStudio.tsx")
-    start = studio.index("{/* The whole video again, with other settings (#190).")
-    action = studio[start: studio.index("</button>", start) + len("</button>")]
-    assert untranslated(f"const A = () => (<div>{action}</div>)") == []

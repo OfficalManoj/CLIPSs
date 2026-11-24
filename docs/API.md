@@ -287,7 +287,7 @@ inputs and edits in outputs`. Each suggestion is kept in the clip's
 `scores.plugin_edits` ([below](#get-videosvideo_idclips)); the clip itself is
 made exactly as it would be without `edit`, and the edit step never writes a
 clip's `render_opts` (what a run writes to a clip it makes again is under
-**Clips the video already has**, below). Clips Kitty doesn’t put a suggestion into a clip until you use it in the editor and apply your edits (Apply edits, or Apply edits & upload).
+**Clips the video already has**, below). Clips Kitty doesn’t put a suggestion into a clip by itself. Using one in the editor comes in a later update.
 An edit plugin that couldn't run holds nothing back: its suggestions change
 no clip, so watched channels and `then` publish as they would without it.
 `{"clear": ["edit"]}` on `PATCH /jobs/{id}` drops it. The word means three
