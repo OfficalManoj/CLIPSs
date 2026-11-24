@@ -91,3 +91,25 @@ def test_mcp_tells_the_model_about_the_presets():
     assert style["size"]["enum"] == ["small", "medium", "large"]
     assert style["safe_zone"]["enum"] == list(caption_presets.SAFE_ZONE_CHOICES)
     assert not {"font", "font_size", "color", "uppercase", "highlight", "animation"} & set(style)
+
+
+def test_every_validator_takes_a_dragged_spot_and_refuses_one_off_the_frame():
+    from video_editor.project.env import AppEnv
+
+    assert _clean_caption_style({"x": 0.25, "y": 0.8, "position": "top"}) == {"position": "top", "x": 0.25, "y": 0.8}
+    assert _clean_caption_style({"x": "left", "y": True}) == {}
+    assert mcp._caption_style({"x": 0.25, "y": 1}) == {"x": 0.25, "y": 1.0}
+    for bad in ({"x": 1.5}, {"y": -0.1}, {"x": "left"}, {"y": True}):
+        with pytest.raises(ValueError):
+            mcp._caption_style(bad)
+    schema = json.dumps([t["inputSchema"] for t in mcp.TOOLS])
+    assert '"x": {"type": "number", "minimum": 0, "maximum": 1' in schema
+    env = AppEnv(db=None, data_dir=ROOT)
+    assert env.caption_style({"preset": "concat.impact", "x": 0.3, "y": 0.123456}) == {
+        "preset": "concat.impact", "x": 0.3, "y": 0.1235}
+    assert env.caption_style({"x": None}) == {}
+    for bad in ({"x": 2}, {"y": "low"}, {"y": False}):
+        with pytest.raises(ValueError):
+            env.caption_style(bad)
+    prompt = (ROOT / "config" / "prompts" / "edit_clip.txt").read_text(encoding="utf-8")
+    assert '"x", "y"' in prompt

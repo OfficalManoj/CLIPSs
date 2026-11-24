@@ -163,8 +163,9 @@ def _apply(
 
 def _clean_caption_style(style: dict) -> dict:
     """The AI's caption style, kept to what the renderer knows: one of the
-    editor's presets, its size and place, words per caption and a safe
-    zone (video/caption_presets.py). Anything else is dropped."""
+    editor's presets, its size and place (a named row, or x and y as shares
+    of the frame), words per caption and a safe zone
+    (video/caption_presets.py). Anything else is dropped."""
     from video import caption_presets
 
     out: dict = {}
@@ -180,6 +181,10 @@ def _clean_caption_style(style: dict) -> dict:
             out[key] = value.strip().lower()
     if _is_number(style.get("words_per_caption")):
         out["words_per_caption"] = int(max(1, min(6, float(style["words_per_caption"]))))
+    for key in caption_presets.POSITION_KEYS:
+        share = caption_presets.fraction(style.get(key))
+        if share is not None:
+            out[key] = share
     return out
 
 

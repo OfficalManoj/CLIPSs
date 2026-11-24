@@ -142,3 +142,72 @@ def test_no_karaoke_highlight_or_animation_is_left():
     source = (cp.PRESETS_PATH.parent.parent / "video" / "captions.py").read_text(encoding="utf-8")
     for gone in ("_karaoke", "_highlighted", "_animated", "karaoke_untimed", "ANIMATIONS", "WINDOWS_FONTS"):
         assert not re.search(rf"\b{gone}\b", source), gone
+
+
+# ---- a caption dragged on the preview (x, y) ----------------------------------------------------
+
+
+def _events(text: str) -> list[str]:
+    return [line for line in text.splitlines() if line.startswith("Dialogue:")]
+
+
+def test_a_style_with_no_spot_is_as_it_always_was():
+    for style in ({}, {"position": "top", "safe_zone": "reels"}, {"preset": "concat.block", "size": "large"}):
+        assert "x" not in cp.normalize(style) and "y" not in cp.normalize(style)
+        assert cp.look(style)["offsetX"] == 0.0 and cp.resolve(style)["x"] == 540
+
+
+def test_a_spot_is_kept_as_shares_of_the_frame():
+    assert {k: cp.normalize({"x": 0.25, "y": 0.6})[k] for k in ("x", "y")} == {"x": 0.25, "y": 0.6}
+    assert {k: cp.normalize({"x": 1.7, "y": -2})[k] for k in ("x", "y")} == {"x": 1.0, "y": 0.0}
+    for bad in (True, "0.3", None, float("nan"), [0.5]):
+        assert "x" not in cp.normalize({"x": bad})
+
+
+def test_a_dragged_caption_burns_where_it_was_put(tmp_path):
+    style = {"x": 0.35, "y": 0.6, "safe_zone": "off"}
+    r = cp.resolve(style)
+    assert (r["x"], r["y"]) == (round(1080 * 0.35), round(1920 * 0.6))
+    text = _ass(tmp_path, style)
+    assert all(f"\\an5\\pos({r['x']},{r['y']})" in e for e in _events(text))
+    # The lines wrap inside the frame around that centre: the margins give
+    # the width, the same on both sides of it.
+    assert r["x"] - (1080 - 2 * r["margin"]) / 2 >= cp.SIDE_MARGIN
+
+
+def test_a_dragged_caption_stays_inside_the_frame_and_clear_of_the_app():
+    for zone, area in cp.SAFE_ZONES.items():
+        for x, y in ((0.0, 0.0), (1.0, 1.0), (0.95, 0.5), (0.5, 0.99), (0.5, 0.02)):
+            r = cp.resolve({"x": x, "y": y, "safe_zone": zone, "size": "large"})
+            half = (1080 - 2 * r["margin"]) / 2
+            assert r["x"] - half >= cp.SIDE_MARGIN and r["x"] + half <= 1080 - area["right"], (zone, x, y)
+            assert r["y"] - 0.6 * r["em"] >= area["top"] + cp.SAFE_CLEARANCE - 0.5, (zone, x, y)
+            assert r["y"] + 0.6 * r["em"] <= 1920 - area["bottom"] - cp.SAFE_CLEARANCE + 0.5, (zone, x, y)
+            assert half * 2 >= cp.MIN_WIDTH * 1080 - 1
+    # Off, it only stays inside the frame; landscape has no zone.
+    r = cp.resolve({"x": 0.9, "y": 0.9, "safe_zone": "off"})
+    assert r["x"] + (1080 - 2 * r["margin"]) / 2 <= 1080 - cp.SIDE_MARGIN and r["y"] == round(1920 * 0.9)
+    wide = cp.resolve({"x": 0.3, "y": 0.25, "safe_zone": "tiktok"}, (1920, 1080))
+    assert (wide["x"], wide["y"]) == (round(1920 * 0.3), round(1080 * 0.25))
+    # At an edge it stops where lines MIN_WIDTH of the frame wide still fit.
+    edge = cp.resolve({"x": 0.0, "y": 0.5, "safe_zone": "off"})
+    assert 1080 - 2 * edge["margin"] >= cp.MIN_WIDTH * 1080 - 2 and edge["x"] < 300
+
+
+def test_a_named_place_sets_only_the_row():
+    across = cp.resolve({"x": 0.4})
+    assert across["y"] == cp.resolve({})["y"] and across["x"] == round(1080 * 0.4)
+    assert cp.resolve({"y": 0.5})["x"] == 540 and cp.resolve({"y": 0.5})["margin"] == cp.resolve({})["margin"]
+
+
+def test_the_editor_puts_a_dragged_caption_at_the_same_spot():
+    from kitty_editor.build import caption_column
+
+    for style in ({"x": 0.3, "y": 0.4}, {"x": 0.9, "y": 0.95, "safe_zone": "shorts", "preset": "concat.block"},
+                  {"x": 0.5, "y": 0.1, "safe_zone": "off"}):
+        look, row, _ = caption_look(style, (1080, 1920))
+        burned = cp.resolve(style)
+        assert round(1080 * (0.5 + caption_column(style, (1080, 1920)))) == burned["x"]
+        assert round(1920 * (0.5 + row)) == burned["y"]
+        assert look["maxWidth"] == pytest.approx((1080 - 2 * burned["margin"]) / 1080, abs=1e-4)
+    assert caption_column({}, (1080, 1920)) == 0.0

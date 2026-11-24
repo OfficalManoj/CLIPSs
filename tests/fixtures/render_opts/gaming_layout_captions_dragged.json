@@ -1,0 +1,14 @@
+{
+  "about": "Editor suite step KD: the gaming layout case (the default stacked layout, rendered by gaming/compose.py) with the job's captions on and dragged on the preview to the left of the game half (x 0.3, y 0.62): the ASS file places them there, clear of TikTok's buttons. Person detection is faked as in gaming_layout.",
+  "config": {"clips": {"gaming": true, "captions": true, "caption_style": {"x": 0.3, "y": 0.62, "safe_zone": "tiktok"}}},
+  "render_opts": {"gaming": {"panels": [], "cam": [0.0, 0.62, 0.26, 0.38], "by": "video"}},
+  "gaming": {
+    "frame": [1920, 1080],
+    "video_fps": 30.0,
+    "duration": 10.4,
+    "sample_fps": 8,
+    "samples": 80,
+    "people": [{"box": [40, 700, 460, 1080], "head": [170, 712, 300, 880], "head_cx": 0.12}],
+    "head_in_box": [235.0, 712.0, 880.0]
+  }
+}

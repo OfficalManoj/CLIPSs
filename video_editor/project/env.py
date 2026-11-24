@@ -135,14 +135,21 @@ class AppEnv(Env):
 
     def caption_style(self, style: dict) -> dict:
         """A caption style with only the keys the captions read
-        (video/caption_presets.py DEFAULT), each checked."""
+        (video/caption_presets.py DEFAULT, and a dragged x and y), each
+        checked."""
         from video import caption_presets as cp
 
         out = {}
         for key, value in style.items():
-            if key not in cp.DEFAULT:
-                raise ValueError(f"has no {str(key)[:40]!r}. It takes {', '.join(cp.DEFAULT)}")
-            if key == "preset":
+            if key not in cp.DEFAULT and key not in cp.POSITION_KEYS:
+                raise ValueError(f"has no {str(key)[:40]!r}. It takes {', '.join((*cp.DEFAULT, *cp.POSITION_KEYS))}")
+            if key in cp.POSITION_KEYS:
+                if value is None:
+                    continue            # back to the named place
+                if cp.fraction(value) is None or not 0 <= value <= 1:
+                    raise ValueError(f"{key} must be a number from 0 to 1 (a share of the frame)")
+                value = cp.fraction(value)
+            elif key == "preset":
                 if value not in cp.ids():
                     raise ValueError(f"preset {str(value)[:60]!r} is not one of the editor's text presets")
             elif key == "size":

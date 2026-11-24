@@ -291,6 +291,15 @@ export interface CaptionStyle {
   safe_zone?: CaptionSafeZone
 }
 
+/** Where a caption dragged on the preview sits: its block's centre, as
+ *  shares of the frame's width and height (0 to 1). Kept apart from
+ *  CaptionStyle because a style without them is the plain one (the named
+ *  position, in the middle across); null or absent puts the named place back. */
+export interface CaptionSpot {
+  x?: number | null
+  y?: number | null
+}
+
 export type CaptionSize = 'small' | 'medium' | 'large'
 
 export type CaptionSafeZone = 'off' | 'tiktok' | 'reels' | 'shorts'

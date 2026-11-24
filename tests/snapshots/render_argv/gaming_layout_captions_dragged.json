@@ -1,0 +1,513 @@
+{
+  "about": "Editor suite step KD: the gaming layout case (the default stacked layout, rendered by gaming/compose.py) with the job's captions on and dragged on the preview to the left of the game half (x 0.3, y 0.62): the ASS file places them there, clear of TikTok's buttons. Person detection is faked as in gaming_layout.",
+  "cpu": {
+    "commands": [
+      {
+        "argv": [
+          "ffmpeg",
+          "-y",
+          "-hwaccel",
+          "auto",
+          "-ss",
+          "10.00",
+          "-i",
+          "<SRC>",
+          "-t",
+          "10.40",
+          "-vsync",
+          "cfr",
+          "-af",
+          "aresample=async=1",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "veryfast",
+          "-crf",
+          "20",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-movflags",
+          "+faststart",
+          "<TMP>/clips/clip_00010-00020.source.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=width,height:stream_side_data=rotation",
+          "-of",
+          "default=nw=1",
+          "<TMP>/clips/clip_00010-00020.source.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffmpeg",
+          "-y",
+          "-i",
+          "<TMP>/clips/clip_00010-00020.source.mp4",
+          "-filter_complex",
+          "[0:v]crop=2:2:0:0,scale=1080:1920,setsar=1,drawbox=x=0:y=0:w=1080:h=1920:color=black:t=fill[base];[0:v]crop=1402:1080:518:0[e0s];[e0s]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,scale=135:240,gblur=sigma=12,scale=1080:1920:flags=bilinear,setsar=1[e0];[base][e0]overlay=0:0[l0];[0:v]crop=460:410:4:668,scale=1080:960:flags=lanczos,setsar=1[e1];[l0][e1]overlay=0:128[l1];[0:v]crop=1402:1080:518:0,split=2[e2b][e2f];[e2b]scale=1080:830:force_original_aspect_ratio=increase,crop=1080:830,scale=135:103,gblur=sigma=12,scale=1080:830:flags=bilinear,setsar=1[e2bg];[e2f]scale=1080:830:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1[e2fg];[e2bg][e2fg]overlay=(W-w)/2:H-h[e2];[l1][e2]overlay=0:1088[l2];[l2]format=yuv420p[v];[v]subtitles=clip_00010-00020.ass:fontsdir=fonts[v]",
+          "-map",
+          "[v]",
+          "-map",
+          "0:a:0?",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "veryfast",
+          "-crf",
+          "20",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-af",
+          "aresample=async=1,loudnorm=I=-14:TP=-1.5:LRA=11",
+          "-fps_mode",
+          "cfr",
+          "-movflags",
+          "+faststart+negative_cts_offsets",
+          "-shortest",
+          "<TMP>/clips/clip_00010-00020.pre-card.mp4"
+        ],
+        "via": "run",
+        "cwd": "<TMP>/clips",
+        "ass": {
+          "clip_00010-00020.ass": [
+            "[Script Info]",
+            "ScriptType: v4.00+",
+            "PlayResX: 1080",
+            "PlayResY: 1920",
+            "WrapStyle: 0",
+            "",
+            "[V4+ Styles]",
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+            "Style: Default,Montserrat Black,150,&H00FFFFFF,&H00FFFFFF,&H00000000,&H69000000,0,0,0,0,100,100,0,0,1,11.52,0,5,293,293,0,1",
+            "",
+            "[Events]",
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\fscx90\\fscy90\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}see"
+          ]
+        }
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-show_streams",
+          "-of",
+          "json",
+          "<TMP>/clips/clip_00010-00020.pre-card.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffmpeg",
+          "-y",
+          "-v",
+          "error",
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          "<TMP>/clips/clip_00010-00020.pre-card.cardlist.txt",
+          "-copyts",
+          "-c",
+          "copy",
+          "-movflags",
+          "+faststart+negative_cts_offsets",
+          "<TMP>/clips/clip_00010-00020.mp4"
+        ],
+        "via": "run",
+        "listing": {
+          "<TMP>/clips/clip_00010-00020.pre-card.cardlist.txt": [
+            "file '<TMP>/clips/clip_00010-00020.pre-card.mp4'",
+            "file '<TMP>/data/outro/outro2_1080x1920_30_yuv420p_48000_2.mp4'"
+          ]
+        }
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-select_streams",
+          "v:0",
+          "-read_intervals",
+          "%+#5",
+          "-show_entries",
+          "frame=pts_time",
+          "-of",
+          "csv=p=0",
+          "<TMP>/clips/clip_00010-00020.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-ignore_editlist",
+          "1",
+          "-select_streams",
+          "v:0",
+          "-read_intervals",
+          "%+#5",
+          "-show_entries",
+          "frame=pts_time",
+          "-of",
+          "csv=p=0",
+          "<TMP>/clips/clip_00010-00020.mp4"
+        ],
+        "via": "run"
+      }
+    ],
+    "calls": [
+      {
+        "detect.sample_tracks": {
+          "args": [
+            "<TMP>/clips/clip_00010-00020.source.mp4",
+            "yolov8n-pose.pt",
+            8
+          ]
+        }
+      },
+      {
+        "detect.head_in_box": {
+          "args": [
+            "<TMP>/clips/clip_00010-00020.source.mp4",
+            [
+              0.0,
+              0.62,
+              0.26,
+              0.38
+            ],
+            "yolov8n-pose.pt"
+          ]
+        }
+      }
+    ],
+    "returned": "<TMP>/clips/clip_00010-00020.mp4",
+    "render_opts": {
+      "gaming": {
+        "panels": [],
+        "cam": [
+          0.0,
+          0.62,
+          0.26,
+          0.38
+        ],
+        "by": "video",
+        "layout": "split",
+        "used_preset": "half",
+        "used_cam": [
+          0.0,
+          0.62,
+          0.26,
+          0.38
+        ],
+        "face": {
+          "top": true,
+          "bottom": true
+        }
+      },
+      "caption_style": {
+        "preset": "concat.bold-caption",
+        "size": "medium",
+        "position": "bottom",
+        "words_per_caption": 3,
+        "second_speaker": false,
+        "second_speaker_color": "#5CE1FF",
+        "safe_zone": "tiktok",
+        "x": 0.3,
+        "y": 0.62
+      }
+    },
+    "files": [
+      "clips/clip_00010-00020.mp4",
+      "data/outro/outro2_1080x1920_30_yuv420p_48000_2.mp4",
+      "source.mp4"
+    ]
+  },
+  "nvenc": {
+    "commands": [
+      {
+        "argv": [
+          "ffmpeg",
+          "-y",
+          "-hwaccel",
+          "auto",
+          "-ss",
+          "10.00",
+          "-i",
+          "<SRC>",
+          "-t",
+          "10.40",
+          "-vsync",
+          "cfr",
+          "-af",
+          "aresample=async=1",
+          "-c:v",
+          "h264_nvenc",
+          "-preset",
+          "p5",
+          "-rc",
+          "vbr",
+          "-cq",
+          "23",
+          "-b:v",
+          "0",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-movflags",
+          "+faststart",
+          "<TMP>/clips/clip_00010-00020.source.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=width,height:stream_side_data=rotation",
+          "-of",
+          "default=nw=1",
+          "<TMP>/clips/clip_00010-00020.source.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffmpeg",
+          "-y",
+          "-i",
+          "<TMP>/clips/clip_00010-00020.source.mp4",
+          "-filter_complex",
+          "[0:v]crop=2:2:0:0,scale=1080:1920,setsar=1,drawbox=x=0:y=0:w=1080:h=1920:color=black:t=fill[base];[0:v]crop=1402:1080:518:0[e0s];[e0s]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,scale=135:240,gblur=sigma=12,scale=1080:1920:flags=bilinear,setsar=1[e0];[base][e0]overlay=0:0[l0];[0:v]crop=460:410:4:668,scale=1080:960:flags=lanczos,setsar=1[e1];[l0][e1]overlay=0:128[l1];[0:v]crop=1402:1080:518:0,split=2[e2b][e2f];[e2b]scale=1080:830:force_original_aspect_ratio=increase,crop=1080:830,scale=135:103,gblur=sigma=12,scale=1080:830:flags=bilinear,setsar=1[e2bg];[e2f]scale=1080:830:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1[e2fg];[e2bg][e2fg]overlay=(W-w)/2:H-h[e2];[l1][e2]overlay=0:1088[l2];[l2]format=yuv420p[v];[v]subtitles=clip_00010-00020.ass:fontsdir=fonts[v]",
+          "-map",
+          "[v]",
+          "-map",
+          "0:a:0?",
+          "-c:v",
+          "h264_nvenc",
+          "-preset",
+          "p5",
+          "-rc",
+          "vbr",
+          "-cq",
+          "23",
+          "-b:v",
+          "0",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-af",
+          "aresample=async=1,loudnorm=I=-14:TP=-1.5:LRA=11",
+          "-fps_mode",
+          "cfr",
+          "-movflags",
+          "+faststart+negative_cts_offsets",
+          "-shortest",
+          "<TMP>/clips/clip_00010-00020.pre-card.mp4"
+        ],
+        "via": "run",
+        "cwd": "<TMP>/clips",
+        "ass": {
+          "clip_00010-00020.ass": [
+            "[Script Info]",
+            "ScriptType: v4.00+",
+            "PlayResX: 1080",
+            "PlayResY: 1920",
+            "WrapStyle: 0",
+            "",
+            "[V4+ Styles]",
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+            "Style: Default,Montserrat Black,150,&H00FFFFFF,&H00FFFFFF,&H00000000,&H69000000,0,0,0,0,100,100,0,0,1,11.52,0,5,293,293,0,1",
+            "",
+            "[Events]",
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+            "Dialogue: 0,0:00:00.02,0:00:00.55,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}so this is",
+            "Dialogue: 0,0:00:00.58,0:00:01.30,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}the part where",
+            "Dialogue: 0,0:00:01.33,0:00:02.05,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}it all goes",
+            "Dialogue: 0,0:00:02.10,0:00:03.58,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}wrong watch the",
+            "Dialogue: 0,0:00:03.62,0:00:05.05,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}left side, right",
+            "Dialogue: 0,0:00:05.10,0:00:07.02,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}there. no way",
+            "Dialogue: 0,0:00:07.10,0:00:08.35,Default,,0,0,0,,{\\fscx90\\fscy90\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}that just happened!",
+            "Dialogue: 0,0:00:08.92,0:00:09.70,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}chat did you",
+            "Dialogue: 0,0:00:09.75,0:00:09.98,Default,,0,0,0,,{\\an5\\pos(324,1190)\\xshad4.8\\yshad6.72}see"
+          ]
+        }
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-show_streams",
+          "-of",
+          "json",
+          "<TMP>/clips/clip_00010-00020.pre-card.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffmpeg",
+          "-y",
+          "-v",
+          "error",
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          "<TMP>/clips/clip_00010-00020.pre-card.cardlist.txt",
+          "-copyts",
+          "-c",
+          "copy",
+          "-movflags",
+          "+faststart+negative_cts_offsets",
+          "<TMP>/clips/clip_00010-00020.mp4"
+        ],
+        "via": "run",
+        "listing": {
+          "<TMP>/clips/clip_00010-00020.pre-card.cardlist.txt": [
+            "file '<TMP>/clips/clip_00010-00020.pre-card.mp4'",
+            "file '<TMP>/data/outro/outro2_1080x1920_30_yuv420p_48000_2.mp4'"
+          ]
+        }
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-select_streams",
+          "v:0",
+          "-read_intervals",
+          "%+#5",
+          "-show_entries",
+          "frame=pts_time",
+          "-of",
+          "csv=p=0",
+          "<TMP>/clips/clip_00010-00020.mp4"
+        ],
+        "via": "run"
+      },
+      {
+        "argv": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-ignore_editlist",
+          "1",
+          "-select_streams",
+          "v:0",
+          "-read_intervals",
+          "%+#5",
+          "-show_entries",
+          "frame=pts_time",
+          "-of",
+          "csv=p=0",
+          "<TMP>/clips/clip_00010-00020.mp4"
+        ],
+        "via": "run"
+      }
+    ],
+    "calls": [
+      {
+        "detect.sample_tracks": {
+          "args": [
+            "<TMP>/clips/clip_00010-00020.source.mp4",
+            "yolov8n-pose.pt",
+            8
+          ]
+        }
+      },
+      {
+        "detect.head_in_box": {
+          "args": [
+            "<TMP>/clips/clip_00010-00020.source.mp4",
+            [
+              0.0,
+              0.62,
+              0.26,
+              0.38
+            ],
+            "yolov8n-pose.pt"
+          ]
+        }
+      }
+    ],
+    "returned": "<TMP>/clips/clip_00010-00020.mp4",
+    "render_opts": {
+      "gaming": {
+        "panels": [],
+        "cam": [
+          0.0,
+          0.62,
+          0.26,
+          0.38
+        ],
+        "by": "video",
+        "layout": "split",
+        "used_preset": "half",
+        "used_cam": [
+          0.0,
+          0.62,
+          0.26,
+          0.38
+        ],
+        "face": {
+          "top": true,
+          "bottom": true
+        }
+      },
+      "caption_style": {
+        "preset": "concat.bold-caption",
+        "size": "medium",
+        "position": "bottom",
+        "words_per_caption": 3,
+        "second_speaker": false,
+        "second_speaker_color": "#5CE1FF",
+        "safe_zone": "tiktok",
+        "x": 0.3,
+        "y": 0.62
+      }
+    },
+    "files": [
+      "clips/clip_00010-00020.mp4",
+      "data/outro/outro2_1080x1920_30_yuv420p_48000_2.mp4",
+      "source.mp4"
+    ]
+  }
+}
