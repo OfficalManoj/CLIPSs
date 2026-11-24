@@ -491,6 +491,11 @@ def build_captions(
         else None
     )
 
+    pos_tag = ""
+    if opts.get("caption_y") is not None or opts.get("y_percent") is not None:
+        cy = float(opts.get("caption_y") if opts.get("caption_y") is not None else opts.get("y_percent"))
+        pos_tag = f"{{\\an5\\pos({canvas[0] // 2},{round(cy * canvas[1])})}}"
+
     dialogue = []
     for line in lines:
         text = str(line.get("text", "")).strip()
@@ -504,10 +509,10 @@ def build_captions(
             continue
         tint = second if second and line.get("speaker") else None
         if opts.get("highlight"):
-            dialogue.extend(_highlighted(text, start, end, spoken, opts, tint))
+            dialogue.extend(_highlighted(text, start, end, spoken, opts, tint, pos_tag))
         else:
             dialogue.append(
-                f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,0,,{_tinted(text, tint)}"
+                f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,0,,{pos_tag}{_tinted(text, tint)}"
             )
 
     if not dialogue:
@@ -548,7 +553,7 @@ def _tinted(text: str, tint: str | None) -> str:
 
 
 def _highlighted(
-    text: str, start: float, end: float, spoken: list[dict], opts: dict, tint: str | None = None
+    text: str, start: float, end: float, spoken: list[dict], opts: dict, tint: str | None = None, pos_tag: str = ""
 ) -> list[str]:
     """One Dialogue per word: the whole caption, with the word being spoken
     in the highlight colour. `tint` is the caption's own colour when it is
@@ -561,7 +566,7 @@ def _highlighted(
     tokens = text.split()
     times = _word_times(text, start, end, spoken)
     if len(tokens) < 2 or not times:
-        return [f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,0,,{_tinted(text, tint)}"]
+        return [f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,0,,{pos_tag}{_tinted(text, tint)}"]
 
     base = tint or _inline_color(opts["color"])
     hot = _inline_color(opts.get("highlight_color", DEFAULT_STYLE["highlight_color"]))
@@ -579,17 +584,15 @@ def _highlighted(
         )
         events.append(
             f"Dialogue: 0,{_ass_time(seg_start)},{_ass_time(seg_end)},Default,,0,0,0,,"
-            f"{{\\1c{base}}}{body}"
+            f"{pos_tag}{{\\1c{base}}}{body}"
         )
     return events
 
 
 def _header(opts: dict, canvas: tuple[int, int] = (1080, 1920)) -> str:
     if opts.get("caption_y") is not None or opts.get("y_percent") is not None:
-        cy = float(opts.get("caption_y") if opts.get("caption_y") is not None else opts.get("y_percent"))
-        alignment = 2
-        raw_margin_v = max(20, min(1900, round((1.0 - cy) * 1920)))
-        margin_v = raw_margin_v
+        alignment = 5
+        margin_v = 0
     else:
         alignment, margin_v = _POSITIONS.get(opts.get("position", "bottom"), _POSITIONS["bottom"])
     color = _ass_color(opts.get("color", "#FFFFFF"))

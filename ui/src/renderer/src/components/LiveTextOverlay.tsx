@@ -71,11 +71,16 @@ export default function LiveTextOverlay({
   // Frosted strip over text that's ALREADY burned into the preview file, so
   // the old caption/hook doesn't ghost through behind the pending one.
   const burnedLine = overlay.burned?.lines.find((l) => t >= l.start && t <= l.end)
-  const maskBand = (position: string, fontSizeAss: number, marginAss: number): JSX.Element => {
+  const maskBand = (
+    position: string,
+    fontSizeAss: number,
+    marginAss: number,
+    burnedCaptionY?: number
+  ): JSX.Element => {
     const size = Math.max(40, Math.min(140, fontSizeAss)) * s
     const band: React.CSSProperties =
-      st?.caption_y !== undefined
-        ? { top: `${st.caption_y * 100}%`, transform: 'translateY(-50%)', height: size * 3 }
+      burnedCaptionY !== undefined
+        ? { top: `${burnedCaptionY * 100}%`, transform: 'translateY(-50%)', height: size * 3 }
         : position === 'top'
           ? { top: Math.max(0, marginAss * s - size * 0.35), height: size * 3 }
           : position === 'middle'
@@ -108,7 +113,8 @@ export default function LiveTextOverlay({
         maskBand(
           overlay.burned.style.position,
           overlay.burned.style.font_size,
-          overlay.burned.style.position === 'top' ? 140 : 440
+          overlay.burned.style.position === 'top' ? 140 : 440,
+          overlay.burned.style.caption_y
         )}
       {overlay.burnedHook &&
         elapsed <= overlay.burnedHook.seconds &&

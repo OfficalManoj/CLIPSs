@@ -299,6 +299,9 @@ export default function TimelineEditor({
     ...DEFAULT_CAPTION_STYLE,
     ...(clip.render_opts?.caption_style ?? {})
   }
+  if (clip.render_opts?.gaming?.caption_y !== undefined) {
+    storedStyle.caption_y = clip.render_opts.gaming.caption_y
+  }
   const [captionStyle, setCaptionStyle] = useState<Required<CaptionStyle>>(storedStyle)
   // Whether this clip burns captions: its own switch, else the choice of the
   // job that made it (core/pipeline.py captions_on, #128).
@@ -611,7 +614,7 @@ export default function TimelineEditor({
   // Ctrl+scroll (and trackpad pinch) zooms around the cursor. Native
   // listener because React's root-level wheel handlers are passive —
   // preventDefault there can't stop the browser's page zoom.
-  const wheelZoom = useRef<(e: WheelEvent) => void>(() => {})
+  const wheelZoom = useRef<(e: WheelEvent) => void>(() => { })
   useEffect(() => {
     wheelZoom.current = (e: WheelEvent): void => {
       zoomTo(zoom * (e.deltaY < 0 ? 1.25 : 0.8), timeFromX(e.clientX))
@@ -1147,7 +1150,11 @@ export default function TimelineEditor({
     if (layoutDirty) renderOpts.crop = layout
     // null turns the split off for this clip; settings turn it on or change it.
     if (gamingDirty) renderOpts.gaming = gaming
-    if (styleDirty) renderOpts.caption_style = captionStyle
+    const effectiveStyle = {
+      ...captionStyle,
+      ...(gaming?.caption_y !== undefined ? { caption_y: gaming.caption_y } : {})
+    }
+    if (styleDirty || gaming?.caption_y !== undefined) renderOpts.caption_style = effectiveStyle
     if (captionsDirty) renderOpts.captions = captionsOn
     if (wmDirty) renderOpts.watermark = watermark
     const lines = pendingCaptionLines()
@@ -1605,11 +1612,10 @@ export default function TimelineEditor({
             {keep.map(([a, b], i) => (
               <div
                 key={i}
-                className={`absolute top-4 bottom-0 rounded-sm pointer-events-none ${
-                  i === playheadSeg && keep.length > 1
-                    ? 'bg-accent/60 ring-1 ring-accent'
-                    : 'bg-accent/25'
-                }`}
+                className={`absolute top-4 bottom-0 rounded-sm pointer-events-none ${i === playheadSeg && keep.length > 1
+                  ? 'bg-accent/60 ring-1 ring-accent'
+                  : 'bg-accent/25'
+                  }`}
                 style={{ left: pct(a), width: pct(b - a) }}
               />
             ))}
@@ -1649,9 +1655,8 @@ export default function TimelineEditor({
               <div className="absolute inset-y-0 -left-px w-0.5 bg-white shadow" />
               <div className="absolute top-0 -left-1.5 w-3 h-3 rounded-full bg-white shadow ring-1 ring-black/30" />
               <span
-                className={`absolute top-0 text-[10px] tabular-nums bg-black/70 text-white px-1 py-0.5 rounded whitespace-nowrap ${
-                  playhead / Math.max(duration, 0.1) > 0.85 ? 'right-2.5' : 'left-2.5'
-                }`}
+                className={`absolute top-0 text-[10px] tabular-nums bg-black/70 text-white px-1 py-0.5 rounded whitespace-nowrap ${playhead / Math.max(duration, 0.1) > 0.85 ? 'right-2.5' : 'left-2.5'
+                  }`}
               >
                 {fmt(playhead)}
               </span>
@@ -1759,11 +1764,10 @@ export default function TimelineEditor({
               role="tab"
               aria-selected={activeTab === t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`px-3 py-1.5 -mb-px border-b-2 whitespace-nowrap ${
-                activeTab === t.id
-                  ? 'border-accent text-accent font-medium'
-                  : 'border-transparent text-muted hover:text-ink'
-              }`}
+              className={`px-3 py-1.5 -mb-px border-b-2 whitespace-nowrap ${activeTab === t.id
+                ? 'border-accent text-accent font-medium'
+                : 'border-transparent text-muted hover:text-ink'
+                }`}
             >
               <span aria-hidden>{t.icon}</span> {t.label}
               {changed && <span className="text-accent"> •</span>}
@@ -1781,9 +1785,8 @@ export default function TimelineEditor({
                 setWordMode(mode === 'text' ? 'mute' : 'text')
                 setEditingWord(null)
               }}
-              className={`text-xs px-2.5 py-1 rounded-md ${
-                mode === 'text' ? 'bg-accent/20 text-accent font-medium' : 'bg-raised text-muted hover:text-ink'
-              }`}
+              className={`text-xs px-2.5 py-1 rounded-md ${mode === 'text' ? 'bg-accent/20 text-accent font-medium' : 'bg-raised text-muted hover:text-ink'
+                }`}
               title={t("Fix words the transcription got wrong — the burned caption text updates on Apply")}
             >
               <Pencil className="mr-1.5" />
@@ -1798,11 +1801,10 @@ export default function TimelineEditor({
                   setEditingWord(null)
                   lastSpeakerWord.current = null
                 }}
-                className={`text-xs px-2.5 py-1 rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
-                  mode === 'speaker'
-                    ? 'bg-accent/20 text-accent font-medium'
-                    : 'bg-raised text-muted hover:text-ink'
-                }`}
+                className={`text-xs px-2.5 py-1 rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${mode === 'speaker'
+                  ? 'bg-accent/20 text-accent font-medium'
+                  : 'bg-raised text-muted hover:text-ink'
+                  }`}
                 title={
                   canFixSpeakers
                     ? 'Put right who is talking: switch words to the other speaker’s colour, or back'
@@ -1844,9 +1846,8 @@ export default function TimelineEditor({
             </span>
           </div>
           <div
-            className={`max-h-28 overflow-y-auto bg-base rounded-md p-2 leading-6 ${
-              mode === 'speaker' ? 'select-none' : ''
-            }`}
+            className={`max-h-28 overflow-y-auto bg-base rounded-md p-2 leading-6 ${mode === 'speaker' ? 'select-none' : ''
+              }`}
           >
             {words.map((w, i) => {
               if (editingWord?.i === i) {
@@ -1891,15 +1892,14 @@ export default function TimelineEditor({
                         ? openWordBox(i, corrected?.to ?? w.word)
                         : toggleWord(w)
                   }
-                  className={`text-xs mr-1 rounded px-0.5 ${
-                    muted
-                      ? 'line-through text-red-400 bg-red-500/10'
-                      : corrected
-                        ? 'text-accent bg-accent/10'
-                        : inRemoved
-                          ? 'text-muted/40 line-through'
-                          : 'text-muted hover:text-ink hover:bg-raised'
-                  }`}
+                  className={`text-xs mr-1 rounded px-0.5 ${muted
+                    ? 'line-through text-red-400 bg-red-500/10'
+                    : corrected
+                      ? 'text-accent bg-accent/10'
+                      : inRemoved
+                        ? 'text-muted/40 line-through'
+                        : 'text-muted hover:text-ink hover:bg-raised'
+                    }`}
                   // A bar under the other speaker's words, in their caption
                   // colour. Not an underline: muted and cut words are struck
                   // through, and the two are one CSS property.
@@ -2003,75 +2003,75 @@ export default function TimelineEditor({
       {/* audio controls */}
       {activeTab === 'audio' && (
         <div className="flex items-center gap-3 flex-wrap text-xs">
-        {/* Proposes cuts into the normal edit list, so they are drawn on the
+          {/* Proposes cuts into the normal edit list, so they are drawn on the
             timeline and can be adjusted or undone before anything renders. */}
-        <button
-          className="btn-ghost !py-1 text-xs"
-          disabled={tightening}
-          title={t("Find pauses and filler words (um, uh) and cut them. The cuts appear on the timeline for you to check — nothing renders until you Apply.")}
-          onClick={async () => {
-            setTightening(true)
-            setTightenNote('')
-            try {
-              const r = await api.tightenClip(clip.id)
-              if (r.cuts === 0) {
-                setTightenNote('Nothing to trim — no dead air or filler found.')
-              } else {
-                push({ ...edit, keep: r.keep })
-                setTightenNote(
-                  `${r.cuts} cut(s), ${r.removed_seconds.toFixed(1)}s removed → ${r.new_duration.toFixed(1)}s. Undo if it took too much.`
-                )
+          <button
+            className="btn-ghost !py-1 text-xs"
+            disabled={tightening}
+            title={t("Find pauses and filler words (um, uh) and cut them. The cuts appear on the timeline for you to check — nothing renders until you Apply.")}
+            onClick={async () => {
+              setTightening(true)
+              setTightenNote('')
+              try {
+                const r = await api.tightenClip(clip.id)
+                if (r.cuts === 0) {
+                  setTightenNote('Nothing to trim — no dead air or filler found.')
+                } else {
+                  push({ ...edit, keep: r.keep })
+                  setTightenNote(
+                    `${r.cuts} cut(s), ${r.removed_seconds.toFixed(1)}s removed → ${r.new_duration.toFixed(1)}s. Undo if it took too much.`
+                  )
+                }
+              } catch (err) {
+                setTightenNote(`Error: ${err instanceof Error ? err.message : String(err)}`)
+              } finally {
+                setTightening(false)
               }
-            } catch (err) {
-              setTightenNote(`Error: ${err instanceof Error ? err.message : String(err)}`)
-            } finally {
-              setTightening(false)
-            }
-          }}
-        >
-          {tightening ? 'Finding…' : 'Trim pauses & filler'}
-        </button>
-        {tightenNote && <span className="text-muted">{tightenNote}</span>}
-        <label
-          className="flex items-center gap-1.5 cursor-pointer"
-          title={t("Remove ALL of the clip's audio — e.g. to post it with background music only")}
-        >
-          <input
-            type="checkbox"
-            checked={edit.mute_all}
-            onChange={(e) => push({ ...edit, mute_all: e.target.checked })}
-          />
-          Mute all
-        </label>
-        <label className="flex items-center gap-1.5">
-          Volume
-          <input
-            type="range"
-            min={0}
-            max={200}
-            value={Math.round(edit.volume * 100)}
-            disabled={edit.mute_all}
-            className="w-24 accent-[#38BDF8]"
-            onChange={(e) => setEdit({ ...edit, volume: Number(e.target.value) / 100 })}
-            onMouseUp={() => setHistory((h) => [...h.slice(-30), { edit }])}
-          />
-          <span className="tabular-nums w-8">{Math.round(edit.volume * 100)}%</span>
-        </label>
-        {(['fade_in', 'fade_out'] as const).map((k) => (
-          <label key={k} className="flex items-center gap-1.5">
-            {k === 'fade_in' ? 'Fade in' : 'Fade out'}
-            <select
-              value={edit[k]}
-              onChange={(e) => push({ ...edit, [k]: Number(e.target.value) })}
-              className="bg-base border border-raised rounded px-1 py-0.5"
-            >
-              <option value={0}>off</option>
-              <option value={0.3}>0.3s</option>
-              <option value={0.5}>0.5s</option>
-              <option value={1}>1s</option>
-            </select>
+            }}
+          >
+            {tightening ? 'Finding…' : 'Trim pauses & filler'}
+          </button>
+          {tightenNote && <span className="text-muted">{tightenNote}</span>}
+          <label
+            className="flex items-center gap-1.5 cursor-pointer"
+            title={t("Remove ALL of the clip's audio — e.g. to post it with background music only")}
+          >
+            <input
+              type="checkbox"
+              checked={edit.mute_all}
+              onChange={(e) => push({ ...edit, mute_all: e.target.checked })}
+            />
+            Mute all
           </label>
-        ))}
+          <label className="flex items-center gap-1.5">
+            Volume
+            <input
+              type="range"
+              min={0}
+              max={200}
+              value={Math.round(edit.volume * 100)}
+              disabled={edit.mute_all}
+              className="w-24 accent-[#38BDF8]"
+              onChange={(e) => setEdit({ ...edit, volume: Number(e.target.value) / 100 })}
+              onMouseUp={() => setHistory((h) => [...h.slice(-30), { edit }])}
+            />
+            <span className="tabular-nums w-8">{Math.round(edit.volume * 100)}%</span>
+          </label>
+          {(['fade_in', 'fade_out'] as const).map((k) => (
+            <label key={k} className="flex items-center gap-1.5">
+              {k === 'fade_in' ? 'Fade in' : 'Fade out'}
+              <select
+                value={edit[k]}
+                onChange={(e) => push({ ...edit, [k]: Number(e.target.value) })}
+                className="bg-base border border-raised rounded px-1 py-0.5"
+              >
+                <option value={0}>off</option>
+                <option value={0.3}>0.3s</option>
+                <option value={0.5}>0.5s</option>
+                <option value={1}>1s</option>
+              </select>
+            </label>
+          ))}
         </div>
       )}
 
@@ -2118,11 +2118,10 @@ export default function TimelineEditor({
                       updatePreviewRef.current?.({ gaming: nextG, profile: null, clearProfile: true })
                     }
                   }}
-                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                    isSelected
-                      ? 'bg-accent text-white font-semibold shadow-sm'
-                      : 'bg-raised text-muted hover:text-ink'
-                  }`}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${isSelected
+                    ? 'bg-accent text-white font-semibold shadow-sm'
+                    : 'bg-raised text-muted hover:text-ink'
+                    }`}
                 >
                   {fLabel}
                 </button>
@@ -2146,11 +2145,10 @@ export default function TimelineEditor({
                       setGaming(null)
                       updatePreviewRef.current?.({ layout: val, gaming: null, profile: 'landscape' })
                     }}
-                    className={`px-3 py-1.5 rounded-md ${
-                      layout === val
-                        ? 'bg-accent/20 text-accent font-semibold border border-accent/40'
-                        : 'bg-raised text-muted hover:text-ink'
-                    }`}
+                    className={`px-3 py-1.5 rounded-md ${layout === val
+                      ? 'bg-accent/20 text-accent font-semibold border border-accent/40'
+                      : 'bg-raised text-muted hover:text-ink'
+                      }`}
                     title={tip}
                   >
                     {lab}
@@ -2189,11 +2187,10 @@ export default function TimelineEditor({
                         setGaming(null)
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-md ${
-                      (gaming ? 'split' : layout) === value
-                        ? 'bg-accent/20 text-accent font-semibold border border-accent/40'
-                        : 'bg-raised text-muted hover:text-ink'
-                    }`}
+                    className={`px-3 py-1.5 rounded-md ${(gaming ? 'split' : layout) === value
+                      ? 'bg-accent/20 text-accent font-semibold border border-accent/40'
+                      : 'bg-raised text-muted hover:text-ink'
+                      }`}
                     title={tip}
                   >
                     {label}
@@ -2221,11 +2218,10 @@ export default function TimelineEditor({
                           void api.patchClip(clip.id, { render_opts: { gaming: updated } }).catch(() => undefined)
                           setNotice(`Switched layout to ${pLabel}`)
                         }}
-                        className={`px-2.5 py-1 rounded text-xs ${
-                          gaming.preset === pId
-                            ? 'bg-accent text-white font-medium shadow-sm'
-                            : 'bg-raised text-ink hover:bg-raised/70'
-                        }`}
+                        className={`px-2.5 py-1 rounded text-xs ${gaming.preset === pId
+                          ? 'bg-accent text-white font-medium shadow-sm'
+                          : 'bg-raised text-ink hover:bg-raised/70'
+                          }`}
                       >
                         {pLabel as string}
                       </button>
@@ -2259,11 +2255,18 @@ export default function TimelineEditor({
           onDone={async (next, remember) => {
             setGaming(next)
             setRememberGaming(remember)
+            const nextStyle = next.caption_y !== undefined ? { ...captionStyle, caption_y: next.caption_y } : captionStyle
+            if (next.caption_y !== undefined) setCaptionStyle(nextStyle)
             try {
-              await api.patchClip(clip.id, { render_opts: { gaming: next } })
+              await api.patchClip(clip.id, {
+                render_opts: {
+                  gaming: next,
+                  ...(next.caption_y !== undefined ? { caption_style: nextStyle } : {})
+                }
+              })
               setNotice('✓ Saved layout to clip — updating preview…')
               onChanged()
-              updatePreview({ gaming: next })
+              updatePreview({ gaming: next, captionStyle: nextStyle })
             } catch (e) {
               console.warn('Could not patch clip layout:', e)
             }
@@ -2271,14 +2274,21 @@ export default function TimelineEditor({
           onSaveAndRerender={async (next, remember) => {
             setGaming(next)
             setRememberGaming(remember)
+            const nextStyle = next.caption_y !== undefined ? { ...captionStyle, caption_y: next.caption_y } : captionStyle
+            if (next.caption_y !== undefined) setCaptionStyle(nextStyle)
             setNotice('⚡ Re-rendering clip with new layout on GPU…')
             try {
               const currentOpts = buildRenderOpts()
-              const res = await api.rerenderClip(clip.id, undefined, { ...currentOpts, gaming: next }, usedSuggestions())
+              const res = await api.rerenderClip(
+                clip.id,
+                undefined,
+                { ...currentOpts, gaming: next, ...(next.caption_y !== undefined ? { caption_style: nextStyle } : {}) },
+                usedSuggestions()
+              )
               setNotice(`⚡ Re-render queued (Job #${res.job_id}) — updating preview!`)
               onChanged()
               onReloadClip?.()
-              updatePreview({ gaming: next })
+              updatePreview({ gaming: next, captionStyle: nextStyle })
             } catch (e) {
               setNotice(`Error: ${e instanceof Error ? e.message : String(e)}`)
             }
@@ -2289,121 +2299,121 @@ export default function TimelineEditor({
       {/* speed / hook title / music — the Effects tab */}
       {activeTab === 'motion' && (
         <div className="space-y-2 text-xs">
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="flex items-center gap-1.5">
-            Speed
-            <select
-              value={edit.speed ?? 1}
-              onChange={(e) => push({ ...edit, speed: Number(e.target.value) })}
-              className="bg-base border border-raised rounded px-1 py-0.5"
-            >
-              {[0.75, 1, 1.25, 1.5, 2].map((s) => (
-                <option key={s} value={s}>
-                  {s}x
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-1.5 flex-1 min-w-48">
-            Hook title
-            <input
-              value={edit.hook?.text ?? ''}
-              placeholder={t("big top text for the first seconds, e.g. WAIT FOR IT…")}
-              className="flex-1 bg-base border border-raised rounded px-2 py-1"
-              onChange={(e) =>
-                setEdit({
-                  ...edit,
-                  hook: e.target.value.trim()
-                    ? { text: e.target.value, seconds: edit.hook?.seconds ?? 3 }
-                    : null
-                })
-              }
-              onBlur={() => setHistory((h) => [...h.slice(-30), { edit }])}
-            />
-          </label>
-          {edit.hook && (
-            <select
-              value={edit.hook.seconds}
-              onChange={(e) => push({ ...edit, hook: { ...edit.hook!, seconds: Number(e.target.value) } })}
-              className="bg-base border border-raised rounded px-1 py-0.5"
-              aria-label={t("How long the hook title stays on screen")}
-            >
-              {[2, 3, 5, 8].map((s) => (
-                <option key={s} value={s}>
-                  {s}s
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="flex items-center gap-1.5 flex-1 min-w-56">
-            Music
-            <input
-              value={edit.music?.path ?? ''}
-              placeholder={t("background music — loops under the clip")}
-              className="flex-1 bg-base border border-raised rounded px-2 py-1"
-              onChange={(e) =>
-                setEdit({
-                  ...edit,
-                  music: e.target.value.trim()
-                    ? {
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-1.5">
+              Speed
+              <select
+                value={edit.speed ?? 1}
+                onChange={(e) => push({ ...edit, speed: Number(e.target.value) })}
+                className="bg-base border border-raised rounded px-1 py-0.5"
+              >
+                {[0.75, 1, 1.25, 1.5, 2].map((s) => (
+                  <option key={s} value={s}>
+                    {s}x
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 flex-1 min-w-48">
+              Hook title
+              <input
+                value={edit.hook?.text ?? ''}
+                placeholder={t("big top text for the first seconds, e.g. WAIT FOR IT…")}
+                className="flex-1 bg-base border border-raised rounded px-2 py-1"
+                onChange={(e) =>
+                  setEdit({
+                    ...edit,
+                    hook: e.target.value.trim()
+                      ? { text: e.target.value, seconds: edit.hook?.seconds ?? 3 }
+                      : null
+                  })
+                }
+                onBlur={() => setHistory((h) => [...h.slice(-30), { edit }])}
+              />
+            </label>
+            {edit.hook && (
+              <select
+                value={edit.hook.seconds}
+                onChange={(e) => push({ ...edit, hook: { ...edit.hook!, seconds: Number(e.target.value) } })}
+                className="bg-base border border-raised rounded px-1 py-0.5"
+                aria-label={t("How long the hook title stays on screen")}
+              >
+                {[2, 3, 5, 8].map((s) => (
+                  <option key={s} value={s}>
+                    {s}s
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-1.5 flex-1 min-w-56">
+              Music
+              <input
+                value={edit.music?.path ?? ''}
+                placeholder={t("background music — loops under the clip")}
+                className="flex-1 bg-base border border-raised rounded px-2 py-1"
+                onChange={(e) =>
+                  setEdit({
+                    ...edit,
+                    music: e.target.value.trim()
+                      ? {
                         path: e.target.value,
                         volume: edit.music?.volume ?? 0.25,
                         duck: edit.music?.duck ?? true
                       }
-                    : null
-                })
-              }
-              onBlur={() => setHistory((h) => [...h.slice(-30), { edit }])}
-            />
-          </label>
-          <button
-            className="bg-raised px-2.5 py-1 rounded-md hover:bg-raised/70"
-            onClick={async () => {
-              const path = await window.studio.pickAudioFile()
-              if (path) {
-                push({
-                  ...edit,
-                  music: {
-                    path,
-                    volume: edit.music?.volume ?? 0.25,
-                    duck: edit.music?.duck ?? true
-                  }
-                })
-              }
-            }}
-            title={t("Choose a music file from your computer")}
-          >
-            <Folder className="mr-1.5" />
-            Browse…
-          </button>
-          {edit.music && (
-            <>
-              <label className="flex items-center gap-1.5">
-                Vol
-                <input
-                  type="range"
-                  min={5}
-                  max={100}
-                  value={Math.round(edit.music.volume * 100)}
-                  className="w-20 accent-[#38BDF8]"
-                  onChange={(e) =>
-                    setEdit({ ...edit, music: { ...edit.music!, volume: Number(e.target.value) / 100 } })
-                  }
-                />
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer" title={t("Music automatically dips whenever the creator talks")}>
-                <input
-                  type="checkbox"
-                  checked={edit.music.duck}
-                  onChange={(e) => push({ ...edit, music: { ...edit.music!, duck: e.target.checked } })}
-                />
-                Duck under voice
-              </label>
-            </>
-          )}
-        </div>
+                      : null
+                  })
+                }
+                onBlur={() => setHistory((h) => [...h.slice(-30), { edit }])}
+              />
+            </label>
+            <button
+              className="bg-raised px-2.5 py-1 rounded-md hover:bg-raised/70"
+              onClick={async () => {
+                const path = await window.studio.pickAudioFile()
+                if (path) {
+                  push({
+                    ...edit,
+                    music: {
+                      path,
+                      volume: edit.music?.volume ?? 0.25,
+                      duck: edit.music?.duck ?? true
+                    }
+                  })
+                }
+              }}
+              title={t("Choose a music file from your computer")}
+            >
+              <Folder className="mr-1.5" />
+              Browse…
+            </button>
+            {edit.music && (
+              <>
+                <label className="flex items-center gap-1.5">
+                  Vol
+                  <input
+                    type="range"
+                    min={5}
+                    max={100}
+                    value={Math.round(edit.music.volume * 100)}
+                    className="w-20 accent-[#38BDF8]"
+                    onChange={(e) =>
+                      setEdit({ ...edit, music: { ...edit.music!, volume: Number(e.target.value) / 100 } })
+                    }
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer" title={t("Music automatically dips whenever the creator talks")}>
+                  <input
+                    type="checkbox"
+                    checked={edit.music.duck}
+                    onChange={(e) => push({ ...edit, music: { ...edit.music!, duck: e.target.checked } })}
+                  />
+                  Duck under voice
+                </label>
+              </>
+            )}
+          </div>
         </div>
       )}
 

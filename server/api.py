@@ -1980,7 +1980,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
 
             content_lang = detected_language(row["video_id"], data_dir / "transcripts")
             rendered, _ = _render_files(
-                source, candidate, segments, prev_dir, config, opts, content_lang
+                source, candidate, segments, prev_dir, config, opts, content_lang, is_preview=True
             )
             # The last preview may still be playing in the editor: Windows
             # refuses deleting or renaming over it (#137), so put the new one

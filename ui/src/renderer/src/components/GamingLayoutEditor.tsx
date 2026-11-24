@@ -995,18 +995,17 @@ export default function GamingLayoutEditor({
                       role="radio"
                       aria-checked={selected}
                       onClick={() => pick('custom')}
-                      className={`rounded-lg p-1 text-[10px] flex flex-col items-center justify-between border transition-all ${
-                        selected
-                          ? 'border-accent bg-accent/20 text-accent font-semibold shadow-md ring-1 ring-accent'
-                          : 'border-dashed border-accent/60 hover:border-accent text-accent/80 hover:text-accent bg-accent/5'
-                      }`}
+                      className={`rounded-lg p-1 text-[10px] flex flex-col items-center justify-between border transition-all ${selected
+                        ? 'border-accent bg-accent/20 text-accent font-semibold shadow-md ring-1 ring-accent'
+                        : 'border-dashed border-accent/60 hover:border-accent text-accent/80 hover:text-accent bg-accent/5'
+                        }`}
                       style={{ height: 122 }}
                       title={t('Create or freely edit a custom gaming layout without restrictions')}
                     >
                       <span className="truncate w-full text-center font-bold tracking-wide">⭐ Custom</span>
                       <div className="w-[56px] h-[90px] rounded border border-dashed border-accent/40 bg-accent/10 flex flex-col items-center justify-center gap-1 p-1">
                         <span className="text-base">📐</span>
-                        <span className="text-[8px] font-semibold text-center leading-tight">Freeform<br/>Layout</span>
+                        <span className="text-[8px] font-semibold text-center leading-tight">Freeform<br />Layout</span>
                       </div>
                     </button>
                   )
@@ -1031,9 +1030,8 @@ export default function GamingLayoutEditor({
                     role="radio"
                     aria-checked={selected}
                     onClick={() => pick(id)}
-                    className={`rounded-lg p-1 text-[10px] flex flex-col items-center gap-1 border ${
-                      selected ? 'border-accent bg-accent/10 text-accent font-semibold' : 'border-raised hover:border-muted text-muted'
-                    }`}
+                    className={`rounded-lg p-1 text-[10px] flex flex-col items-center gap-1 border ${selected ? 'border-accent bg-accent/10 text-accent font-semibold' : 'border-raised hover:border-muted text-muted'
+                      }`}
                     title={t(presetSpec?.label ?? id)}
                   >
                     <span className="truncate w-full text-center">{t(presetSpec?.label ?? id)}</span>
@@ -1594,11 +1592,10 @@ export default function GamingLayoutEditor({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                        Math.abs(captionY - 0.41) < 0.02
-                          ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/50 font-bold'
-                          : 'bg-raised text-muted hover:text-ink'
-                      }`}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${Math.abs(captionY - 0.41) < 0.02
+                        ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/50 font-bold'
+                        : 'bg-raised text-muted hover:text-ink'
+                        }`}
                       onClick={() => setCaptionY(0.41)}
                       title={t('Snap captions into the upper blur band between streamer and gameplay')}
                     >
@@ -1606,11 +1603,10 @@ export default function GamingLayoutEditor({
                     </button>
                     <button
                       type="button"
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                        Math.abs(captionY - 0.88) < 0.02
-                          ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/50 font-bold'
-                          : 'bg-raised text-muted hover:text-ink'
-                      }`}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${Math.abs(captionY - 0.88) < 0.02
+                        ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/50 font-bold'
+                        : 'bg-raised text-muted hover:text-ink'
+                        }`}
                       onClick={() => setCaptionY(0.88)}
                       title={t('Snap captions into the lower blur band below gameplay')}
                     >
@@ -1618,11 +1614,10 @@ export default function GamingLayoutEditor({
                     </button>
                     <button
                       type="button"
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                        Math.abs(captionY - 0.50) < 0.02
-                          ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/50 font-bold'
-                          : 'bg-raised text-muted hover:text-ink'
-                      }`}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${Math.abs(captionY - 0.50) < 0.02
+                        ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/50 font-bold'
+                        : 'bg-raised text-muted hover:text-ink'
+                        }`}
                       onClick={() => setCaptionY(0.50)}
                       title={t('Center captions on screen')}
                     >
