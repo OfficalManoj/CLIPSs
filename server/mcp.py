@@ -305,12 +305,18 @@ GAMING_LAYOUT_PARAM = {
 def _queue_video(args: dict) -> str:
     body: dict = {"url": args["url"]}
     for key in ("force", "min_score", "max_clips", "podcast", "vertical_live", "gaming", "long_clips",
-                "captions", "focus", "sport", "pipeline", "gaming_layout"):
+                "captions", "focus", "sport", "pipeline", "gaming_layout", "gaming_scoring"):
         if args.get(key) is not None:
             body[key] = args[key]
     if args.get("watermark"):
         body["watermark_profile_id"] = _branding_id(args["watermark"])
-    if args.get("longform"):
+    elif args.get("watermark_profile_id"):
+        # The Generate bar's branding (the box fills it in, agent.with_defaults).
+        body["watermark_profile_id"] = int(args["watermark_profile_id"])
+    # The model names a mode; the bar sends {"mode": ..., "shorts": ...} as is.
+    if isinstance(args.get("longform"), dict):
+        body["longform"] = args["longform"]
+    elif args.get("longform"):
         body["longform"] = {"mode": args["longform"]}
     if args.get("caption_style"):
         body["caption_style"] = _caption_style(args["caption_style"])
@@ -346,9 +352,20 @@ def _queue_video(args: dict) -> str:
 
 def _queue_local_file(args: dict) -> str:
     body = {"path": args["path"]}
-    for key in ("force", "min_score", "max_clips", "captions", "pipeline", "gaming_layout"):
+    # podcast, long_clips and gaming_scoring come from the app's Generate bar
+    # (the box fills them in, server/agent.py with_defaults), as with a link.
+    for key in ("force", "min_score", "max_clips", "captions", "pipeline", "gaming_layout",
+                "podcast", "long_clips", "gaming_scoring"):
         if args.get(key) is not None:
             body[key] = args[key]
+    if args.get("caption_style"):
+        body["caption_style"] = _caption_style(args["caption_style"])
+    if isinstance(args.get("longform"), dict):
+        body["longform"] = args["longform"]
+    elif args.get("longform"):
+        body["longform"] = {"mode": args["longform"]}
+    if args.get("watermark_profile_id"):
+        body["watermark_profile_id"] = int(args["watermark_profile_id"])
     if args.get("title"):
         body["title"] = args["title"]
     # Worth passing: creator profiles key off the channel, so an empty one means
@@ -561,6 +578,59 @@ def _list_videos(_args: dict) -> str:
     return "\n".join(lines)
 
 
+def _mp4_seconds(path) -> float | None:
+    """A clip file's length from its MP4 header (moov/mvhd), or None.
+
+    Read rather than run through FFprobe: list_clips can show a dozen clips,
+    and this costs a few small reads each. The file includes the end card, so
+    it can be longer than the clip's window in the video.
+    """
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            end = f.tell()
+            return _box_seconds(f, 0, end, inside_moov=False)
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def _box_seconds(f, start: int, end: int, inside_moov: bool) -> float | None:
+    pos = start
+    while pos + 8 <= end:
+        f.seek(pos)
+        header = f.read(8)
+        if len(header) < 8:
+            return None
+        size, kind = int.from_bytes(header[:4], "big"), header[4:8]
+        body = pos + 8
+        if size == 1:
+            size = int.from_bytes(f.read(8), "big")
+            body = pos + 16
+        elif size == 0:
+            size = end - pos
+        if size < 8:
+            return None
+        if not inside_moov and kind == b"moov":
+            return _box_seconds(f, body, pos + size, inside_moov=True)
+        if inside_moov and kind == b"mvhd":
+            f.seek(body)
+            version = f.read(1)
+            if not version:
+                return None
+            f.read(3)  # flags
+            if version[0] == 1:
+                f.read(16)  # creation and modification times
+                scale = int.from_bytes(f.read(4), "big")
+                length = int.from_bytes(f.read(8), "big")
+            else:
+                f.read(8)
+                scale = int.from_bytes(f.read(4), "big")
+                length = int.from_bytes(f.read(4), "big")
+            return length / scale if scale else None
+        pos += size
+    return None
+
+
 def _list_clips(args: dict) -> str:
     video_id = str(args["video_id"])
     clips = _request("GET", f"/videos/{video_id}/clips")
@@ -576,9 +646,12 @@ def _list_clips(args: dict) -> str:
         start_minutes, start_seconds = divmod(round(start), 60)
         end_minutes, end_seconds = divmod(round(end), 60)
         exported = " (exported)" if clip.get("exported_at") else ""
+        # The file's own length, so "the last 3 seconds" can be worked out.
+        seconds = _mp4_seconds(clip["path"]) if clip.get("path") else None
+        length = f"file {seconds:.1f}s  " if seconds else ""
         lines.append(
             f"[{clip['id']}] score {clip.get('score', 0):>3}  "
-            f"{start_minutes}m{start_seconds:02d}s-{end_minutes}m{end_seconds:02d}s  "
+            f"{start_minutes}m{start_seconds:02d}s-{end_minutes}m{end_seconds:02d}s  {length}"
             f"{(clip.get('title') or clip.get('hook') or '').strip()[:70]}{exported}"
         )
     return "\n".join(lines)
@@ -1483,7 +1556,9 @@ TOOLS: list[dict] = [
         "name": "list_clips",
         "title": "List a video's clips",
         "description": (
-            "The clips from one video: id, score, timestamps and title. Scores are the "
+            "The clips from one video: id, score, timestamps in the video, the clip "
+            "file's length in seconds (it includes the end card, so it can be longer than "
+            "the timestamps; use it for 'the last 3 seconds') and title. Scores are the "
             "model's ranking, 0-100."
         ),
         "inputSchema": {

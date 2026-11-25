@@ -291,3 +291,19 @@ def test_no_context_adds_nothing():
     assert agent.where_note("") == ""
     assert agent.where_note("  ") == ""
     assert len(agent.where_note("x" * 1000)) < 450
+
+
+def test_the_model_never_asks_for_ids_and_finds_the_newest_video_itself():
+    # "schedule my clips 5 a day" came back asking for clip or video ids.
+    assert "Never ask the person for an id of any kind" in agent.SYSTEM
+    assert "newest finished one" in agent.SYSTEM and "by its title" in agent.SYSTEM
+
+
+def test_posting_refusals_say_what_to_do_in_settings():
+    assert agent.refusal_text("YouTube publishing is not enabled") == (
+        "Connect YouTube in Settings to post from here.")
+    assert agent.refusal_text("WoopSocial publishing is not enabled") == (
+        "Add your WoopSocial key in Settings to post from here.")
+    assert agent.refusal_text("no such clip") == "That was refused: no such clip"
+    for text in agent.REFUSAL_NEXT_STEP.values():
+        assert "not enabled" not in text and "reactivat" not in text

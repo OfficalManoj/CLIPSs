@@ -757,3 +757,84 @@ def test_add_animation_says_to_look_up_a_blocks_variables_first():
     add = tools["add_animation"]
     assert "call it with block FIRST" in add["description"]
     assert "hyperframes_catalog with block" in add["inputSchema"]["properties"]["variables"]["description"]
+
+
+def _mp4(path, seconds: float, version: int = 0, moov_last: bool = True):
+    """A file with just the boxes a player reads the length from."""
+    scale = 1000
+    if version == 1:
+        mvhd_body = bytes([1, 0, 0, 0]) + bytes(16) + scale.to_bytes(4, "big") + int(seconds * scale).to_bytes(8, "big")
+    else:
+        mvhd_body = bytes(4) + bytes(8) + scale.to_bytes(4, "big") + int(seconds * scale).to_bytes(4, "big")
+    mvhd_body += bytes(80)
+    mvhd = (8 + len(mvhd_body)).to_bytes(4, "big") + b"mvhd" + mvhd_body
+    trak = (8 + 4).to_bytes(4, "big") + b"trak" + bytes(4)
+    moov_body = trak + mvhd
+    moov = (8 + len(moov_body)).to_bytes(4, "big") + b"moov" + moov_body
+    ftyp = (16).to_bytes(4, "big") + b"ftypisom" + bytes(4)
+    mdat = (8 + 1000).to_bytes(4, "big") + b"mdat" + bytes(1000)
+    path.write_bytes(ftyp + (mdat + moov if moov_last else moov + mdat))
+    return path
+
+
+@pytest.mark.parametrize("version,moov_last", [(0, True), (0, False), (1, True)])
+def test_the_mp4_header_gives_the_files_length(tmp_path, version, moov_last):
+    clip = _mp4(tmp_path / "c.mp4", 22.3, version=version, moov_last=moov_last)
+    assert mcp._mp4_seconds(clip) == pytest.approx(22.3)
+
+
+def test_a_missing_or_broken_file_has_no_length(tmp_path):
+    assert mcp._mp4_seconds(tmp_path / "gone.mp4") is None
+    (tmp_path / "junk.mp4").write_bytes(b"not a video at all")
+    assert mcp._mp4_seconds(tmp_path / "junk.mp4") is None
+
+
+def test_list_clips_shows_each_files_length(tmp_path, monkeypatch):
+    # "The last 3 seconds" needs the file's length: 9m04s-9m23s is 19 s of
+    # the video, but the file with its end card is 22.3 s.
+    clip = _mp4(tmp_path / "c.mp4", 22.3)
+    monkeypatch.setattr(mcp, "_request", lambda *_a: [
+        {"id": 7, "start_s": 544, "end_s": 563, "score": 88, "title": "Big win", "path": str(clip)},
+        {"id": 8, "start_s": 600, "end_s": 620, "score": 70, "title": "Not rendered", "path": ""},
+    ])
+    text = _send(_request(9, "tools/call", {"name": "list_clips", "arguments": {"video_id": "v"}}))[
+        "result"]["content"][0]["text"]
+    first, second = text.splitlines()
+    assert "9m04s-9m23s  file 22.3s  Big win" in first
+    assert "file" not in second and "Not rendered" in second
+    tool = next(t for t in mcp.TOOLS if t["name"] == "list_clips")
+    assert "length in seconds" in tool["description"] and "end card" in tool["description"]
+
+
+def test_queue_local_file_passes_the_bars_switches(monkeypatch):
+    sent = {}
+
+    def fake(method, path, body=None):
+        sent.update(body or {})
+        return {"job_id": 5, "video_id": "local-1"}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    mcp._queue_local_file({"path": "C:/v.mp4", "podcast": True, "long_clips": True, "gaming_scoring": True,
+                           "longform": {"mode": "highlights"}, "watermark_profile_id": 3,
+                           "caption_style": {"font": "Impact", "position": "middle"}})
+    assert sent["podcast"] is True and sent["long_clips"] is True and sent["gaming_scoring"] is True
+    assert sent["longform"] == {"mode": "highlights"} and sent["watermark_profile_id"] == 3
+    assert sent["caption_style"] == {"font": "Impact", "position": "middle"}
+
+def test_queue_video_keeps_the_bars_long_form_and_branding(monkeypatch):
+    """The bar sends longform as {"mode": ...} and its branding as an id; a
+    link must not wrap the one again or drop the other."""
+    sent = {}
+
+    def fake(method, path, body=None):
+        sent.update(body or {})
+        return {"job_id": 6, "video_id": "abc"}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    mcp._queue_video({"url": "https://youtu.be/x", "longform": {"mode": "highlights", "shorts": True},
+                      "watermark_profile_id": 4, "gaming_scoring": True})
+    assert sent["longform"] == {"mode": "highlights", "shorts": True}
+    assert sent["watermark_profile_id"] == 4 and sent["gaming_scoring"] is True
+    sent.clear()
+    mcp._queue_video({"url": "https://youtu.be/x", "longform": "edited_stream"})
+    assert sent["longform"] == {"mode": "edited_stream"}

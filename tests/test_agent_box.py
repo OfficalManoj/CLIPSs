@@ -337,3 +337,112 @@ def test_the_chat_tells_the_model_where_the_box_is(client, monkeypatch):
                                               "context": "the Clip Editor, with clip 7 open"})
     assert r.status_code == 200, r.text
     assert seen["context"] == "the Clip Editor, with clip 7 open"
+
+
+# ---- speed: the box's own Ollama calls (app test minor 4) --------------------------
+
+
+def test_the_box_calls_ollama_on_127_0_0_1_not_localhost():
+    # "localhost" took 2 s a call on Windows (IPv6 first); 127.0.0.1 took 0.01 s.
+    assert agent_box.loopback("http://localhost:11434") == "http://127.0.0.1:11434"
+    assert agent_box.loopback("http://LOCALHOST:11434/") == "http://127.0.0.1:11434"
+    assert agent_box.loopback("http://localhost") == "http://127.0.0.1"
+    # Anything else is left exactly as set.
+    assert agent_box.loopback("http://192.168.1.5:11434") == "http://192.168.1.5:11434"
+    assert agent_box.loopback("http://my-localhost.lan:11434") == "http://my-localhost.lan:11434"
+
+
+def test_the_box_host_is_the_loopback_but_the_pipeline_setting_is_untouched(tmp_path, monkeypatch):
+    env = Env(tmp_path, monkeypatch, FakeOllama({}))
+    env.config["llm"]["ollama_host"] = "http://localhost:11434"
+    box = agent_box.Box(config=env.config, db=env.db, data_dir=env.data, ollama_host="http://localhost:11434",
+                        list_models=lambda provider_id: [])
+    assert box.ollama_host == "http://127.0.0.1:11434"
+    assert env.config["llm"]["ollama_host"] == "http://localhost:11434"
+
+
+def test_a_chosen_model_is_checked_from_what_the_list_already_asked(tmp_path, monkeypatch):
+    fake = FakeOllama({"gemma3:4b": False, "gemma4:e4b": True})
+    env = Env(tmp_path, monkeypatch, fake)
+    env.box.groups()
+    asked = list(fake.shown)
+    env.box.choose("ollama/gemma4:e4b")
+    assert env.box.check()["ready"] is True
+    # Already asked by the list as it was shown: not again.
+    assert fake.shown == asked
+    env.box.choose("ollama/gemma3:4b")
+    assert env.box.check()["ready"] is False
+
+
+def test_a_model_the_list_never_asked_about_is_asked_once(tmp_path, monkeypatch):
+    fake = FakeOllama({"gemma4:e4b": True})
+    env = Env(tmp_path, monkeypatch, fake)
+    env.box.choose("ollama/gemma4:e4b")
+    assert env.box.check()["ready"] is True
+    assert env.box.check()["ready"] is True
+    assert fake.shown == ["gemma4:e4b"]
+
+
+# ---- the tools, through the chat route (app test minors 8 and 10) ----------------------
+
+
+def _chat_calling(monkeypatch, http_client, name, arguments, defaults=None):
+    """Runs /agent/chat with a model that makes one tool call; returns its text."""
+    from server import agent
+
+    out = {}
+
+    def fake_run(message, history, tools, call_tool, host, model, num_ctx=16384, context=""):
+        out["text"], _ = call_tool(name, dict(arguments))
+        out["host"] = host
+        return {"reply": "ok", "steps": [], "plan": None, "model": model}
+
+    monkeypatch.setattr(agent, "run", fake_run)
+    r = http_client.post("/agent/chat", json={"message": "go", "model": "ollama/gemma4:e4b",
+                                              **({"defaults": defaults} if defaults else {})})
+    assert r.status_code == 200, r.text
+    return out
+
+
+def test_a_file_on_this_pc_follows_the_generate_bars_switches(client, monkeypatch):
+    from server import mcp
+
+    http_client, _ = client
+    seen = {}
+    tool = next(t for t in mcp.TOOLS if t["name"] == "queue_local_file")
+    monkeypatch.setitem(tool, "handler", lambda args: seen.update(args) or "Queued as job 5.")
+    _chat_calling(monkeypatch, http_client, "queue_local_file", {"path": "C:/v.mp4", "captions": False},
+                  defaults={"captions": True, "long_clips": True, "gaming": True,
+                            "publish_when_done": ["youtube"]})
+    # The bar fills in what the model didn't say; what it said still wins,
+    # and posting is never taken from the bar.
+    assert seen["long_clips"] is True and seen["gaming"] is True
+    assert seen["captions"] is False
+    assert "publish_when_done" not in seen
+
+
+@pytest.mark.parametrize("detail,wanted", [
+    ("YouTube publishing is not enabled", "Connect YouTube in Settings to post from here."),
+    ("WoopSocial publishing is not enabled", "Add your WoopSocial key in Settings to post from here."),
+    ("that time is in the past", "That was refused: that time is in the past"),
+])
+def test_a_posting_refusal_reaches_the_model_as_the_next_step(client, monkeypatch, detail, wanted):
+    import io
+    import json as _json
+    import urllib.error
+
+    from server import mcp
+
+    http_client, _ = client
+
+    def refuse(_args):
+        raise urllib.error.HTTPError("http://x", 404, "Not Found", {},
+                                     io.BytesIO(_json.dumps({"detail": detail}).encode()))
+
+    tool = next(t for t in mcp.TOOLS if t["name"] == "publish_plan")
+    monkeypatch.setitem(tool, "handler", refuse)
+    out = _chat_calling(monkeypatch, http_client, "publish_plan", {"clip_ids": [1]})
+    assert out["text"] == wanted
+    assert "not enabled" not in out["text"]
+    # The box's own chat goes to Ollama on 127.0.0.1 too.
+    assert out["host"].startswith("http://127.0.0.1")

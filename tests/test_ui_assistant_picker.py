@@ -111,3 +111,14 @@ def test_the_cloud_model_label_is_shared_by_the_sidebar_and_the_dashboard(tmp_pa
         assert "cloudModelLabel" in (UI / page).read_text(encoding="utf-8"), page
     dashboard = (UI / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
     assert "{cloudModel || settings.model}" in dashboard
+
+
+def test_choosing_a_model_says_checking_until_the_engine_answers():
+    # The box looked ready for about 7 s after a pick, before the check said
+    # whether that model could run at all.
+    box = (UI / "components" / "Assistant.tsx").read_text(encoding="utf-8")
+    choose = box[box.index("const chooseModel"):box.index("const picker")]
+    assert choose.index("setReady(null)") < choose.index("await api.chooseAgentModel(spec)")
+    # A slower answer for an earlier pick never overrides the latest one.
+    assert choose.count("seq === pickSeq.current") + choose.count("seq !== pickSeq.current") == 2
+    assert "placeholder={ready === null ? t('Checking…')" in box

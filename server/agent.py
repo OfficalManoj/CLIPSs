@@ -66,6 +66,12 @@ SYSTEM = (
     "video by its subject or title, call list_videos and match it yourself. If "
     "you need clip ids, call list_clips. Asking for an id you could have "
     "fetched is a failure.\n"
+    # "schedule my clips 5 a day" came back as "which clip or video ids?",
+    # which a person never knows.
+    "When they ask about, post or schedule 'my clips' without naming a "
+    "video, call list_videos and use the newest finished one (the first "
+    "marked done). If none is finished, or two could be meant, ask which "
+    "video by its title. Never ask the person for an id of any kind.\n"
     "Work in steps: call a tool, read the result, call the next one. A request "
     "with two halves needs at least two calls.\n"
     "Processing a video takes tens of minutes: queue it, report the job id, and "
@@ -136,9 +142,25 @@ def _without_deferred_publish(schema: dict) -> dict:
     return {**schema, "properties": {k: v for k, v in props.items() if k != DEFERRED_PUBLISH}}
 
 
+# The engine's posting refusals, as the step that makes posting work. The
+# model turned "WoopSocial publishing is not enabled" into "let me know when
+# that service is reactivated". Only the box sees these words.
+REFUSAL_NEXT_STEP = {
+    "YouTube publishing is not enabled": "Connect YouTube in Settings to post from here.",
+    "WoopSocial publishing is not enabled": "Add your WoopSocial key in Settings to post from here.",
+}
+
+
+def refusal_text(detail: str) -> str:
+    """What the box hands the model when the engine says no: the next step
+    for a refusal that has one, else the engine's own reason."""
+    detail = str(detail or "").strip()
+    return REFUSAL_NEXT_STEP.get(detail) or f"That was refused: {detail}"
+
+
 def with_defaults(arguments: dict, defaults: dict | None) -> dict:
-    """queue_video's arguments with the bar's defaults filled in where the
-    model said nothing (an explicit "no captions" still wins). Never
+    """queue_video's or queue_local_file's arguments with the bar's defaults
+    filled in where the model said nothing (an explicit "no captions" still wins). Never
     publish_when_done, even from the defaults: posting waits for a click."""
     for key, value in (defaults or {}).items():
         if key != DEFERRED_PUBLISH:
