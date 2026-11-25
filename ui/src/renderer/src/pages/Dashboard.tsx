@@ -5,6 +5,7 @@ import AddVideos from '../components/queue/AddVideos'
 import { Trash } from '../components/icons'
 import ProcessingBar from '../components/ProcessingBar'
 import SystemStats from '../components/SystemStats'
+import { cloudModelLabel } from '../lib/activeModel'
 import { api } from '../lib/api'
 import { useEvents } from '../lib/useEvents'
 import { useJobWatch } from '../lib/useJobWatch'
@@ -69,6 +70,9 @@ export default function Dashboard({
 }): JSX.Element {
   const [videos, setVideos] = useState<Video[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
+  // The app's model when it runs in the cloud ("OpenRouter · model"), so the
+  // chip names the provider as the sidebar does. "" on this PC.
+  const [cloudModel, setCloudModel] = useState('')
   const [log, setLog] = useState<string[]>([])
   const [sort, setSort] = useState<SortMode>('newest')
   const [channelFilter, setChannelFilter] = useState<{
@@ -120,6 +124,7 @@ export default function Dashboard({
     try {
       setVideos(await api.videos())
       setSettings(await api.settings())
+      setCloudModel(await api.ai().then(cloudModelLabel).catch(() => ''))
       // An expanded row keeps the clips it fetched when it was opened, so
       // after a re-render it would go on showing the previous version. Re-read
       // whichever row is open rather than leaving it stale.
@@ -414,8 +419,12 @@ export default function Dashboard({
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">{t('Dashboard')}</h2>
           {settings && (
-            <span className="bg-raised px-3 py-1.5 rounded-lg text-sm">
-              model: <span className="text-accent font-medium">{settings.model}</span>
+            <span
+              className="bg-raised px-3 py-1.5 rounded-lg text-sm"
+              title={t('The model that picks your clips. Change it in the sidebar or in Settings → AI.')}
+            >
+              {t('model:')}{' '}
+              <span className="text-accent font-medium">{cloudModel || settings.model}</span>
             </span>
           )}
         </div>
@@ -743,7 +752,7 @@ export default function Dashboard({
             <div className="h-1 w-20 rounded-full bg-raised transition-colors group-hover:bg-accent/70 group-focus:bg-accent" />
           </div>
           <div className="flex-1 min-h-0">
-            <Assistant />
+            <Assistant where="the Dashboard" />
           </div>
         </div>
       </div>

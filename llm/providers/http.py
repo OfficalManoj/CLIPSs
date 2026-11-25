@@ -113,6 +113,14 @@ def error_from(spec: ProviderSpec, status: int, body) -> LLMError:
                                             "try again, or choose a model more providers run, such as the "
                                             "preferred one.")
         return LLMError("rate_limited", f"{label} is rate limiting your key. Wait a minute and try again.")
+    if status == 404 and ("tool use" in detail.lower() or "requested parameters" in detail.lower()):
+        # OpenRouter: "No endpoints found that support tool use", or, with
+        # provider.require_parameters (sent only with tools), "No endpoints
+        # found that can handle the requested parameters". The model is
+        # listed, but nobody who runs it for OpenRouter accepts tools.
+        return LLMError("model_unavailable", f"None of the companies that run this model for {label} let it use "
+                                    "tools, and the Ask Clips Kitty box needs them. Choose a model marked "
+                                    "\"Uses tools\" in the box's model list.")
     if status == 404:
         return LLMError("model_unavailable", f"{label} doesn't offer that model to your key. "
                                              "Pick another one in Settings → AI." + _said(detail))

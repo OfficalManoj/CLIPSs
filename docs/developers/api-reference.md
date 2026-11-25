@@ -4,7 +4,7 @@
 
 API version **1** (`GET /health` → `api_version`). The engine listens on `http://127.0.0.1:8765`. How to call it, with examples and the gotchas, is in [`docs/API.md`](../API.md); what the labels promise is in [API](api.md).
 
-258 routes: **60 stable**, **47 experimental**, 151 internal.
+260 routes: **60 stable**, **47 experimental**, 153 internal.
 
 | Label | Promise |
 |---|---|
@@ -216,7 +216,7 @@ Everything else. Grouped by the first part of the path; the module is where it i
 
 | Area | Routes | Module |
 |---|---|---|
-| `/agent` | `POST /agent/chat`<br>`GET /agent/status` | `server.api` |
+| `/agent` | `POST /agent/chat`<br>`PUT /agent/model`<br>`GET /agent/models`<br>`GET /agent/status` | `server.api` |
 | `/ai` | `GET /ai/providers/{provider_id}/callback/{state}`<br>`POST /ai/providers/{provider_id}/connect`<br>`POST /ai/providers/{provider_id}/stt-check`<br>`GET /ai/signin/{provider_id}`<br>`POST /ai/signin/{provider_id}/automation`<br>`POST /ai/signin/{provider_id}/cancel`<br>`GET /ai/signin/{provider_id}/models`<br>`POST /ai/signin/{provider_id}/sign-out`<br>`POST /ai/signin/{provider_id}/start`<br>`POST /ai/signin/{provider_id}/test` | `server.ai_api` |
 | `/branding` | `GET /branding`<br>`POST /branding`<br>`POST /branding/asset`<br>`GET /branding/asset/{name}`<br>`DELETE /branding/{profile_id}`<br>`PUT /branding/{profile_id}` | `server.api` |
 | `/campaigns` | `GET /campaigns`<br>`POST /campaigns`<br>`POST /campaigns/preview`<br>`GET /campaigns/submissions`<br>`POST /campaigns/submissions`<br>`GET /campaigns/submissions/{submission_id}`<br>`PATCH /campaigns/submissions/{submission_id}`<br>`POST /campaigns/submissions/{submission_id}/approve`<br>`POST /campaigns/submissions/{submission_id}/cancel`<br>`POST /campaigns/submissions/{submission_id}/move`<br>`POST /campaigns/submissions/{submission_id}/opened`<br>`POST /campaigns/submissions/{submission_id}/record`<br>`POST /campaigns/submissions/{submission_id}/retry`<br>`POST /campaigns/submissions/{submission_id}/submit`<br>`DELETE /campaigns/{campaign_id}`<br>`GET /campaigns/{campaign_id}`<br>`PATCH /campaigns/{campaign_id}` | `server.campaigns_api` |

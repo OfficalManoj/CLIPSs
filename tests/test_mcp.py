@@ -376,7 +376,7 @@ def _call(name: str, arguments: dict) -> dict:
 def test_the_new_tools_are_offered():
     names = {t["name"] for t in _send(_request(29, "tools/list"))["result"]["tools"]}
     assert {"start_queue", "clip_posts"} <= names
-    assert len(names) == len(mcp.TOOLS) == 21
+    assert len(names) == len(mcp.TOOLS) == 22
 
 
 def test_start_queue_presses_start_then_reads_the_queue(monkeypatch):
@@ -584,3 +584,135 @@ def test_clip_posts_quotes_a_mistyped_video_id(monkeypatch):
     text = _call("clip_posts", {"video_id": "my video"})["content"][0]["text"]
     assert calls == ["/videos/my%20video/clips"]
     assert text.startswith("No clips for my video.")
+
+
+# ---- set_clip_text ------------------------------------------------------------
+
+
+def test_set_clip_text_patches_only_what_was_passed(monkeypatch):
+    calls = []
+
+    def fake(method, path, body=None, *a, **k):
+        calls.append((method, path, body))
+        return {"id": 9, "title": "New hook", "description": "old", "hashtags": ["gaming"]}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    result = _call("set_clip_text", {"clip_id": 9, "title": "New hook"})
+    assert calls == [("PATCH", "/clips/9", {"title": "New hook"})]
+    assert result["isError"] is False
+    assert result["content"][0]["text"] == "Clip 9 updated.\nTitle: New hook"
+
+
+def test_set_clip_text_sends_hashtags_as_a_list(monkeypatch):
+    sent = {}
+    monkeypatch.setattr(mcp, "_request", lambda m, p, b=None, *a, **k: (
+        sent.update(b), {"hashtags": b["hashtags"], "description": b["description"]})[1])
+    text = _call("set_clip_text", {"clip_id": 3, "description": "A clutch win",
+                                   "hashtags": "gaming, gta6 #clips"})["content"][0]["text"]
+    assert sent == {"description": "A clutch win", "hashtags": ["gaming", "gta6", "#clips"]}
+    assert "Hashtags: #gaming #gta6 #clips" in text
+
+
+def test_set_clip_text_with_nothing_to_change_calls_nothing(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    assert _call("set_clip_text", {"clip_id": 3})["content"][0]["text"].startswith("Nothing changed")
+
+
+def test_set_clip_text_names_a_missing_clip(monkeypatch):
+    import urllib.error
+
+    def missing(*a, **k):
+        raise urllib.error.HTTPError("http://x/clips/404", 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(mcp, "_request", missing)
+    text = _call("set_clip_text", {"clip_id": 404, "title": "x"})["content"][0]["text"]
+    assert text == "There is no clip 404. list_clips shows the ids that exist."
+
+
+def test_set_clip_text_sends_only_fields_patch_clips_takes():
+    api = pytest.importorskip("server.api")
+    tool = next(t for t in mcp.TOOLS if t["name"] == "set_clip_text")
+    props = set(tool["inputSchema"]["properties"]) - {"clip_id"}
+    assert props <= set(api.ClipPatch.model_fields)
+    assert tool["inputSchema"]["required"] == ["clip_id"]
+
+
+def _mp4(path, seconds: float, version: int = 0, moov_last: bool = True):
+    """A file with just the boxes a player reads the length from."""
+    scale = 1000
+    if version == 1:
+        mvhd_body = bytes([1, 0, 0, 0]) + bytes(16) + scale.to_bytes(4, "big") + int(seconds * scale).to_bytes(8, "big")
+    else:
+        mvhd_body = bytes(4) + bytes(8) + scale.to_bytes(4, "big") + int(seconds * scale).to_bytes(4, "big")
+    mvhd_body += bytes(80)
+    mvhd = (8 + len(mvhd_body)).to_bytes(4, "big") + b"mvhd" + mvhd_body
+    trak = (8 + 4).to_bytes(4, "big") + b"trak" + bytes(4)
+    moov_body = trak + mvhd
+    moov = (8 + len(moov_body)).to_bytes(4, "big") + b"moov" + moov_body
+    ftyp = (16).to_bytes(4, "big") + b"ftypisom" + bytes(4)
+    mdat = (8 + 1000).to_bytes(4, "big") + b"mdat" + bytes(1000)
+    path.write_bytes(ftyp + (mdat + moov if moov_last else moov + mdat))
+    return path
+
+
+@pytest.mark.parametrize("version,moov_last", [(0, True), (0, False), (1, True)])
+def test_the_mp4_header_gives_the_files_length(tmp_path, version, moov_last):
+    clip = _mp4(tmp_path / "c.mp4", 22.3, version=version, moov_last=moov_last)
+    assert mcp._mp4_seconds(clip) == pytest.approx(22.3)
+
+
+def test_a_missing_or_broken_file_has_no_length(tmp_path):
+    assert mcp._mp4_seconds(tmp_path / "gone.mp4") is None
+    (tmp_path / "junk.mp4").write_bytes(b"not a video at all")
+    assert mcp._mp4_seconds(tmp_path / "junk.mp4") is None
+
+
+def test_list_clips_shows_each_files_length(tmp_path, monkeypatch):
+    # "The last 3 seconds" needs the file's length: 9m04s-9m23s is 19 s of
+    # the video, but the file with its end card is 22.3 s.
+    clip = _mp4(tmp_path / "c.mp4", 22.3)
+    monkeypatch.setattr(mcp, "_request", lambda *_a: [
+        {"id": 7, "start_s": 544, "end_s": 563, "score": 88, "title": "Big win", "path": str(clip)},
+        {"id": 8, "start_s": 600, "end_s": 620, "score": 70, "title": "Not rendered", "path": ""},
+    ])
+    text = _send(_request(9, "tools/call", {"name": "list_clips", "arguments": {"video_id": "v"}}))[
+        "result"]["content"][0]["text"]
+    first, second = text.splitlines()
+    assert "9m04s-9m23s  file 22.3s  Big win" in first
+    assert "file" not in second and "Not rendered" in second
+    tool = next(t for t in mcp.TOOLS if t["name"] == "list_clips")
+    assert "length in seconds" in tool["description"] and "end card" in tool["description"]
+
+
+def test_queue_local_file_passes_the_bars_switches(monkeypatch):
+    sent = {}
+
+    def fake(method, path, body=None):
+        sent.update(body or {})
+        return {"job_id": 5, "video_id": "local-1"}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    mcp._queue_local_file({"path": "C:/v.mp4", "podcast": True, "long_clips": True, "gaming_scoring": True,
+                           "longform": {"mode": "highlights"}, "watermark_profile_id": 3,
+                           "caption_style": {"font": "Impact", "position": "middle"}})
+    assert sent["podcast"] is True and sent["long_clips"] is True and sent["gaming_scoring"] is True
+    assert sent["longform"] == {"mode": "highlights"} and sent["watermark_profile_id"] == 3
+    assert sent["caption_style"] == {"font": "Impact", "position": "middle"}
+
+def test_queue_video_keeps_the_bars_long_form_and_branding(monkeypatch):
+    """The bar sends longform as {"mode": ...} and its branding as an id; a
+    link must not wrap the one again or drop the other."""
+    sent = {}
+
+    def fake(method, path, body=None):
+        sent.update(body or {})
+        return {"job_id": 6, "video_id": "abc"}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    mcp._queue_video({"url": "https://youtu.be/x", "longform": {"mode": "highlights", "shorts": True},
+                      "watermark_profile_id": 4, "gaming_scoring": True})
+    assert sent["longform"] == {"mode": "highlights", "shorts": True}
+    assert sent["watermark_profile_id"] == 4 and sent["gaming_scoring"] is True
+    sent.clear()
+    mcp._queue_video({"url": "https://youtu.be/x", "longform": "edited_stream"})
+    assert sent["longform"] == {"mode": "edited_stream"}

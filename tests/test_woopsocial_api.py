@@ -401,6 +401,61 @@ def test_a_daily_plan_shows_the_slots_that_will_be_used(client, monkeypatch, tmp
     assert (times[3] - times[2]).total_seconds() == 3600
 
 
+def test_a_plans_start_time_reaches_the_batch_it_confirms(client, monkeypatch, tmp_path):
+    """"Schedule my clips starting tomorrow at 9" showed tomorrow's times on
+    the Ask Clips Kitty card, but the plan never handed its start back, so
+    "Schedule these" sent the batch from now. Public posts can't be undone."""
+    import re
+    from datetime import datetime, timedelta, timezone
+
+    _enable(client)
+    monkeypatch.setattr(service, "has_key", lambda _p: True)
+
+    class FakeClient:
+        def projects(self):
+            return [{"id": "proj1"}]
+
+        def connected_platforms(self, project_id):
+            return ["youtube"]
+
+    monkeypatch.setattr(service, "make_client", lambda _p: FakeClient())
+    ids = _clips(client, tmp_path, 2)
+    start = (datetime.now(timezone.utc) + timedelta(days=1)).replace(
+        hour=9, minute=0, second=0, microsecond=0).isoformat()
+
+    plan = client.post(
+        "/woopsocial/batch/plan",
+        json={"clip_ids": ids, "platforms": ["youtube"], "every_hours": 2, "start_at": start},
+    ).json()
+    assert plan["start_at"] == start
+    assert datetime.fromisoformat(plan["items"][0]["publish_at"]) == datetime.fromisoformat(start)
+
+    seen = {}
+
+    def fake_publish(_d, _data, **kwargs):
+        seen.update(kwargs)
+        return {"started": [], "skipped": []}
+
+    monkeypatch.setattr(service, "publish_clips", fake_publish)
+    # What the box's confirm sends, built from the plan the card showed.
+    got = client.post(
+        "/woopsocial/batch",
+        json={"clip_ids": [i["clip_id"] for i in plan["items"]], "platforms": plan["platforms"],
+              "every_hours": plan["every_hours"], "start_at": plan["start_at"],
+              "hashtags": plan["hashtags"]},
+    )
+    assert got.status_code == 200
+    assert seen["start_at"] == start
+
+    # And the box itself keeps the plan's start and sends it on confirm.
+    src = (Path(__file__).resolve().parent.parent / "ui" / "src" / "renderer" / "src"
+           / "components" / "Assistant.tsx").read_text(encoding="utf-8")
+    assert re.search(r"start_at:\s*p\.start_at", src)
+    batch_call = src[src.index("api.woopSocialBatch({"):]
+    batch_call = batch_call[: batch_call.index("})")]
+    assert re.search(r"start_at:\s*schedule\.start_at", batch_call)
+
+
 def test_a_single_publish_records_its_time_caption_and_visibility(client, monkeypatch, tmp_path):
     """Without its time an editor-scheduled post looked due the moment it was
     sent, and without its caption and visibility no rule about the post

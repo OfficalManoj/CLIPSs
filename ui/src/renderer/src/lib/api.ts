@@ -1,4 +1,45 @@
 import type { WoopAccount } from './woopTargets'
+
+/** Whether the Ask Clips Kitty box can run, on which model, and if not why. */
+export interface AgentStatus {
+  ready: boolean
+  /** A full spec: "ollama/gemma4:e4b", "openrouter/google/gemma-4-26b-a4b-it". */
+  model: string
+  configured: string
+  reason: string
+  install?: { model: string; size_gb: number } | null
+  /** The provider whose key Settings → AI should open, or "". */
+  settings?: string
+}
+
+export interface AgentModel {
+  spec: string
+  name: string
+  tools: boolean
+  note: string
+}
+
+export interface AgentModelGroup {
+  id: string
+  label: string
+  tier: number
+  local: boolean
+  has_key: boolean
+  /** True when the fix is in Settings → AI (add a key, sign in). */
+  settings: boolean
+  message: string
+  models: AgentModel[]
+}
+
+export interface AgentModelList {
+  groups: AgentModelGroup[]
+  /** The box's own remembered choice, or "" (following the app's model). */
+  chosen: string
+  /** The app's model, the one that picks clips. */
+  active: string
+  /** What the box uses now: the first usable one, in order. */
+  default: string
+}
 import type {
   AIModelList,
   AISignIn,
@@ -291,14 +332,19 @@ export const api = {
   /** Whether the assistant can run, and which model it would use. The app's
    *  default scoring model cannot call tools, so this is a real question.
    *  `install` is the Gemma 4 build to offer when no installed model can. */
-  agentStatus: () =>
-    request<{
-      ready: boolean
-      model: string
-      configured: string
-      reason: string
-      install?: { model: string; size_gb: number } | null
-    }>('/agent/status'),
+  agentStatus: (model = '') =>
+    request<AgentStatus>(`/agent/status${model ? `?model=${encodeURIComponent(model)}` : ''}`),
+  /** The box's model picker: Ollama, then OpenRouter, then the direct
+   *  providers and plan sign-ins, each model marked with whether it can use
+   *  tools. The box's choice is its own, apart from the app's model. */
+  agentModels: () => request<AgentModelList>('/agent/models'),
+  /** Remember the box's model. "" follows the app's model again. Never
+   *  changes the model that picks clips. */
+  chooseAgentModel: (model: string) =>
+    request<AgentStatus & { chosen: string }>('/agent/model', {
+      method: 'PUT',
+      body: JSON.stringify({ model })
+    }),
   /** One exchange with the assistant. `steps` is what it actually did, `plan`
    *  is a proposed batch of uploads that NOTHING has acted on yet. */
   agentChat: (
@@ -306,14 +352,21 @@ export const api = {
     history: { role: string; content: string }[],
     /** The Generate bar's current toggles, so a job the assistant queues
      *  behaves like one started by hand. */
-    defaults?: JobOptions
+    defaults?: JobOptions,
+    /** The box's model from its picker; "" is the one it remembers. */
+    model = '',
+    /** Where the box is: the page, and on the Clip Editor the open clip. */
+    context = ''
   ) =>
     request<{
       reply: string
       model: string
       steps: { tool: string; arguments: Record<string, unknown>; result: string }[]
       plan: { items: PublishPlanItem[]; warnings: string[] } | null
-    }>('/agent/chat', { method: 'POST', body: JSON.stringify({ message, history, defaults }) }),
+    }>('/agent/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, history, defaults, model, context })
+    }),
   /** Carry out a plan the person has agreed to. Only a click reaches this. */
   executePublishPlan: (items: PublishPlanItem[]) =>
     request<{

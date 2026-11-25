@@ -12,6 +12,22 @@ fixed were often broken in a way that only showed up on somebody else's machine.
 
 ### Added
 
+- **Choose the model for Ask Clips Kitty in the box itself.** The text box at the bottom of
+  the dashboard has its own model list, like the one in VS Code's AI chat: your Ollama
+  models first, then OpenRouter, then any provider you added your own key for. Each model
+  says whether it can use tools, which the box needs, and a provider with no key yet says
+  "Add your key in Settings". Choosing here only changes the box: your clips are still
+  picked by the model in the sidebar. The box never moves to a paid cloud model on its
+  own. On OpenRouter, the box only goes to providers that support tools, and says so
+  plainly when a model has none.
+
+- **The box plans posts and you press the button.** Ask Clips Kitty no longer posts or
+  schedules by itself: it shows the plan as a card, and nothing goes out until you press
+  Upload these or Schedule these.
+
+- **A new tool for AI agents (MCP): `set_clip_text`.** It changes a clip's title,
+  description or hashtags, as the clip editor's text boxes do, and never posts anything.
+
 - **Two new tools for AI agents (MCP).** `start_queue` presses the Queue page's Start
   queue button, so a video an agent queued starts processing, and `clip_posts` tells
   where each clip was posted and gives the link once a post is live. The MCP server

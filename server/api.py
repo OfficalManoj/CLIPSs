@@ -315,6 +315,17 @@ class AgentIn(BaseModel):
     # live in the renderer, so without them the chat silently used the config
     # defaults and burned captions in on a video whose box was unticked.
     defaults: dict = {}
+    # The box's own model, from its picker ("ollama/gemma4:e4b",
+    # "openrouter/google/gemma-4-26b-a4b-it"). Empty: the one it remembers.
+    model: str = ""
+    # Where the box is (the Dashboard, or the Clip Editor with clip 7 open),
+    # so "add a lower third to this clip" needs no id.
+    context: str = ""
+
+
+class AgentModelIn(BaseModel):
+    # "" goes back to following the app's model.
+    model: str = ""
 
 
 class ExportIn(BaseModel):
@@ -2849,86 +2860,62 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
 
     # ---- the assistant -----------------------------------------------------
 
+    from server.agent_box import Box
+
+    agent_box = Box(
+        config=config, db=db, data_dir=data_dir,
+        ollama_host=config["llm"].get("ollama_host", "http://localhost:11434"),
+        list_models=lambda provider_id: app.state.ai_text_models(provider_id),
+        vram_gb=_nvidia_vram_gb,
+    )
+
     @app.get("/agent/status")
-    def agent_status():
+    def agent_status(model: str = ""):
         """Whether the box can work, and which model it would use.
 
         The app's default clip-scoring model cannot call tools, so this is a
         real question rather than a formality, and the answer belongs in the
-        window instead of arriving as a confusing reply.
+        window instead of arriving as a confusing reply. `model` asks about one
+        model from the box's picker; without it, the box's current model.
         """
-        from llm.spec import is_local, parse_spec
-        from server.agent import install_offer, usable_model
+        return agent_box.check(model)
 
-        backend_spec = config["llm"].get("backend") or ""
-        if not is_local(backend_spec):
-            # A cloud model on the user's own key runs the assistant too: every
-            # provider offered can call tools. What it needs is the key.
-            from llm.providers.catalog import get
-            from llm.providers.keys import has_key
+    @app.get("/agent/models")
+    def agent_models():
+        """The box's model picker: Ollama, then OpenRouter, then the direct
+        providers and plan sign-ins, each model marked with whether it can
+        use tools. The box's choice and the app's model are separate."""
+        return agent_box.listing()
 
-            provider, cloud_model = parse_spec(backend_spec)
-            from llm.signin import catalog as signin
+    @app.put("/agent/model")
+    def agent_choose_model(body: AgentModelIn):
+        """Remember the box's model. Only the box's: the model that picks
+        clips (llm.backend) and the sidebar switcher are left as they are."""
+        from llm.spec import parse_spec
 
-            if signin.is_signin(provider):
-                # Codex's tool calling for other apps is still experimental,
-                # so the assistant doesn't run on a signed-in plan yet.
-                return {
-                    "ready": False,
-                    "model": backend_spec,
-                    "configured": backend_spec,
-                    "reason": "The assistant can't use the ChatGPT plan yet. Choose Ollama or a "
-                              "provider with your own API key in Settings → AI to use it.",
-                    "install": None,
-                }
-            spec = get(provider)
-            ready = bool(spec and cloud_model and has_key(config["llm"].get("data_dir") or data_dir, provider))
-            return {
-                "ready": ready,
-                "model": backend_spec,
-                "configured": backend_spec,
-                "reason": "" if ready else (
-                    f"Add your {spec.key_label if spec else 'API key'} in Settings → AI to use the assistant."
-                ),
-                "install": None,
-            }
-
-        configured = (config["llm"].get("backend") or "").split("/")[-1]
-        model = usable_model(ollama_host, configured)
-        return {
-            "ready": bool(model),
-            "model": model,
-            "configured": configured,
-            "reason": "" if model else (
-                "No installed model can use tools. Install Gemma 4 on the Models page: "
-                "gemma4:e4b for a 6 GB graphics card, gemma4:e2b for less. "
-                "Or use OpenRouter with your own key in Settings → AI."
-            ),
-            # The build for this machine, so the box can offer the download
-            # itself and nobody has to work out which of the two they need.
-            "install": None if model else install_offer(_nvidia_vram_gb()),
-        }
+        spec = body.model.strip()
+        if spec and not parse_spec(spec)[1]:
+            raise HTTPException(400, "Choose a model in the list.")
+        return {"chosen": agent_box.choose(spec), **agent_box.check()}
 
     @app.post("/agent/chat")
     def agent_chat(body: AgentIn):
         """One exchange with the assistant."""
-        from llm.spec import is_local
-        from server.agent import run, run_cloud, usable_model
+        from llm.spec import is_local, parse_spec
+        from server.agent import refusal_text, run, run_cloud, with_defaults
         from server.mcp import TOOLS
 
         if not body.message.strip():
             raise HTTPException(400, "Say what you would like done.")
 
-        cloud = not is_local(config["llm"].get("backend") or "")
-        model = ""
-        if not cloud:
-            configured = (config["llm"].get("backend") or "").split("/")[-1]
-            model = usable_model(ollama_host, configured)
-            if not model:
-                raise HTTPException(
-                    400,
-                    "No installed model can use tools. Install Gemma 4 on the Models page.",
-                )
+        # Checked before a run, every time: a model that can't use tools fails
+        # by inventing an answer, so it is named and the run never starts.
+        checked = agent_box.check(body.model.strip())
+        if not checked["ready"]:
+            raise HTTPException(400, checked["reason"] or "Choose a model in the list.")
+        box_spec = checked["model"]
+        cloud = not is_local(box_spec)
+        model = "" if cloud else parse_spec(box_spec)[1]
 
         # The plan tool's structured items go to the window, which turns them
         # into a Confirm button; the model only needs to describe the plan.
@@ -2936,11 +2923,11 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
             tool = next((x for x in TOOLS if x["name"] == name), None)
             if tool is None:
                 return f"There is no tool called {name}.", None
-            if name == "queue_video":
+            if name in ("queue_video", "queue_local_file"):
                 # Only where the model said nothing: an explicit "no captions"
-                # in the sentence still beats the bar above it.
-                for key, value in (body.defaults or {}).items():
-                    arguments.setdefault(key, value)
+                # in the sentence still beats the bar above it. A file on this
+                # PC follows the bar's switches just as a link does.
+                with_defaults(arguments, body.defaults)
             try:
                 text = tool["handler"](arguments)
             except urllib.error.HTTPError as e:
@@ -2950,7 +2937,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                     detail = json.loads(e.read() or b"{}").get("detail", "")
                 except Exception:
                     detail = ""
-                return f"That was refused: {detail or e.reason}", None
+                return refusal_text(detail or e.reason), None
             except Exception:  # a tool failing is news, not a crash
                 # Unlike the refusal above, this is an unexpected internal
                 # failure rather than our own API saying no. Its text can
@@ -3005,12 +2992,16 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
             if cloud:
                 from llm.registry import create_backend
 
+                # The app's AI settings with only the model swapped for the
+                # box's, never written back: the pipeline keeps its own.
                 return run_cloud(body.message, body.history, TOOLS, call_tool,
-                                 create_backend(config["llm"]))
+                                 create_backend(agent_box.backend_config(box_spec)),
+                                 context=body.context)
             return run(
-                body.message, body.history, TOOLS, call_tool, ollama_host, model,
+                body.message, body.history, TOOLS, call_tool, agent_box.ollama_host, model,
                 # Never below 16K: the tool list alone fills most of Ollama's 4K default.
                 num_ctx=max(16384, int(config["llm"].get("num_ctx") or 0)),
+                context=body.context,
             )
         except Exception as e:
             from llm.providers.base import LLMError

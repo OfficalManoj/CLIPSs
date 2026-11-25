@@ -59,23 +59,19 @@ def _run(monkeypatch, replies, message="do it"):
     return out, calls, fake
 
 
-def test_publishing_is_offered_to_the_model():
-    # This assertion used to say the opposite. Withholding the publish tools
-    # meant "process this video and publish them all" got the processing and
-    # silence about the rest, which is worse than either doing it or saying
-    # no. Colin's call, 2026-09-22: it should do what it is told.
+def test_posting_is_not_offered_to_the_model():
+    # The plan Colin approved on 2026-11-25: posting runs only from the plan
+    # card, after the person's click. The model plans; it never posts.
     names = [spec["function"]["name"] for spec in agent.tool_specs(_tools())]
-    assert "publish_plan_execute" in names
-    assert "uploadpost_publish" in names
-    # Still offered, and still what the model should reach for first.
+    assert "publish_plan_execute" not in names
+    assert "uploadpost_publish" not in names
+    # Planning and reading stay offered.
     assert "uploadpost_status" in names
     assert "publish_plan" in names and "list_videos" in names
 
 
-def test_nothing_is_withheld_from_the_model():
-    # The gate is empty on purpose. If something is ever put back, it needs a
-    # reason written next to it, and this test says so out loud.
-    assert agent.HUMAN_ONLY == set()
+def test_the_posting_tools_are_the_human_only_ones():
+    assert agent.HUMAN_ONLY == {"publish_plan_execute", "schedule_clips_execute", "uploadpost_publish"}
 
 
 def test_a_plain_answer_ends_the_loop(monkeypatch):
@@ -102,24 +98,85 @@ def test_a_plan_is_handed_back_for_a_human_to_confirm(monkeypatch):
     assert out["plan"] == {"items": [{"clip_id": 1}]}
 
 
-def test_executing_a_publish_now_runs(monkeypatch):
-    out, calls, _ = _run(monkeypatch, [
+def test_executing_a_publish_needs_the_click(monkeypatch):
+    out, calls, fake = _run(monkeypatch, [
         {"role": "assistant",
          "tool_calls": [{"function": {"name": "publish_plan_execute", "arguments": {}}}]},
-        {"role": "assistant", "content": "Published"},
+        {"role": "assistant", "content": "Press Upload these"},
     ])
-    assert calls == ["publish_plan_execute"], "the handler must run now"
-    assert out["reply"] == "Published"
+    assert calls == [], "the handler must never run from the box"
+    assert out["steps"][0]["result"].startswith("Not done: posting needs the person's click")
+    # The model is told, in plain words, what to do instead.
+    tool_message = fake.seen[1]["messages"][-2]  # the same list; the reply came after
+    assert tool_message["role"] == "tool" and "plan card" in tool_message["content"]
 
 
-def test_multi_platform_publishing_now_runs(monkeypatch):
+def test_multi_platform_publishing_needs_the_click(monkeypatch):
     out, calls, _ = _run(monkeypatch, [
         {"role": "assistant",
          "tool_calls": [{"function": {"name": "uploadpost_publish",
                                       "arguments": {"clip_id": 1, "platforms": ["youtube"]}}}]},
-        {"role": "assistant", "content": "Published"},
+        {"role": "assistant", "content": "Press the button"},
     ])
-    assert calls == ["uploadpost_publish"]
+    assert calls == []
+    assert out["steps"][0]["result"] == agent.NEEDS_CLICK
+
+
+def test_scheduling_needs_the_click(monkeypatch):
+    out, calls, _ = _run(monkeypatch, [
+        {"role": "assistant",
+         "tool_calls": [{"function": {"name": "schedule_clips_execute", "arguments": {"clip_ids": [1]}}}]},
+        {"role": "assistant", "content": "ok"},
+    ])
+    assert calls == []
+    assert out["steps"][0]["result"] == agent.NEEDS_CLICK
+
+
+def test_publish_when_done_is_never_taken_from_the_model(monkeypatch):
+    fake = _Ollama([
+        {"role": "assistant", "tool_calls": [{"function": {"name": "queue_video", "arguments": {
+            "url": "https://youtu.be/x", "publish_when_done": ["youtube"]}}}]},
+        {"role": "assistant", "content": "Queued"},
+    ])
+    monkeypatch.setitem(__import__("sys").modules, "requests", fake)
+    seen = []
+
+    def call_tool(name, args):
+        seen.append(dict(args))
+        return "Queued as job 1", None
+
+    tools = [{"name": "queue_video", "description": "Queue", "handler": lambda a: "",
+              "inputSchema": {"type": "object", "properties": {
+                  "url": {"type": "string"}, "publish_when_done": {"type": "array"}}}}]
+    out = agent.run("clip and post it", [], tools, call_tool, "http://x", "gemma4:e4b")
+    assert seen == [{"url": "https://youtu.be/x"}]
+    assert agent.NEEDS_CLICK in out["steps"][0]["result"]
+    # Not in what the model is shown either, while the MCP tool keeps it.
+    sent = fake.seen[0]["tools"][0]["function"]["parameters"]["properties"]
+    assert "publish_when_done" not in sent
+    assert "publish_when_done" in tools[0]["inputSchema"]["properties"]
+
+
+
+def test_the_bars_defaults_never_bring_publish_when_done_back():
+    args = agent.with_defaults({"url": "https://youtu.be/x", "captions": False},
+                               {"captions": True, "aspect": "9:16", "publish_when_done": ["youtube"]})
+    assert args == {"url": "https://youtu.be/x", "captions": False, "aspect": "9:16"}
+    assert agent.with_defaults({"url": "u"}, None) == {"url": "u"}
+
+
+def test_the_real_queue_video_hides_publish_when_done_from_the_box():
+    from server.mcp import TOOLS
+
+    specs = {s["function"]["name"]: s["function"] for s in agent.tool_specs(TOOLS)}
+    assert "publish_when_done" not in specs["queue_video"]["parameters"]["properties"]
+    assert not agent.HUMAN_ONLY & set(specs)
+    assert "set_clip_text" in specs
+
+
+def test_the_system_prompt_no_longer_says_to_execute():
+    assert "publish_when_done" not in agent.SYSTEM
+    assert "presses its button" in agent.SYSTEM
 
 
 def test_string_arguments_are_parsed(monkeypatch):
@@ -151,9 +208,9 @@ def test_the_model_is_told_what_time_it_is(monkeypatch):
     assert "RFC 3339" in system
 
 
-def test_scheduling_a_batch_is_allowed(monkeypatch):
-    """Turning a video into a month of posts is exactly the sort of thing to
-    ask for in a sentence, so the model can now do it when asked."""
+def test_scheduling_a_batch_is_planned_not_posted(monkeypatch):
+    """Turning a video into a month of posts is still asked for in a sentence:
+    the model plans it, the card shows it, the click posts it."""
     tools = [
         *_tools(),
         {"name": "schedule_clips_plan", "description": "Plan", "inputSchema": {"type": "object"},
@@ -162,8 +219,19 @@ def test_scheduling_a_batch_is_allowed(monkeypatch):
          "inputSchema": {"type": "object"}, "handler": lambda a: "posted"},
     ]
     names = [spec["function"]["name"] for spec in agent.tool_specs(tools)]
-    assert "schedule_clips_execute" in names
+    assert "schedule_clips_execute" not in names
     assert "schedule_clips_plan" in names
+
+
+def test_a_schedule_plan_reaches_the_card(monkeypatch):
+    fake = _Ollama([
+        {"role": "assistant", "tool_calls": [{"function": {"name": "schedule_clips_plan", "arguments": {}}}]},
+        {"role": "assistant", "content": "Here is the schedule"},
+    ])
+    monkeypatch.setitem(__import__("sys").modules, "requests", fake)
+    card = {"provider": "woopsocial", "items": [{"clip_id": 3}]}
+    out = agent.run("post them", [], [], lambda n, a: ("planned", card), "http://x", "gemma4:e4b")
+    assert out["plan"] == card
 
 
 def test_the_model_gets_room_for_the_tool_list(monkeypatch):
@@ -202,3 +270,40 @@ def test_the_builds_offered_are_ones_the_models_page_lists():
 
     listed = {model for _hardware, model, _note in RECOMMENDATIONS}
     assert set(agent.GEMMA4_DOWNLOAD_GB) <= listed
+
+
+def test_the_model_is_told_to_write_plain_words_for_a_person():
+    # The box showed "**15**" and "check job_status(job_id=5)" as they came.
+    assert "no Markdown" in agent.SYSTEM
+    assert "Never name a tool" in agent.SYSTEM
+
+
+def test_where_the_box_is_reaches_the_system_prompt(monkeypatch):
+    fake = _Ollama([{"role": "assistant", "content": "ok"}])
+    monkeypatch.setitem(__import__("sys").modules, "requests", fake)
+    agent.run("add a title to this clip", [], _tools(), lambda n, a: ("", None), "http://x", "gemma4:e4b",
+              context="the Clip Editor, with clip 7 open")
+    system = fake.seen[0]["messages"][0]["content"]
+    assert "the Clip Editor, with clip 7 open" in system and "'this clip'" in system
+
+
+def test_no_context_adds_nothing():
+    assert agent.where_note("") == ""
+    assert agent.where_note("  ") == ""
+    assert len(agent.where_note("x" * 1000)) < 450
+
+
+def test_the_model_never_asks_for_ids_and_finds_the_newest_video_itself():
+    # "schedule my clips 5 a day" came back asking for clip or video ids.
+    assert "Never ask the person for an id of any kind" in agent.SYSTEM
+    assert "newest finished one" in agent.SYSTEM and "by its title" in agent.SYSTEM
+
+
+def test_posting_refusals_say_what_to_do_in_settings():
+    assert agent.refusal_text("YouTube publishing is not enabled") == (
+        "Connect YouTube in Settings to post from here.")
+    assert agent.refusal_text("WoopSocial publishing is not enabled") == (
+        "Add your WoopSocial key in Settings to post from here.")
+    assert agent.refusal_text("no such clip") == "That was refused: no such clip"
+    for text in agent.REFUSAL_NEXT_STEP.values():
+        assert "not enabled" not in text and "reactivat" not in text

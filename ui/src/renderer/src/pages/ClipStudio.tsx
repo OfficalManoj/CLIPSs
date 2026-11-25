@@ -1,5 +1,6 @@
 import { t } from '../lib/i18n'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Assistant from '../components/Assistant'
 import NoClipsExplanation from '../components/NoClipsExplanation'
 import ClipDirectionNote from '../components/ClipDirectionNote'
 import PluginStepsNote from '../components/PluginStepsNote'
@@ -270,14 +271,37 @@ export default function ClipStudio({
     }
   }
 
+  // Ask Clips Kitty works here too, with the Dashboard's conversation: told
+  // which clip is open, so "add a lower third to this clip" needs no id, and
+  // the clips are read again when it has done something.
+  const openClip = editingClip ?? current
+  const activeTitle = videos.find((v) => v.video_id === activeVideo)?.title
+  const boxWhere = openClip
+    ? `the Clip Editor, with clip ${openClip.id} ("${(openClip.title || openClip.hook || '').slice(0, 80)}") of video ${openClip.video_id} open`
+    : activeVideo
+      ? `the Clip Editor, looking at the clips of video ${activeVideo}${activeTitle ? ` ("${activeTitle.slice(0, 80)}")` : ''}`
+      : 'the Clip Editor'
+  const askBox = (
+    <div className="h-72 min-h-0">
+      <Assistant
+        where={boxWhere}
+        onAnswered={() => {
+          void refreshVideos()
+          if (activeVideo) void refreshClips(activeVideo)
+        }}
+      />
+    </div>
+  )
+
   if (editingClip) {
     return (
-      <div className="p-6">
+      <div className="p-6 space-y-5">
         <EditorView
           clip={editingClip}
           onClose={() => setEditingClipId(null)}
           onChanged={() => activeVideo && refreshClips(activeVideo)}
         />
+        {askBox}
       </div>
     )
   }
@@ -358,6 +382,7 @@ export default function ClipStudio({
       {videos.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-5 items-start">
           <div className="xl:col-span-3 space-y-3">
+            {askBox}
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex gap-1.5" role="group" aria-label={t("Filter clips by format")}>
                 {(
@@ -459,6 +484,8 @@ export default function ClipStudio({
           </div>
         </div>
       )}
+
+      {videos.length === 0 && askBox}
 
       {showSchedule && <ScheduleView onClose={() => setShowSchedule(false)} />}
 

@@ -31,8 +31,10 @@ def attribution_headers() -> dict:
 def _route_to_capable_providers(body: dict) -> dict:
     """With a response format set, only route to providers that honour it
     (OpenRouter's own advice for structured output); otherwise the request
-    could land on one that ignores the format and returns prose."""
-    if "response_format" in body:
+    could land on one that ignores the format and returns prose. The same for
+    tools (the Ask Clips Kitty box): a provider that drops them answers in
+    prose having called nothing."""
+    if "response_format" in body or body.get("tools"):
         body = {**body, "provider": {**body.get("provider", {}), "require_parameters": True}}
     return body
 
