@@ -318,6 +318,9 @@ class AgentIn(BaseModel):
     # The box's own model, from its picker ("ollama/gemma4:e4b",
     # "openrouter/google/gemma-4-26b-a4b-it"). Empty: the one it remembers.
     model: str = ""
+    # Where the box is (the Dashboard, or the Clip Editor with clip 7 open),
+    # so "add a lower third to this clip" needs no id.
+    context: str = ""
 
 
 class AgentModelIn(BaseModel):
@@ -2991,11 +2994,13 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                 # The app's AI settings with only the model swapped for the
                 # box's, never written back: the pipeline keeps its own.
                 return run_cloud(body.message, body.history, TOOLS, call_tool,
-                                 create_backend(agent_box.backend_config(box_spec)))
+                                 create_backend(agent_box.backend_config(box_spec)),
+                                 context=body.context)
             return run(
                 body.message, body.history, TOOLS, call_tool, ollama_host, model,
                 # Never below 16K: the tool list alone fills most of Ollama's 4K default.
                 num_ctx=max(16384, int(config["llm"].get("num_ctx") or 0)),
+                context=body.context,
             )
         except Exception as e:
             from llm.providers.base import LLMError

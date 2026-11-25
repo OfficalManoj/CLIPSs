@@ -88,8 +88,27 @@ SYSTEM = (
     "never removes others.\n"
     "Never drop part of a request in silence. If you cannot do something they "
     "asked for, say which part and why, in the same reply.\n"
-    "Keep answers short and concrete."
+    "Keep answers short and concrete.\n"
+    # The box shows text as it comes: Markdown reached the person as raw
+    # stars, and "check job_status(job_id=5)" told them to run a function.
+    "Write plain sentences for a person, not a developer: no Markdown at all "
+    "(no ** or * for bold or bullets, no # headings, no backticks, no tables). "
+    "For a list, put each item on its own line. Never name a tool, a function "
+    "or its arguments: say what you did, or what they can do in the app, "
+    "like 'the Queue page shows its progress'."
 )
+
+
+def where_note(context: str) -> str:
+    """Where the person is in the app, from the window (the page, and the clip
+    they have open), so 'this clip' means something. Empty: nothing said."""
+    context = " ".join(str(context or "").split())[:300]
+    if not context:
+        return ""
+    return (
+        f"Where the person is in the app right now: {context}. When they say "
+        "'this clip' or 'this video' without an id, they mean that one."
+    )
 
 
 def tool_specs(tools: list[dict]) -> list[dict]:
@@ -210,6 +229,7 @@ def run(
     host: str,
     model: str,
     num_ctx: int = 16384,
+    context: str = "",
 ) -> dict:
     """One exchange: the model calls tools until it can answer.
 
@@ -232,7 +252,7 @@ def run(
         "Work out any 'tomorrow' or 'tonight' from that, and always pass times "
         "in RFC 3339 WITH the offset, like 2026-09-18T12:00:00-05:00."
     )
-    messages = [{"role": "system", "content": SYSTEM + chr(10) + when}]
+    messages = [{"role": "system", "content": chr(10).join(x for x in (SYSTEM, when, where_note(context)) if x)}]
     messages += [m for m in history if m.get("role") in ("user", "assistant")]
     messages.append({"role": "user", "content": message})
 
@@ -294,7 +314,8 @@ def run(
     }
 
 
-def run_cloud(message: str, history: list[dict], tools: list[dict], call_tool, backend) -> dict:
+def run_cloud(message: str, history: list[dict], tools: list[dict], call_tool, backend,
+              context: str = "") -> dict:
     """The same exchange as run(), on a cloud model with the user's own key.
 
     run() is the local path and is left exactly as it is. This is its twin for
@@ -310,7 +331,7 @@ def run_cloud(message: str, history: list[dict], tools: list[dict], call_tool, b
         "Work out any 'tomorrow' or 'tonight' from that, and always pass times "
         "in RFC 3339 WITH the offset, like 2026-09-18T12:00:00-05:00."
     )
-    messages = [{"role": "system", "content": SYSTEM + chr(10) + when}]
+    messages = [{"role": "system", "content": chr(10).join(x for x in (SYSTEM, when, where_note(context)) if x)}]
     messages += [{"role": m["role"], "content": str(m.get("content") or "")}
                  for m in history if m.get("role") in ("user", "assistant")]
     messages.append({"role": "user", "content": message})

@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { openAISetup } from '../lib/aiSetup'
 import { api, type AgentModelList } from '../lib/api'
+import {
+  chatState,
+  plainReply,
+  subscribeChat,
+  updateChat,
+  type ChatSchedule,
+  type ChatTurn
+} from '../lib/assistantChat'
 import { t } from '../lib/i18n'
 import { CHECKING, isChecking, pullPercent } from '../lib/modelPull'
-import type { PublishPlanItem } from '../lib/types'
 import { useEvents } from '../lib/useEvents'
 import AssistantModelPicker from './AssistantModelPicker'
 import { seedOptions } from './queue/AddVideos'
-
-interface Turn {
-  role: 'user' | 'assistant'
-  text: string
-  steps?: { tool: string; result: string }[]
-}
 
 /** Ask Clips Kitty to do things in plain language.
  *
@@ -27,8 +28,19 @@ interface Turn {
  *
  *  It plans posts but never posts (server/agent.py HUMAN_ONLY): a plan comes
  *  back as a card here, and only a click on that card posts or schedules.
+ *
+ *  The same box sits on the Dashboard and the Clip Editor, with one
+ *  conversation between them (lib/assistantChat). `where` says where it is,
+ *  so "this clip" on the Clip Editor means the clip that is open there, and
+ *  `onAnswered` lets that page show what a request changed.
  */
-export default function Assistant(): JSX.Element | null {
+export default function Assistant({
+  where = '',
+  onAnswered
+}: {
+  where?: string
+  onAnswered?: () => void
+} = {}): JSX.Element | null {
   const [ready, setReady] = useState<boolean | null>(null)
   const [model, setModel] = useState('')
   const [reason, setReason] = useState('')
@@ -38,23 +50,16 @@ export default function Assistant(): JSX.Element | null {
   // engine (PUT /agent/model), never the app's model.
   const [models, setModels] = useState<AgentModelList | null>(null)
   const [loadingModels, setLoadingModels] = useState(true)
-  const [turns, setTurns] = useState<Turn[]>([])
+  // The conversation is shared by every page's box (lib/assistantChat), so
+  // it carries over when you change page; only the half-typed input is this
+  // copy's own.
+  const { turns, busy, plan, planNote, schedule } = useSyncExternalStore(subscribeChat, chatState)
+  const addTurn = (turn: ChatTurn): void => updateChat((now) => ({ turns: [...now.turns, turn] }))
+  const setBusy = (value: boolean): void => updateChat({ busy: value })
+  const setPlan = (value: typeof plan): void => updateChat({ plan: value })
+  const setPlanNote = (value: string): void => updateChat({ planNote: value })
+  const setSchedule = (value: ChatSchedule | null): void => updateChat({ schedule: value })
   const [input, setInput] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [plan, setPlan] = useState<PublishPlanItem[] | null>(null)
-  const [planNote, setPlanNote] = useState('')
-  // A social-platform schedule is a different plan from a YouTube one:
-  // different confirm, different wording. Null means the YouTube kind.
-  const [schedule, setSchedule] = useState<{
-    platforms: string[]
-    every_hours: number
-    /** A daily budget. 0 means a flat every_hours gap instead. */
-    per_day: number
-    gap_hours: number
-    /** When the first post goes out, as the plan worked it out. Empty means now. */
-    start_at: string
-    hashtags: string[]
-  } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   // The Gemma 4 build to offer when nothing installed can run the box (#121).
   const [install, setInstall] = useState<{ model: string; size_gb: number } | null>(null)
@@ -241,32 +246,31 @@ export default function Assistant(): JSX.Element | null {
 
   const send = async (): Promise<void> => {
     const text = input.trim()
-    if (!text || busy) return
+    // Read from the store, not this render: another page's box may be busy.
+    if (!text || chatState().busy) return
     setInput('')
-    setPlan(null)
-    setPlanNote('')
-    setSchedule(null)
-    setTurns((prior) => [...prior, { role: 'user', text }])
-    setBusy(true)
+    // The words so far, before this one is added.
+    const prior = chatState().turns
+    updateChat({ plan: null, planNote: '', schedule: null, busy: true })
+    addTurn({ role: 'user', text })
     try {
       // Only the words go back, not the tool traffic: the model re-reads its
       // own answers, and feeding it every raw tool result again would fill
       // the context with things it already summarised.
-      const history = turns.map((turn) => ({ role: turn.role, content: turn.text }))
+      const history = prior.map((turn) => ({ role: turn.role, content: turn.text }))
       // The Generate bar's settings travel with the message. Without
       // them a job asked for in the chat ignored every toggle above it:
       // captions came back burned in however often the box was unticked,
       // because that choice lives in this window and the model never
       // saw it.
-      const res = await api.agentChat(text, history, seedOptions(), model)
-      setTurns((prior) => [
-        ...prior,
-        {
-          role: 'assistant',
-          text: res.reply || t('Done.'),
-          steps: res.steps?.map((s) => ({ tool: s.tool, result: s.result }))
-        }
-      ])
+      const res = await api.agentChat(text, history, seedOptions(), model, where)
+      addTurn({
+        role: 'assistant',
+        text: plainReply(res.reply) || t('Done.'),
+        steps: res.steps?.map((s) => ({ tool: s.tool, result: s.result }))
+      })
+      // A retitled clip or a new animation shows on the page at once.
+      if (res.steps?.length) onAnswered?.()
       if (res.plan?.items?.length) {
         setPlan(res.plan.items)
         setPlanNote((res.plan.warnings || []).join(' '))
@@ -293,17 +297,14 @@ export default function Assistant(): JSX.Element | null {
         )
       }
     } catch (e) {
-      setTurns((prior) => [
-        ...prior,
-        { role: 'assistant', text: String(e).replace(/^Error:\s*/, '') }
-      ])
+      addTurn({ role: 'assistant', text: String(e).replace(/^Error:\s*/, '') })
     } finally {
       setBusy(false)
     }
   }
 
   const confirmPlan = async (): Promise<void> => {
-    if (!plan || busy) return
+    if (!plan || chatState().busy) return
     setBusy(true)
     try {
       // A social-platform schedule goes through the batch route; a YouTube
@@ -326,7 +327,7 @@ export default function Assistant(): JSX.Element | null {
         for (const row of res.skipped) {
           parts.push(`${t('Skipped clip')} ${row.clip_id}: ${row.reason}`)
         }
-        setTurns((prior) => [...prior, { role: 'assistant', text: parts.join(' ') }])
+        addTurn({ role: 'assistant', text: parts.join(' ') })
         setPlan(null)
         setSchedule(null)
         return
@@ -334,7 +335,7 @@ export default function Assistant(): JSX.Element | null {
       const res = await api.executePublishPlan(plan)
       const parts = [`${t('Uploading')} ${res.started.length}.`]
       for (const row of res.skipped) parts.push(`${t('Skipped clip')} ${row.clip_id}: ${row.reason}`)
-      setTurns((prior) => [...prior, { role: 'assistant', text: parts.join(' ') }])
+      addTurn({ role: 'assistant', text: parts.join(' ') })
       setPlan(null)
     } catch (e) {
       setPlanNote(String(e).replace(/^Error:\s*/, ''))
