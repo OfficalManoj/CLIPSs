@@ -535,7 +535,7 @@ def test_the_box_writes_with_the_model_it_runs_on(client, monkeypatch, tmp_path)
     tool = next(t for t in mcp.TOOLS if t["name"] == "add_animation")
     monkeypatch.setitem(tool, "handler", lambda args: seen.update(args) or "ok")
 
-    def fake_run_cloud(message, history, tools, call_tool, backend):
+    def fake_run_cloud(message, history, tools, call_tool, backend, context=""):
         call_tool("add_animation", {"clip_id": 5, "request": "a title", "model": "something/else"})
         return {"reply": "done", "steps": [], "plan": None, "model": backend.name}
 
