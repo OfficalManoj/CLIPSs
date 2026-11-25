@@ -121,3 +121,10 @@ def test_a_schedule_plan_reaches_the_card_on_a_cloud_model():
     card = {"provider": "woopsocial", "items": [{"clip_id": 2}]}
     result = run_cloud("post them 5 a day", [], TOOLS, lambda n, a: ("planned", card), backend)
     assert result["plan"] == card
+
+
+def test_where_the_box_is_reaches_a_cloud_model_too():
+    backend = Scripted([ChatTurn(text="ok")])
+    run_cloud("retitle this clip", [], TOOLS, lambda n, a: ("", None), backend,
+              context="the Clip Editor, with clip 7 open")
+    assert "clip 7 open" in backend.seen[0][0][0]["content"]

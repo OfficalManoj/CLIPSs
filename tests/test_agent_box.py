@@ -319,3 +319,21 @@ def test_the_routes_choose_the_box_model_only(client):
     refused = http_client.post("/agent/chat", json={"message": "list my videos"})
     assert refused.status_code == 400 and "can't use tools" in refused.json()["detail"]
     assert http_client.put("/agent/model", json={"model": "openrouter/"}).status_code == 400
+
+
+def test_the_chat_tells_the_model_where_the_box_is(client, monkeypatch):
+    # The box sits on the Clip Editor too; it says which clip is open there.
+    from server import agent
+
+    http_client, _ = client
+    seen = {}
+
+    def fake_run(message, history, tools, call_tool, host, model, num_ctx=16384, context=""):
+        seen["context"] = context
+        return {"reply": "ok", "steps": [], "plan": None, "model": model}
+
+    monkeypatch.setattr(agent, "run", fake_run)
+    r = http_client.post("/agent/chat", json={"message": "add a title to this clip", "model": "ollama/gemma4:e4b",
+                                              "context": "the Clip Editor, with clip 7 open"})
+    assert r.status_code == 200, r.text
+    assert seen["context"] == "the Clip Editor, with clip 7 open"

@@ -270,3 +270,24 @@ def test_the_builds_offered_are_ones_the_models_page_lists():
 
     listed = {model for _hardware, model, _note in RECOMMENDATIONS}
     assert set(agent.GEMMA4_DOWNLOAD_GB) <= listed
+
+
+def test_the_model_is_told_to_write_plain_words_for_a_person():
+    # The box showed "**15**" and "check job_status(job_id=5)" as they came.
+    assert "no Markdown" in agent.SYSTEM
+    assert "Never name a tool" in agent.SYSTEM
+
+
+def test_where_the_box_is_reaches_the_system_prompt(monkeypatch):
+    fake = _Ollama([{"role": "assistant", "content": "ok"}])
+    monkeypatch.setitem(__import__("sys").modules, "requests", fake)
+    agent.run("add a title to this clip", [], _tools(), lambda n, a: ("", None), "http://x", "gemma4:e4b",
+              context="the Clip Editor, with clip 7 open")
+    system = fake.seen[0]["messages"][0]["content"]
+    assert "the Clip Editor, with clip 7 open" in system and "'this clip'" in system
+
+
+def test_no_context_adds_nothing():
+    assert agent.where_note("") == ""
+    assert agent.where_note("  ") == ""
+    assert len(agent.where_note("x" * 1000)) < 450

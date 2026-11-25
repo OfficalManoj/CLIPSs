@@ -79,7 +79,7 @@ def test_the_closed_picker_shows_the_models_own_name(tmp_path):
 def test_the_box_sends_its_model_and_never_switches_the_apps():
     box = (UI / "components" / "Assistant.tsx").read_text(encoding="utf-8")
     picker = (UI / "components" / "AssistantModelPicker.tsx").read_text(encoding="utf-8")
-    assert "api.agentChat(text, history, seedOptions(), model)" in box
+    assert "api.agentChat(text, history, seedOptions(), model, where)" in box
     assert "api.chooseAgentModel(spec)" in box
     assert "<AssistantModelPicker" in box
     # Its picker is in both the ready box and the not-ready one, so a model

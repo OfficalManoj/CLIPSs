@@ -752,7 +752,7 @@ export default function Dashboard({
             <div className="h-1 w-20 rounded-full bg-raised transition-colors group-hover:bg-accent/70 group-focus:bg-accent" />
           </div>
           <div className="flex-1 min-h-0">
-            <Assistant />
+            <Assistant where="the Dashboard" />
           </div>
         </div>
       </div>

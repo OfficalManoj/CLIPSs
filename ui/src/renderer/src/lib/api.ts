@@ -354,14 +354,19 @@ export const api = {
      *  behaves like one started by hand. */
     defaults?: JobOptions,
     /** The box's model from its picker; "" is the one it remembers. */
-    model = ''
+    model = '',
+    /** Where the box is: the page, and on the Clip Editor the open clip. */
+    context = ''
   ) =>
     request<{
       reply: string
       model: string
       steps: { tool: string; arguments: Record<string, unknown>; result: string }[]
       plan: { items: PublishPlanItem[]; warnings: string[] } | null
-    }>('/agent/chat', { method: 'POST', body: JSON.stringify({ message, history, defaults, model }) }),
+    }>('/agent/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, history, defaults, model, context })
+    }),
   /** Carry out a plan the person has agreed to. Only a click reaches this. */
   executePublishPlan: (items: PublishPlanItem[]) =>
     request<{
