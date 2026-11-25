@@ -44,6 +44,16 @@ def _gapped() -> list[Segment]:
     return [Segment(start=0.0, end=60.0, text=" ".join(w["word"] for w in words), words=words)]
 
 
+@pytest.fixture(autouse=True)
+def _word_count_alone(monkeypatch):
+    """Captions grouped by the word count alone: three of these "w24" words
+    are wider than one line at the default size, and the colours, not the
+    one-line rule (tests/test_caption_one_line.py), are what is tested here."""
+    import video.captions as captions
+
+    monkeypatch.setattr(captions, "_fits", lambda fit, words: True)
+
+
 @pytest.fixture
 def pipeline(monkeypatch):
     pytest.importorskip("numpy")

@@ -247,6 +247,12 @@ def render(intermediate: Path, output: Path, g: dict, config: dict, ass_path: Pa
     if cam_el is not None and "cam" in heads:
         face = framing.face_clear(heads["cam"], cam_el.src, cam_el.dest, cam_el.shift,
                                   framing.safe_zone(p.safe))
+    # The heads as shares of the frame, so the editor's project (made from
+    # the source, kitty_editor/sections.py) frames the webcams the same way
+    # without looking for them again.
+    heads_norm = {role: [round(hx / src_w, 5), round(top / src_h, 5), round(chin / src_h, 5)]
+                  for role, (hx, top, chin) in heads.items()}
     return {**(settings if whole else g), "layout": p.kind, "used_preset": p.preset,
             "used_cam": [round(v, 4) for v in use] if use else None,
-            **({"face": face} if face is not None else {})}
+            **({"face": face} if face is not None else {}),
+            **({"heads_norm": heads_norm} if heads_norm else {})}

@@ -148,7 +148,9 @@ ROUTES = [("get", "/editor/status"), ("get", "/editor/launch"), ("get", "/editor
           ("post", "/editor/projects/" + "0" * 32 + "/exports"),
           ("get", "/editor/projects/" + "0" * 32 + "/languages"),
           ("post", "/editor/projects/" + "0" * 32 + "/languages"),
-          ("post", "/editor/projects/" + "0" * 32 + "/languages/apply")]
+          ("post", "/editor/projects/" + "0" * 32 + "/languages/apply"),
+          ("post", "/editor/projects/" + "0" * 32 + "/layout"),
+          ("post", "/editor/projects/" + "0" * 32 + "/layout/apply")]
 
 
 @pytest.mark.parametrize("method, path", ROUTES)
@@ -185,7 +187,8 @@ def test_the_served_editor_routes_are_exactly_these_and_all_internal(env):
             ("POST", "/editor/projects/{project_id}/open"), ("DELETE", "/editor/projects/{project_id}"),
             ("POST", "/editor/projects/{project_id}/exports"),
             ("GET", "/editor/projects/{project_id}/languages"), ("POST", "/editor/projects/{project_id}/languages"),
-            ("POST", "/editor/projects/{project_id}/languages/apply")}
+            ("POST", "/editor/projects/{project_id}/languages/apply"),
+            ("POST", "/editor/projects/{project_id}/layout"), ("POST", "/editor/projects/{project_id}/layout/apply")}
     assert {route for route in served if route[1].startswith("/editor/")} == mine
     for route in mine:
         assert st.label(*route) == st.INTERNAL
@@ -1095,7 +1098,7 @@ def test_the_clips_video_is_made_again_when_its_window_framing_or_file_changed(e
     env.db.conn.commit()
     fresh()
     assert len(env.rendered) == 1                                   # the captions' colour: the same video
-    env.db.conn.execute("UPDATE clips SET render_opts = ? WHERE id = ?", (json.dumps({"crop": "center"}), clip_id))
+    env.db.conn.execute("UPDATE clips SET render_opts = ? WHERE id = ?", (json.dumps({"crop": "bias_left"}), clip_id))
     env.db.conn.commit()
     fresh()
     assert len(env.rendered) == 2                                   # the framing
@@ -1191,3 +1194,72 @@ def test_caption_words_typed_in_the_editor_reach_the_clip_and_clip_captions(env)
     r = env.post(f"/editor/projects/{project['id']}/exports", {"file": "Clip two.mp4", "export_folder": None})
     assert r.json()["result"] == "replaced_clip" and "captions" not in r.json()
     assert env.get(f"/clips/{other}/captions").json()["lines"] == lines
+
+
+# ---- gaming sections, Letterbox and Center from the source; the Layout picker (KG) ---------------
+
+KG_GAMING = {"cam": [0.02, 0.05, 0.25, 0.3], "preset": "split", "by": "video", "layout": "split",
+             "used_preset": "split", "used_cam": [0.02, 0.05, 0.25, 0.3], "panels": [],
+             "heads_norm": {"cam": [0.14, 0.06, 0.2]}}
+
+
+@pytest.mark.parametrize("opts, kind", [({"gaming": KG_GAMING}, "gaming"), ({"crop": "letterbox"}, "framing"),
+                                         ({"crop": "center"}, "framing")])
+def test_a_gaming_letterbox_or_center_clip_opens_from_the_source_with_no_base_render(env, opts, kind):
+    clip_id = env.clip(opts)
+    project = env.open({"kind": "clip", "clip_id": clip_id})
+    assert env.rendered == []                                           # no base render
+    assert Path(project["video_file"]) == env.data_dir / "downloads" / "vid1.mp4"
+    assert project["clock"] == "source" and "framing_baked" not in project["notes"]
+    assert project["layout"]["kind"] == kind and project["canvas"]["width"] == 1080
+    doc = saved(project)
+    piece = next(c for c in doc["clips"] if c["kind"] == "video")
+    assert piece["sourceStart"] == pytest.approx(10.0)                  # the clip's window of the source
+    # The window (45 s and the render's end pad), held to what the stand-in's
+    # 45.4 s "source" has left after 10 s.
+    assert sum(c["duration"] for c in doc["clips"] if c["kind"] == "video") == pytest.approx(35.4)
+
+
+def test_with_its_source_gone_a_gaming_clip_opens_as_before(env):
+    clip_id = env.clip({"gaming": KG_GAMING})
+    (env.data_dir / "downloads" / "vid1.mp4").unlink()
+    project = env.open({"kind": "clip", "clip_id": clip_id})
+    assert len(env.rendered) == 1 and "source_missing" in project["notes"] and project["layout"] is None
+
+
+@pytest.mark.parametrize("opts", [{"profile": "longform"}, {"vertical_live": True}, {"podcast": True},
+                                  {"sport": "basketball"}])
+def test_no_layout_to_pick_for_longform_vertical_live_podcast_or_sport(env, opts):
+    project = env.open({"kind": "clip", "clip_id": env.clip(opts)})
+    assert project["layout"] is None
+    r = env.post(f"/editor/projects/{project['id']}/layout", {"crop": "letterbox"})
+    assert r.status_code == 400
+
+
+def test_the_layout_route_queues_its_job_and_waits_for_a_build(env):
+    from kitty_editor import registry
+
+    project = env.open({"kind": "clip", "clip_id": env.clip({"crop": "track"})})
+    assert project["layout"] == {"kind": "framing", "crop": "track"}
+    r = env.post(f"/editor/projects/{project['id']}/layout", {"crop": "letterbox"})
+    assert r.status_code == 200, r.text
+    job = env.db.conn.execute("SELECT type, payload FROM jobs WHERE id = ?", (r.json()["job_id"],)).fetchone()
+    assert job["type"] == "editor_layout" and json.loads(job["payload"]) == {"project_id": project["id"],
+                                                                          "crop": "letterbox"}
+    assert env.post(f"/editor/projects/{project['id']}/layout", {"crop": "zoom"}).status_code == 400
+    assert env.post(f"/editor/projects/{project['id']}/layout", {}).status_code == 400
+    assert env.post(f"/editor/projects/{project['id']}/layout/apply").json() == {"layout": None}   # nothing made yet
+    registry.update(env.data_dir, project["id"], lambda m: m.update(state="building"))
+    r = env.post(f"/editor/projects/{project['id']}/layout", {"crop": "center"})
+    assert r.status_code == 409 and r.json()["detail"]["reason"] == "building"
+
+
+def test_the_picker_shows_the_layout_picked_and_the_webcam_as_it_is(env):
+    from kitty_editor import registry
+
+    project = env.open({"kind": "clip", "clip_id": env.clip({"gaming": KG_GAMING})})
+    shown = project["layout"]["gaming"]
+    # The webcam the render used, given as set, so GamingLayoutEditor starts from it.
+    assert shown["cam"] == KG_GAMING["used_cam"] and shown["by"] == "user" and shown["preset"] == "split"
+    registry.update(env.data_dir, project["id"], lambda m: m.update(layout={"kind": "framing", "crop": "letterbox"}))
+    assert env.get(f"/editor/projects/{project['id']}").json()["layout"] == {"kind": "framing", "crop": "letterbox"}

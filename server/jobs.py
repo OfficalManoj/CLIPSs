@@ -374,6 +374,8 @@ class Worker(threading.Thread):
                         self._editor_languages(db, payload)
                     finally:
                         _release_voice()
+                elif job["type"] == "editor_layout":
+                    self._editor_layout(db, payload)
                 else:
                     raise ValueError(f"Unknown job type {job['type']!r}")
                 db.finish_job(job["id"], "done")
@@ -793,6 +795,31 @@ class Worker(threading.Thread):
         if problems:
             raise RuntimeError(" ".join(dict.fromkeys(problems)))
 
+    def _editor_layout(self, db: StateDB, payload: dict) -> None:
+        """The Layout picker (step KG): the new layout's lanes for a clip's
+        editor project, and what they need (the heads in the webcams, or
+        Auto's framed video), kept for the app to put in
+        (kitty_editor.relayout). The project itself is not changed here:
+        the editor may have it open."""
+        from kitty_editor import registry, relayout
+
+        data_dir = Path(self.config["paths"]["data_dir"])
+        project_id = str(payload["project_id"])
+        manifest = registry.load(data_dir, project_id)
+        row = db.get_clip(int((manifest.get("clip") or {}).get("id") or 0))
+        if row is None:
+            raise RuntimeError("This clip isn't in Clips Kitty any more.")
+
+        def report(label: str, done: int, total: int) -> None:
+            progress.emit(stage="editor_layout", message=label,
+                          fraction=min(0.999, done / max(1, total)), project_id=project_id)
+
+        try:
+            relayout.prepare(data_dir, project_id, {k: payload.get(k) for k in ("gaming", "crop")},
+                             row=row, config=self.config, progress=report)
+        except ValueError as e:
+            raise RuntimeError(str(e)) from e
+
     def _source_language(self, video_id: str, data_dir: Path) -> str:
         try:
             from transcription.transcriber import detected_language
@@ -808,7 +835,7 @@ class Worker(threading.Thread):
             import json as _json
 
             from core.models import ClipCandidate, Segment
-            from video.captions import DEFAULT_STYLE, build_caption_lines
+            from video.captions import DEFAULT_STYLE, build_caption_lines, line_fit
 
             tpath = data_dir / "transcripts" / f"{clip['video_id']}.json"
             if not tpath.exists():
@@ -820,7 +847,11 @@ class Worker(threading.Thread):
             cand = ClipCandidate(
                 start=clip["start_s"], end=clip["end_s"], score=clip["score"] or 0
             )
-            return build_caption_lines(segments, cand, wpc)
+            # One line per caption, in the box the burn draws it in.
+            style = opts.get("caption_style") or (self.config.get("clips") or {}).get("caption_style")
+            canvas = (1920, 1080) if opts.get("profile") else (1080, 1920)
+            fit = line_fit(style, canvas, self._source_language(clip["video_id"], data_dir))
+            return build_caption_lines(segments, cand, wpc, fit=fit)
         except Exception as e:
             print(f"      (could not rebuild captions: {e})")
             return []
@@ -1081,12 +1112,15 @@ class Worker(threading.Thread):
         if render_opts.get("caption_lines"):
             # Saved caption text is timed for the clip as it was saved: carried
             # to the clip as it is now, and the seconds it gained captioned (#120).
-            from video.captions import DEFAULT_STYLE, refit_caption_lines
+            from transcription.transcriber import detected_language
+            from video.captions import DEFAULT_STYLE, line_fit, refit_caption_lines
 
             style = render_opts.get("caption_style") or (self.config.get("clips") or {}).get("caption_style")
+            canvas = (1920, 1080) if render_opts.get("profile") else (1080, 1920)
             render_opts["caption_lines"] = refit_caption_lines(
                 render_opts["caption_lines"], segments, float(clip["start_s"]), start, end,
                 {**DEFAULT_STYLE, **(style or {})}["words_per_caption"],
+                fit=line_fit(style, canvas, detected_language(video_id, data_dir / "transcripts")),
             )
         if render_opts.get("speaker_edits"):
             # Who a person said is talking where (the editor's Fix speakers) is

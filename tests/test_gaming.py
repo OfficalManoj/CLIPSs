@@ -306,7 +306,9 @@ def test_whole_clip_real_encode_keeps_duration_captions_and_portrait(tmp_path, m
     result = json.loads(probe.stdout)
     assert result["streams"][0]["width"] == 1080 and result["streams"][0]["height"] == 1920
     assert abs(float(result["format"]["duration"]) - duration) < 0.15
-    assert burned and "Synthetic caption" in burned[0] and json.loads(saved)["whole"] is True
+    # One line per caption: at the default size these words are a caption each.
+    assert burned and all(f"}}{w}\n" in burned[0] for w in ("Synthetic", "caption", "fixture"))
+    assert json.loads(saved)["whole"] is True
     assert json.loads(saved)["gaming"]["used_preset"] == "blurred"
 
 

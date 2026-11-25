@@ -1218,10 +1218,18 @@ export interface EditorProject {
   clip_gone?: boolean
   media_missing?: boolean
   damaged?: boolean
+  /** What the Layout picker shows (KG): a gaming clip's layout, a framing
+   *  (Auto, Letterbox or Center), or null for a project with no layout to
+   *  pick (Longform, Vertical Live, Podcast, sport, made from an export). */
+  layout?: EditorLayout | null
   /** POST /editor/projects/{id}/open only: exports found in the project's
    *  out folder after the app stopped, taken in now. */
   recovered?: EditorTakeIn[]
 }
+
+export type EditorFraming = 'track' | 'letterbox' | 'center'
+
+export type EditorLayout = { kind: 'gaming'; gaming: GamingSettings } | { kind: 'framing'; crop: EditorFraming }
 
 /** What the engine answered when it took an export in (E4), or what the
  *  main process says of an export that did not finish. */
@@ -1308,6 +1316,14 @@ export const editorApi = {
       method: 'POST',
       body: JSON.stringify(body)
     }),
+  /** The Layout picker (KG): queue the project's rebuild in a gaming layout or a framing. */
+  layout: (id: string, body: { gaming: GamingSettings } | { crop: EditorFraming }) =>
+    editorRequest<{ job_id: number; layout: EditorLayout }>(`/editor/projects/${id}/layout`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  applyLayout: (id: string) =>
+    editorRequest<{ layout: EditorLayout | null }>(`/editor/projects/${id}/layout/apply`, { method: 'POST' }),
   applyLanguages: (id: string) =>
     editorRequest<{ added: { timeline: string; language: string; voice: boolean }[] }>(
       `/editor/projects/${id}/languages/apply`,

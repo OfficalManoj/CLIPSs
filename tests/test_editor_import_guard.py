@@ -324,7 +324,8 @@ def test_the_worker_and_the_database_never_import_the_package():
 # worker asks it one thing, inside the function that re-renders a clip).
 
 KITTY = ROOT / "kitty_editor"
-KITTY_FILES = ("__init__.py", "automation.py", "build.py", "fastbase.py", "intake.py", "languages.py", "registry.py")
+KITTY_FILES = ("__init__.py", "automation.py", "build.py", "fastbase.py", "intake.py", "languages.py", "registry.py",
+               "relayout.py", "sections.py")
 KITTY_ASKS_INSIDE_A_FUNCTION = {
     "registry.py": {"core.binaries"},
     # core.modes, video.encoding: the base's layout and its encoder settings; video.asd and
@@ -339,6 +340,11 @@ KITTY_ASKS_INSIDE_A_FUNCTION = {
     "intake.py": {"core.paths", "core.remake", "core.state", "multilingual.languages", "server.jobs"},
     # Language tabs (KF): language names and the caption font for a language's letters.
     "languages.py": {"multilingual.languages", "video.caption_presets"},
+    # Gaming sections and framings as editor lanes (KG): the auto render's own layout Plan, the
+    # webcam head finder, the clip's mode, and the loudness measure (FFmpeg and its target).
+    "sections.py": {"core.binaries", "core.modes", "gaming", "video.encoding"},
+    # The Layout picker (KG): the cached source and a layout's presets.
+    "relayout.py": {"core.paths", "gaming.layout"},
 }
 
 

@@ -205,6 +205,13 @@
         "face": {
           "top": true,
           "bottom": true
+        },
+        "heads_norm": {
+          "cam": [
+            0.1224,
+            0.65926,
+            0.81481
+          ]
         }
       },
       "job_captions": false
@@ -428,6 +435,13 @@
         "face": {
           "top": true,
           "bottom": true
+        },
+        "heads_norm": {
+          "cam": [
+            0.1224,
+            0.65926,
+            0.81481
+          ]
         }
       },
       "job_captions": false

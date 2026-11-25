@@ -13,10 +13,18 @@
  *  The Clips page's "Edit whole video" was removed in FL3, and Quick edit
  *  (the old editor) in KC. */
 import { useEffect, useState } from 'react'
-import { editorApi, EditorRouteError, type EditorOpenRequest, type EditorProject, type EditorTakeIn } from './api'
+import {
+  editorApi,
+  EditorRouteError,
+  type EditorFraming,
+  type EditorOpenRequest,
+  type EditorProject,
+  type EditorTakeIn
+} from './api'
 import { exportDestination, nextOpeningProgress, OPENING_MOST } from './editorOpening'
 import { getExportFolder } from './exportFolder'
 import { t } from './i18n'
+import type { GamingSettings } from './types'
 
 export const OPEN_EDITOR_PAGE = 'open-editor-page'
 
@@ -484,8 +492,9 @@ export async function openEditorProject(id: string): Promise<void> {
 export async function ensureEditorShown(): Promise<void> {
   const bridge = window.studio?.editor
   const id = store.shownId
-  // Not while language tabs are being added: the editor is away on purpose
-  // and is shown again when they are in (makeLanguageTabs).
+  // Not while language tabs are being added or the layout is changed: the
+  // editor is away on purpose and is shown again when they are in
+  // (makeLanguageTabs, changeLayout).
   if (!bridge || !id || addingTabs) return
   set({ runtime: { ...store.runtime, error: '', ended: '' } })
   // Read again: the clip may have been deleted since (FL2 F4).
@@ -681,6 +690,71 @@ export async function makeLanguageTabs(
     addingTabs = false
   }
   if (store.shownId === projectId) await ensureEditorShown()
+  if (failed) showEditorNotice({ text: failed, failure: true })
+  return failed
+}
+
+function layoutErrorText(e: unknown): string {
+  if (e instanceof EditorRouteError && e.message) return t(e.message)
+  return t('The layout could not be changed. Your project is as it was.')
+}
+
+/** The Layout picker (KG): the shown clip project rebuilt in another layout,
+ *  its cuts and captions kept. As makeLanguageTabs: the engine makes what
+ *  the layout needs while the editor stays usable, then the editor saves and
+ *  closes the project, the layout goes in, and the editor shows it again.
+ *  Resolves with the failure's sentence, or '' when it is in (or waits for
+ *  the next open). */
+export async function changeLayout(
+  projectId: string,
+  body: { gaming: GamingSettings } | { crop: EditorFraming },
+  onStep: (text: string) => void = () => undefined
+): Promise<string> {
+  // The rebuild starts from the project as saved: give the autosave a moment.
+  for (let i = 0; i < 25 && store.shownId === projectId && store.runtime.dirty; i++) await sleep(200)
+  let jobId: number
+  try {
+    jobId = (await editorApi.layout(projectId, body)).job_id
+  } catch (e) {
+    return layoutErrorText(e)
+  }
+  onStep(t('Changing the layout. You can keep editing.'))
+  for (;;) {
+    await sleep(1000)
+    const job = (await editorApi.jobs().catch(() => [])).find((j) => j.id === jobId)
+    if (!job || job.status === 'queued' || job.status === 'running') continue
+    if (job.status !== 'done') return job.error || t('The layout could not be changed. Your project is as it was.')
+    break
+  }
+  if (store.shownId !== projectId) return ''
+  onStep(t('The editor reopens with the new layout in a few seconds.'))
+  const bridge = window.studio?.editor
+  addingTabs = true
+  let failed = ''
+  try {
+    await bridge?.close()
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await editorApi.applyLayout(projectId)
+        break
+      } catch (e) {
+        // The window lets go of the project's lock as it leaves.
+        if (e instanceof EditorRouteError && e.status === 409 && attempt < 10) {
+          await sleep(500)
+          continue
+        }
+        failed = layoutErrorText(e)
+        break
+      }
+    }
+  } finally {
+    addingTabs = false
+  }
+  if (store.shownId === projectId) {
+    // Read again: the project's layout and video changed.
+    await rereadShownProject(projectId)
+    await ensureEditorShown()
+  }
   if (failed) showEditorNotice({ text: failed, failure: true })
   return failed
 }
