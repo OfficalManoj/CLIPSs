@@ -231,6 +231,13 @@
         "face": {
           "top": true,
           "bottom": true
+        },
+        "heads_norm": {
+          "cam": [
+            0.1224,
+            0.65926,
+            0.81481
+          ]
         }
       },
       "caption_style": {
@@ -490,6 +497,13 @@
         "face": {
           "top": true,
           "bottom": true
+        },
+        "heads_norm": {
+          "cam": [
+            0.1224,
+            0.65926,
+            0.81481
+          ]
         }
       },
       "caption_style": {

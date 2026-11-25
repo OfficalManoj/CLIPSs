@@ -535,10 +535,13 @@ def snap_details(box: tuple, frames: list) -> tuple[tuple, list]:
     return (nx1, ny1, nx2 - nx1, ny2 - ny1), [v is not None for v in sides]
 
 
-def head_in_box(clip_path: Path, box: tuple, model_name: str = "yolov8n-pose.pt", n: int = 8) -> tuple | None:
+def head_in_box(clip_path: Path, box: tuple, model_name: str = "yolov8n-pose.pt", n: int = 8,
+                window: tuple | None = None) -> tuple | None:
     """The streamer's head inside a webcam box over the clip, for framing
     (gaming/framing.py): (centre x, top, chin) in source px, the median of n
-    frames, or None when nobody shows in it.
+    frames, or None when nobody shows in it. `window` (start, length) in
+    seconds looks only at that stretch of a longer video (the editor's
+    project, made from the source: kitty_editor/sections.py).
 
     This is framing, not deciding who: the box is already the streamer's
     (TalkNet's choice, or drawn by the user), so the person in it is them.
@@ -552,7 +555,9 @@ def head_in_box(clip_path: Path, box: tuple, model_name: str = "yolov8n-pose.pt"
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         model = _get_model(model_name)
         for i in range(n):
-            if total:
+            if window is not None:
+                cap.set(cv2.CAP_PROP_POS_MSEC, (float(window[0]) + (i + 0.5) * float(window[1]) / n) * 1000.0)
+            elif total:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, int((i + 0.5) * total / n))
             ok, frame = cap.read()
             if not ok:

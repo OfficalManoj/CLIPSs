@@ -29,7 +29,7 @@ from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from core import in_use
-from kitty_editor import automation, build, intake, languages, registry
+from kitty_editor import automation, build, intake, languages, registry, relayout, sections
 from plugins import session
 from server.projects_api import local_origin
 
@@ -106,6 +106,16 @@ class LanguagesIn(BaseModel):
     languages: list[str]
     dub: bool = False
     voices: dict[str, str] | None = None
+
+
+class LayoutIn(BaseModel):
+    """The Layout picker's choice (step KG): a gaming layout's settings, or
+    a framing ("track" is Auto, "letterbox" or "center")."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    gaming: dict | None = None
+    crop: str | None = None
 
 
 def supported() -> bool:
@@ -193,6 +203,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                 out.update(state="failed", message=UNFINISHED)
         clip = out.get("clip") if out.get("kind") == "clip" else None
         changed, gone = False, False
+        row = None
         if isinstance(clip, dict) and clip.get("id") is not None:
             try:
                 row = d.get_clip(int(clip["id"]))
@@ -211,6 +222,22 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         if out.get("kind") == "clip" and out.get("state") == "ready" and not shown:
             missing = missing or not (registry.root(data_dir) / out["id"] / "media" / "base.mp4").is_file()
         out.update(clip_changed=changed, clip_gone=gone, media_missing=missing)
+        # What the Layout picker shows (KG): none for a project with no
+        # layout to pick, or one made from the clip's finished file.
+        # The picker's own choice (manifest["layout"]) wins over the clip's.
+        chosen = {"layout": out.get("layout")}
+        out["layout"] = None
+        if (row is not None and out.get("kind") == "clip" and out.get("state") == "ready"
+                and not {build.NOTE_EXPORT, build.NOTE_SOURCE} & set(out.get("notes") or ())):
+            try:
+                opts = json.loads(row["render_opts"]) if row["render_opts"] else {}
+                out["layout"] = sections.layout_of(opts if isinstance(opts, dict) else {}, chosen, config)
+                if out["layout"] and out["layout"]["kind"] == "gaming":
+                    # The boxes as they are: the picker (GamingLayoutEditor)
+                    # starts from them instead of a new webcam box.
+                    out["layout"]["gaming"]["by"] = "user"
+            except (ValueError, TypeError):
+                out["layout"] = None
         if out.get("kind") != "clip" or gone:
             # Its export goes to the export folder under the name the sheet
             # shows: "<name> - <date>" to begin with (E4), or what the person
@@ -329,6 +356,13 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         if clip_file is not None and in_project_exports(clip_file, data_dir):
             plain = build.NOTE_EXPORT
         else:
+            from core.paths import cached_source
+
+            source = cached_source(data_dir / "downloads", row["video_id"])
+            kind = sections.mode(opts, manifest, config, source is not None and Path(source).is_file())
+            if kind != "base":
+                return build_from_source(manifest, exe, progress, row, opts, Path(source), kind, stood_on)
+
             key = build.base_key(row, config, data_dir)
             if _kept_base(manifest, key, base):
                 made = {"base_key": key}
@@ -366,25 +400,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                     "fade_in": 0.0, "fade_out": 0.0, "length": info["seconds"], "captions": [], "hook": None,
                     "music": None, "watermark_text": None, "watermark_image": None, "notes": [plain]}
         else:
-            clips_cfg = config.get("clips") or {}
-            # Whether the clip burns captions: core.pipeline.captions_on's rule.
-            wants = bool(clips_cfg.get("captions", True) and opts.get("captions", opts.get("job_captions", True)))
-            style = opts.get("caption_style") or clips_cfg.get("caption_style")
-            lines, own_lines = [], []
-            if wants and clip_captions is not None:
-                own_lines = clip_captions(row)
-                lines = _spoken_by(own_lines, opts, style)
-            watermark = opts["watermark"] if "watermark" in opts else clips_cfg.get("watermark")
-            plan = build.plan_clip(
-                opts=opts, window=float(row["end_s"]) - float(row["start_s"]), base_seconds=info["seconds"],
-                lines=lines, canvas=(info["width"], info["height"]), default_style=clips_cfg.get("caption_style"),
-                captions=wants, music_file=_own_copy(_music_file(opts), home, "music"),
-                watermark=watermark if isinstance(watermark, dict) else None,
-                watermark_image=_own_copy(_logo_file(watermark), home, "watermark"))
-            if plan["captions"]:
-                # Kept so an export carries the retyped words back to the
-                # clip (KC); "follow" is None when they can't be matched.
-                captions = {"follow": build.caption_record(own_lines, plan)}
+            plan, captions = _clip_plan(row, opts, home, info["seconds"], (info["width"], info["height"]))
         with build.open_session(exe, home, [base.parent]) as editor_session:
             progress(0.9, force=True)
             project_dir = build.apply_clip_plan(editor_session, home, manifest["name"], canvas, base, plan)
@@ -396,7 +412,86 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
             source_tab = None
         return {"source_timeline": source_tab, "canvas": canvas, "shape": _shape_of(info["width"], info["height"]), "project_dir": project_dir,
                 "notes": plan["notes"], "media": [], "clip": {**manifest["clip"], **stood_on},
-                "video_file": str(base), "captions": captions, **made}
+                "video_file": str(base), "captions": captions, "clock": "base", **made}
+
+    def _clip_plan(row, opts: dict, home: Path, base_seconds: float, canvas: tuple[int, int]):
+        """build.plan_clip for a clip's project, from the clip's settings,
+        and the caption record kept with it."""
+        clips_cfg = config.get("clips") or {}
+        # Whether the clip burns captions: core.pipeline.captions_on's rule.
+        wants = bool(clips_cfg.get("captions", True) and opts.get("captions", opts.get("job_captions", True)))
+        style = opts.get("caption_style") or clips_cfg.get("caption_style")
+        lines, own_lines = [], []
+        if wants and clip_captions is not None:
+            own_lines = clip_captions(row)
+            lines = _spoken_by(own_lines, opts, style)
+        watermark = opts["watermark"] if "watermark" in opts else clips_cfg.get("watermark")
+        plan = build.plan_clip(
+            opts=opts, window=float(row["end_s"]) - float(row["start_s"]), base_seconds=base_seconds,
+            lines=lines, canvas=canvas, default_style=clips_cfg.get("caption_style"),
+            captions=wants, music_file=_own_copy(_music_file(opts), home, "music"),
+            watermark=watermark if isinstance(watermark, dict) else None,
+            watermark_image=_own_copy(_logo_file(watermark), home, "watermark"))
+        # Kept so an export carries the retyped words back to the clip (KC);
+        # "follow" is None when they can't be matched.
+        captions = {"follow": build.caption_record(own_lines, plan)} if plan["captions"] else None
+        return plan, captions
+
+    def build_from_source(manifest: dict, exe: str, progress, row, opts: dict, source: Path, kind: str,
+                          stood_on: dict) -> dict:
+        """A gaming, Letterbox or Center clip's project, straight from the
+        source video with no base render (step KG): the clip's stretch of
+        the source on the main lane, cut, sped and captioned as any clip's
+        project, then its picture lanes placed (kitty_editor/sections.py)."""
+        from kitty_editor import fastbase
+
+        home = registry.root(data_dir) / manifest["id"]
+        began = time.monotonic()
+        info = build.probe(source)
+        if not info["video"]:
+            raise Failure("This clip's original video could not be read.")
+        width, height = int(info["width"]), int(info["height"])
+        start, length = fastbase.window(row, opts, config)
+        if info["seconds"]:
+            length = min(length, float(info["seconds"]) - start)
+        length = max(build.MIN_PIECE, length)
+        canvas = {"width": sections.W_OUT, "height": sections.H_OUT,
+                  "fps_num": info["fps_num"], "fps_den": info["fps_den"]}
+        more: dict = {}
+        if kind == "gaming":
+            shown = sections.layout_of(opts, manifest, config) or {}
+            settings = shown.get("gaming") or {}
+            cached = manifest.get("heads") if isinstance(manifest.get("heads"), dict) else {}
+            heads = sections.heads_from(opts, settings, width, height, cached)
+            if heads is None:
+                found = sections.look_for_heads(source, settings, width, height, (start, length),
+                                                (config.get("tracking") or {}).get("detector") or "yolov8n-pose.pt")
+                more["heads"] = {**cached, **found}
+                heads = sections.heads_px(found, width, height)
+            lanes = sections.gaming_specs(settings, width, height, heads)
+        else:
+            lanes = sections.framing_specs(kind, width, height)
+        progress(0.3, force=True)
+        plan, captions = _clip_plan(row, opts, home, length, (sections.W_OUT, sections.H_OUT))
+        plan["notes"] = [n for n in plan["notes"] if n != build.NOTE_FRAMING]
+        if opts.get("normalize_audio", True):
+            # The base's loudness levelling, as the main lane's volume.
+            plan["volume"] = round(plan["volume"] * sections.loudness_gain(source, start, length), 4)
+        progress(0.5, force=True)
+        with build.open_session(exe, home, [source.parent]) as editor_session:
+            project_dir = build.apply_clip_plan(editor_session, home, manifest["name"], canvas, source, plan,
+                                                window=(start, length), frame=False)
+        progress(0.9, force=True)
+        sections.place_file(project_dir, lanes, source)
+        print(f"  Editor project {manifest['id']}: the editor's project made in {time.monotonic() - began:.1f} s")
+        _drop_old_video(manifest, source)
+        try:        # the clip's own tab, told from language tabs added later (KF)
+            source_tab = languages.read_project({"project_dir": project_dir}).get("activeTimelineId")
+        except (OSError, ValueError):
+            source_tab = None
+        return {"source_timeline": source_tab, "canvas": canvas, "shape": "9:16", "project_dir": project_dir,
+                "notes": plan["notes"], "media": [], "clip": {**manifest["clip"], **stood_on},
+                "video_file": str(source), "captions": captions, "clock": "source", "base_key": None, **more}
 
     def _kept_base(manifest: dict, key: str, target: Path) -> bool:
         """The clip's video made before from the same window, framing and
@@ -721,6 +816,16 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
                     languages.apply(data_dir, project_id, exe=editor())
                 except (languages.Held, languages.Failed, HTTPException) as e:
                     print(f"  Editor project {project_id}: language tabs not added yet: {e}")
+            if relayout.has_pending(data_dir, project_id):
+                # A layout picked while the project was not on screen (KG):
+                # put in before the editor opens it. Left for later if refused.
+                try:
+                    changed = relayout.apply(data_dir, project_id, exe=editor())
+                    if changed.get("old_video"):
+                        _drop_old_video({**manifest, "video_file": changed["old_video"]}, Path(changed["video_file"]))
+                except (relayout.Held, relayout.Failed, HTTPException) as e:
+                    print(f"  Editor project {project_id}: the new layout is not in yet: {e}")
+                manifest = registry.load(data_dir, project_id)
             recovered = intake.recover(data_dir, project_id, open_db=db, publish=publish,
                                        folder=body.export_folder if body is not None else None)
         if not manifest.get("damaged"):
@@ -814,3 +919,45 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
             raise HTTPException(409, {"message": str(e), "reason": "open_in_editor"}) from e
         except languages.Failed as e:
             raise HTTPException(500, {"message": str(e)}) from e
+
+    # ---- the Layout picker (KG) ---------------------------------------------
+
+    @app.post("/editor/projects/{project_id}/layout", dependencies=guarded)
+    def make_layout(project_id: str, body: LayoutIn):
+        """Queue the change of a clip project's layout: a gaming layout, or
+        Auto, Letterbox or Center. The project is rebuilt by .../layout/apply."""
+        manifest = found(project_id)
+        if manifest.get("state") != "ready" or project_id in building:
+            raise HTTPException(409, {"message": "This project is still being made.", "reason": "building"})
+        d = db()
+        try:
+            shown = view(manifest, d)
+            if shown.get("layout") is None:
+                raise HTTPException(400, "This project has no layout to change.")
+            try:
+                choice = relayout.choice_of(body.model_dump())
+            except ValueError as e:
+                raise HTTPException(400, str(e)) from e
+            job_id = d.add_job("editor_layout", json.dumps({"project_id": project_id, **(
+                {"gaming": choice["gaming"]} if choice["kind"] == "gaming" else {"crop": choice["crop"]})}),
+                title=str(manifest.get("name") or ""))
+        finally:
+            d.close()
+        return {"job_id": job_id, "layout": choice}
+
+    @app.post("/editor/projects/{project_id}/layout/apply", dependencies=guarded)
+    def apply_layout(project_id: str):
+        """Rebuild the project in the layout made for it. The editor's window
+        must have closed the project first."""
+        manifest = found(project_id)
+        if project_id in building:
+            raise HTTPException(409, {"message": "This project is still being made.", "reason": "building"})
+        try:
+            changed = relayout.apply(data_dir, project_id, exe=editor())
+        except relayout.Held as e:
+            raise HTTPException(409, {"message": str(e), "reason": "open_in_editor"}) from e
+        except relayout.Failed as e:
+            raise HTTPException(500, {"message": str(e)}) from e
+        if changed.get("old_video"):
+            _drop_old_video({**manifest, "video_file": changed["old_video"]}, Path(changed["video_file"]))
+        return {"layout": changed.get("layout")}

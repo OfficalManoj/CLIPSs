@@ -555,14 +555,33 @@ def _create(session, home: Path, name: str, canvas: dict) -> tuple[str, dict]:
     return str(location / name), result
 
 
-def apply_clip_plan(session, home: Path, name: str, canvas: dict, base: Path, plan: dict) -> str:
+def apply_clip_plan(session, home: Path, name: str, canvas: dict, base: Path, plan: dict,
+                    window: tuple[float, float] | None = None, frame: bool = True) -> str:
     """The editor's project for a clip, made from `plan` (plan_clip) with
-    the editor's tools; saved and closed. Returns the project's folder."""
+    the editor's tools; saved and closed. Returns the project's folder.
+
+    `window` (start, length): `base` is the SOURCE video and the clip is
+    that stretch of it (step KG: gaming, Letterbox and Center need no base
+    render); the plan's times stay counted from the clip's start. `frame`
+    False leaves the picture as it comes in (its lanes are placed after,
+    kitty_editor/sections.py) instead of filling the frame."""
     path, created = _create(session, home, name, canvas)
     lane = _main_lane(created)
     media = session.tool("media_import", path=path, file=str(base))["createdId"]
     result = session.tool("clip_add", path=path, mediaId=media, trackId=lane, start=0.0)
     whole = _on_lane(result, lane)
+    offset = 0.0
+    if window is not None and whole:
+        offset, length = float(window[0]), float(window[1])
+        if offset > 0:
+            # The head off, the clip kept at 0: its first frame is the window's.
+            result = session.tool("clip_trim", path=path, clipId=whole[0]["id"], edge="start", delta=offset,
+                                  ripple=True)
+            whole = _on_lane(result, lane)
+        over = float(whole[0]["duration"]) - length
+        if whole and over > MIN_PIECE:
+            result = session.tool("clip_trim", path=path, clipId=whole[0]["id"], edge="end", delta=-over)
+            whole = _on_lane(result, lane)
     total = float(whole[0]["duration"]) if whole else 0.0
 
     # The pieces: the whole base is cut at every edge, what is not kept is
@@ -574,7 +593,7 @@ def apply_clip_plan(session, home: Path, name: str, canvas: dict, base: Path, pl
         result = session.tool("clips_split", path=path, clipIds=[c["id"] for c in _on_lane(result, lane)], time=t)
     kept, dropped = [], []
     for clip in _on_lane(result, lane):
-        middle = float(clip.get("sourceStart", clip["start"])) + float(clip["duration"]) / 2
+        middle = float(clip.get("sourceStart", clip["start"])) - offset + float(clip["duration"]) / 2
         piece = next((p for p in pieces if p["in"] <= middle <= p["out"]), None)
         if piece is None:
             dropped.append(clip["id"])
@@ -586,7 +605,8 @@ def apply_clip_plan(session, home: Path, name: str, canvas: dict, base: Path, pl
         result = session.tool("clips_remove", path=path, clipIds=dropped, ripple=True)
 
     for clip_id, piece in kept:
-        session.tool("clip_frame", path=path, clipId=clip_id, framing="fill")
+        if frame:
+            session.tool("clip_frame", path=path, clipId=clip_id, framing="fill")
         patch = {}
         if abs(plan["volume"] - 1.0) >= 0.01:
             patch["volume"] = plan["volume"]

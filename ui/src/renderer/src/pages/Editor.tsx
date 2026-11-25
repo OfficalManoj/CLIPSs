@@ -14,11 +14,14 @@
  *  the strip. The page's state lives in lib/editor.ts, so leaving the page
  *  and coming back shows the work as it was. */
 import { useEffect, useRef, useState } from 'react'
+import GamingLayoutEditor from '../components/GamingLayoutEditor'
 import PublishAllDialog from '../components/PublishAllDialog'
+import FramingPicker from '../components/editor/FramingPicker'
 import OtherLanguagesDialog from '../components/editor/OtherLanguagesDialog'
-import { api, editorApi, type EditorProject, type EditorShape } from '../lib/api'
+import { api, editorApi, type EditorFraming, type EditorProject, type EditorShape } from '../lib/api'
 import {
   appPointerRecent,
+  changeLayout,
   clearEditorNotice,
   clearOpenError,
   closeEditorProject,
@@ -39,7 +42,7 @@ import { publishState } from '../lib/editorOpening'
 import { t } from '../lib/i18n'
 import { readPublishSetup, type PublishSetup } from '../lib/publishSetup'
 import { useEvents } from '../lib/useEvents'
-import type { Clip, StudioEvent, Video } from '../lib/types'
+import type { Clip, GamingSettings, StudioEvent, Video } from '../lib/types'
 
 /** "Same as the video" first, and the default (FL3): a video starts in its
  *  own shape; the other four are there to change it. */
@@ -315,6 +318,12 @@ function ProjectView({
   // window of its own; the editor is hidden while it is open.
   const [languagesOpen, setLanguagesOpen] = useState(false)
   useEditorCover(languagesOpen)
+  // Layout (KG): a gaming clip's layouts, or Auto / Letterbox / Center, in a
+  // window of their own; the editor is hidden while it is open.
+  const [layoutOpen, setLayoutOpen] = useState(false)
+  const [layoutBusy, setLayoutBusy] = useState(false)
+  useEditorCover(layoutOpen)
+  const layoutButton = useRef<HTMLButtonElement>(null)
   const area = useRef<HTMLDivElement>(null)
   const projectsButton = useRef<HTMLButtonElement>(null)
   const publishButton = useRef<HTMLButtonElement>(null)
@@ -489,6 +498,32 @@ function ProjectView({
     if (shownProject?.id) setLanguagesOpen(true)
   }
 
+  // Layout (KG): there for a clip project with a layout to pick.
+  const layout = shownProject?.layout ?? null
+  const pickLayout = async (
+    body: { gaming: GamingSettings } | { crop: EditorFraming },
+    remember = false
+  ): Promise<void> => {
+    const id = shownProject?.id
+    const clipId = shownProject?.clip?.id
+    if (!id) return
+    setLayoutBusy(true)
+    try {
+      if (remember && clipId !== undefined && 'gaming' in body) {
+        // "Remember for this creator's next videos", as the old clip editor did.
+        await api.saveCreatorGamingLayout(clipId, body.gaming).catch(() => {
+          showEditorNotice({ text: t('The layout could not be remembered for this creator.'), failure: true })
+        })
+      }
+      const failed = await changeLayout(id, body, (text) => {
+        if (editorStore().shownId === id) showEditorNotice({ text })
+      })
+      if (!failed && editorStore().shownId === id) clearEditorNotice()
+    } finally {
+      setLayoutBusy(false)
+    }
+  }
+
   const notes = noteSentences(store.project?.notes)
   const showNotes = notes.length > 0 && !store.notesSeen
   const status = stateText(store)
@@ -627,6 +662,26 @@ function ProjectView({
         )}
         {/* Publish and the project's state together at the right (mockup 03). */}
         <span className="ml-auto flex items-center gap-3 shrink-0">
+          {layout && (
+            <button
+              ref={layoutButton}
+              type="button"
+              className="px-2 py-0.5 rounded-md bg-raised hover:bg-raised/70 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
+              onClick={() => {
+                if (!layoutBusy) setLayoutOpen(true)
+              }}
+              aria-disabled={layoutBusy}
+              title={
+                layoutBusy
+                  ? t('The layout is being changed.')
+                  : layout.kind === 'gaming'
+                    ? t('Change how the webcam and the game are laid out. Your cuts and captions stay.')
+                    : t('Change how the video fills the Short: Auto, Letterbox or Center. Your cuts and captions stay.')
+              }
+            >
+              {t('Layout…')}
+            </button>
+          )}
           {publish !== 'none' && (
             <button
               ref={languagesButton}
@@ -699,6 +754,27 @@ function ProjectView({
           youtube={publishSetup.youtube}
           onClose={() => setPublishClip(null)}
           returnFocus={publishButton}
+        />
+      )}
+      {layoutOpen && shownProject && layout?.kind === 'gaming' && shownProject.clip && (
+        <GamingLayoutEditor
+          source={{ clipId: shownProject.clip.id }}
+          context="clip"
+          settings={layout.gaming}
+          remember={false}
+          onClose={() => setLayoutOpen(false)}
+          onDone={(next, remember) => void pickLayout({ gaming: next }, remember)}
+        />
+      )}
+      {layoutOpen && shownProject && layout?.kind === 'framing' && (
+        <FramingPicker
+          current={layout.crop}
+          onClose={() => setLayoutOpen(false)}
+          onPick={(crop) => {
+            setLayoutOpen(false)
+            void pickLayout({ crop })
+          }}
+          returnFocus={layoutButton}
         />
       )}
       {languagesOpen && shownProject && (

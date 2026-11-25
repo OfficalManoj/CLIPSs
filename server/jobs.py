@@ -374,6 +374,8 @@ class Worker(threading.Thread):
                         self._editor_languages(db, payload)
                     finally:
                         _release_voice()
+                elif job["type"] == "editor_layout":
+                    self._editor_layout(db, payload)
                 else:
                     raise ValueError(f"Unknown job type {job['type']!r}")
                 db.finish_job(job["id"], "done")
@@ -792,6 +794,31 @@ class Worker(threading.Thread):
                           speak=speak if payload.get("dub") else None, progress=report)
         if problems:
             raise RuntimeError(" ".join(dict.fromkeys(problems)))
+
+    def _editor_layout(self, db: StateDB, payload: dict) -> None:
+        """The Layout picker (step KG): the new layout's lanes for a clip's
+        editor project, and what they need (the heads in the webcams, or
+        Auto's framed video), kept for the app to put in
+        (kitty_editor.relayout). The project itself is not changed here:
+        the editor may have it open."""
+        from kitty_editor import registry, relayout
+
+        data_dir = Path(self.config["paths"]["data_dir"])
+        project_id = str(payload["project_id"])
+        manifest = registry.load(data_dir, project_id)
+        row = db.get_clip(int((manifest.get("clip") or {}).get("id") or 0))
+        if row is None:
+            raise RuntimeError("This clip isn't in Clips Kitty any more.")
+
+        def report(label: str, done: int, total: int) -> None:
+            progress.emit(stage="editor_layout", message=label,
+                          fraction=min(0.999, done / max(1, total)), project_id=project_id)
+
+        try:
+            relayout.prepare(data_dir, project_id, {k: payload.get(k) for k in ("gaming", "crop")},
+                             row=row, config=self.config, progress=report)
+        except ValueError as e:
+            raise RuntimeError(str(e)) from e
 
     def _source_language(self, video_id: str, data_dir: Path) -> str:
         try:
