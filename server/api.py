@@ -2869,7 +2869,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
         config=config, db=db, data_dir=data_dir,
         ollama_host=config["llm"].get("ollama_host", "http://localhost:11434"),
         list_models=lambda provider_id: app.state.ai_text_models(provider_id),
-        vram_gb=lambda: _nvidia_vram_gb(),
+        vram_gb=_nvidia_vram_gb,
     )
 
     @app.get("/agent/status")
