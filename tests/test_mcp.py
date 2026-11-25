@@ -750,3 +750,10 @@ def test_an_engine_refusal_reaches_the_agent_in_words(monkeypatch):
     monkeypatch.setattr(mcp, "_request", refuse)
     result = _call("add_animation", {"clip_id": 5, "block": "x"})
     assert result["isError"] is True and "Node 22" in result["content"][0]["text"]
+
+
+def test_add_animation_says_to_look_up_a_blocks_variables_first():
+    tools = {t["name"]: t for t in _send(_request(31, "tools/list"))["result"]["tools"]}
+    add = tools["add_animation"]
+    assert "call it with block FIRST" in add["description"]
+    assert "hyperframes_catalog with block" in add["inputSchema"]["properties"]["variables"]["description"]

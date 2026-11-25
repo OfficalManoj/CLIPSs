@@ -246,9 +246,69 @@ def test_a_request_that_still_fails_is_a_plain_error(cli, tmp_path, monkeypatch)
     monkeypatch.setattr(hf, "guide", lambda root=None: "g")
     cli.lint = [LINT_BAD]
     model = FakeModel(["<html>a</html>", "<html>b</html>"])
-    with pytest.raises(hf.HyperFramesError, match="didn't pass HyperFrames' checks"):
+    with pytest.raises(hf.HyperFramesError) as e:
         hf.make({"request": "x"}, size=(1080, 1920), fps=30, out_dir=tmp_path, llm_factory=lambda: model)
     assert len(model.prompts) == 2
+    # One fixed plain sentence, not their raw codes (the model invented causes from those).
+    assert str(e.value) == hf.WRITE_FAILED
+    assert "missing_timeline_registry" not in str(e.value)
+    assert not cli.named("render")
+
+
+def test_a_request_with_no_html_after_the_retry_is_the_same_plain_sentence(cli, tmp_path, monkeypatch):
+    monkeypatch.setattr(hf, "guide", lambda root=None: "g")
+    model = FakeModel(["no html here", "still none"])
+    with pytest.raises(hf.HyperFramesError) as e:
+        hf.make({"request": "x"}, size=(1080, 1920), fps=30, out_dir=tmp_path, llm_factory=lambda: model)
+    assert str(e.value) == hf.WRITE_FAILED
+
+
+def test_html_given_directly_keeps_their_words(cli, tmp_path):
+    cli.lint = [LINT_BAD]
+    with pytest.raises(hf.HyperFramesError, match="missing_timeline_registry"):
+        hf.make({"html": "<html></html>"}, size=(1080, 1920), fps=30, out_dir=tmp_path)
+
+
+def test_the_writing_prompt_says_the_clip_is_laid_underneath():
+    text = hf.writing_prompt("a subscribe animation", (1080, 1920), 3, "g")
+    assert "lays the clip UNDERNEATH" in text
+    assert "no <video>, <audio> or <img>" in text
+    assert "gsap.set" in text and "never with a CSS transform" in text
+    assert hf.skeleton((1080, 1920), 3) in text
+
+
+def test_the_skeleton_follows_their_contract():
+    html = hf.skeleton((1920, 1080), 3)
+    assert html.startswith("<!doctype html>") and html.endswith("</html>")
+    assert 'data-composition-id="main"' in html and 'data-duration="3"' in html
+    assert 'data-width="1920" data-height="1080"' in html
+    assert 'class="clip" data-start="0" data-duration="3"' in html
+    assert 'window.__timelines["main"] = tl' in html and "paused: true" in html
+    assert "<video" not in html and "<audio" not in html and "<img" not in html
+    # No CSS transform anywhere: GSAP sets the start values.
+    style = html[html.index("<style>"):html.index("</style>")]
+    assert "transform" not in style and "gsap.set(" in html
+    assert style.count("background: transparent") == 2
+    assert hf.extract_html(html) == html
+
+
+def test_a_block_variable_it_does_not_have_is_refused_with_its_real_names(cli, tmp_path):
+    with pytest.raises(hf.HyperFramesError) as e:
+        hf.make({"block": "lt-neon-border", "variables": {"text": "GG WP"}, "start": 2},
+                size=(1080, 1920), fps=30, out_dir=tmp_path / "anims")
+    assert str(e.value).startswith("lt-neon-border has no text. Its words go in: name.")
+    assert not cli.named("render")
+    assert not (tmp_path / "anims").exists() or not list((tmp_path / "anims").iterdir())
+
+
+def test_check_variables_names_every_real_one():
+    declared = [{"id": "name"}, {"id": "role"}]
+    hf.check_variables("lt-neon-border", {"name": "GG WP", "role": "World of Warcraft"}, declared)
+    hf.check_variables("lt-neon-border", None, declared)
+    with pytest.raises(hf.HyperFramesError, match=r"has no text, title. Its words go in: name, role."):
+        hf.check_variables("lt-neon-border", {"text": "a", "title": "b", "name": "c"}, declared)
+    with pytest.raises(hf.HyperFramesError, match="has no variables"):
+        hf.check_variables("orb", {"text": "a"}, [])
 
 
 def test_a_solid_background_is_refused(cli, tmp_path, monkeypatch):

@@ -1585,7 +1585,8 @@ TOOLS: list[dict] = [
         "description": (
             "Put an animation on a clip with HyperFrames, then re-render the clip with it; the "
             "source video is never touched. Give exactly ONE of: block plus variables (from "
-            "hyperframes_catalog), html (a full HyperFrames composition, see hyperframes_guide), "
+            "hyperframes_catalog: call it with block FIRST and use only the variable names it "
+            "lists, or the block shows its demo text), html (a full HyperFrames composition, see hyperframes_guide), "
             "or request in plain words ('a subscribe button pop at the end'), which Clips Kitty's "
             "AI writes. start is seconds into the clip. Rendering takes a minute or more. The "
             "clip gets a NEW id when it is done: use that one afterwards."
@@ -1595,7 +1596,8 @@ TOOLS: list[dict] = [
             "properties": {
                 "clip_id": {"type": "integer", "description": "From list_clips"},
                 "block": {"type": "string", "description": "A block name from hyperframes_catalog"},
-                "variables": {"type": "object", "description": "The block's variables, e.g. {\"name\": \"Colin\"}"},
+                "variables": {"type": "object", "description": "The block's variables, named exactly as "
+                              "hyperframes_catalog with block lists them, e.g. {\"name\": \"GG WP\"}"},
                 "html": {"type": "string", "description": "A complete HyperFrames index.html"},
                 "request": {"type": "string", "description": "What the animation should be, in plain words"},
                 "start": {"type": "number", "description": "Seconds into the clip. Default 0."},

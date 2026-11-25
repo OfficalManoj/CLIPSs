@@ -22,12 +22,15 @@ from the engine, and a page that can't reach this PC or its local network.
 """
 
 import json
+import logging
 import os
 import re
 import shutil
 import subprocess
 import time
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 VERSION = "0.9.94"
 NODE_MIN = 22
@@ -482,6 +485,49 @@ def extract_html(text: str) -> str:
     return text[min(starts):end + len("</html>")].strip()
 
 
+# What the box says when a written animation still fails after its one retry:
+# their raw lint codes sent the model off inventing causes ("audio", "try
+# again later"), so it gets one plain sentence instead.
+WRITE_FAILED = ("The AI model couldn't write a working animation for that. Try a catalog block, "
+                "simpler words, or a stronger model.")
+
+
+def skeleton(size: tuple[int, int], duration: float) -> str:
+    """A minimal composition that passes their checks, for the model to fill:
+    a transparent root, one timed element, start values set with gsap.set."""
+    w, h = size
+    d = f"{duration:g}"
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html, body {{ margin: 0; width: {w}px; height: {h}px; overflow: hidden; background: transparent; }}
+      #root {{ position: relative; width: {w}px; height: {h}px; background: transparent; }}
+      #card {{ position: absolute; left: 0; right: 0; bottom: 200px; text-align: center; }}
+      #card .box {{ display: inline-block; padding: 24px 48px; border-radius: 24px; background: #e62117;
+                    color: #fff; font: 700 64px sans-serif; }}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="{d}" data-width="{w}" data-height="{h}">
+      <div id="card" class="clip" data-start="0" data-duration="{d}" data-track-index="0">
+        <div class="box">SUBSCRIBE</div>
+      </div>
+    </div>
+    <script>
+      const tl = gsap.timeline({{ paused: true }});
+      gsap.set("#card .box", {{ opacity: 0, scale: 0.6 }});
+      tl.to("#card .box", {{ opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }}, 0);
+      tl.to("#card .box", {{ opacity: 0, duration: 0.35, ease: "power2.in" }}, {max(0.0, duration - 0.4):g});
+      window.__timelines = window.__timelines || {{}};
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>"""
+
+
 def writing_prompt(request: str, size: tuple[int, int], duration: float, guide_text: str,
                    previous: str = "", errors: list[str] | None = None) -> str:
     w, h = size
@@ -491,6 +537,15 @@ def writing_prompt(request: str, size: tuple[int, int], duration: float, guide_t
         f"Make this animation, to lay over a {w}x{h} video clip: {request.strip()}",
         f"The root is {w}x{h} and lasts {duration:g} seconds (data-duration=\"{duration:g}\"). "
         "Everything outside the animation stays transparent: the clip shows through.",
+        "Clips Kitty lays the clip UNDERNEATH your animation itself. So: no <video>, <audio> or "
+        "<img> of the clip (no media at all), html, body and #root keep background: transparent, "
+        "and set every start value (opacity, x, y, scale, rotation) with gsap.set or the timeline, "
+        "never with a CSS transform: GSAP animates transforms, and a CSS transform on the same "
+        "element fails their checks.",
+        "Start from this working file and change only what the request needs (the elements, "
+        "their words, colours and tweens). Keep its structure: the root, each timed element with "
+        "class=\"clip\", data-start and data-duration, one paused timeline registered as "
+        "window.__timelines[\"main\"]:\n" + skeleton(size, duration),
         "Answer with the complete index.html only, from <!doctype html> to </html>.",
     ]
     if previous and errors:
@@ -502,6 +557,22 @@ def writing_prompt(request: str, size: tuple[int, int], duration: float, guide_t
             previous,
         ]
     return "\n\n".join(lines)
+
+
+def check_variables(block: str, given: dict | None, declared: list[dict]) -> None:
+    """A block's words only show when they go in its own variables; an unknown
+    name is ignored by their renderer and the demo text plays instead. Say
+    which names it has, so the model tries again with those."""
+    unknown = [k for k in (given or {}) if k not in {v.get("id") for v in declared}]
+    if not unknown:
+        return
+    names = ", ".join(str(v.get("id")) for v in declared)
+    missing = ", ".join(unknown)
+    if not names:
+        raise HyperFramesError(f"{block} has no variables, so it has no {missing}: it plays as designed. "
+                               "Add it without variables, or pick another block.")
+    raise HyperFramesError(f"{block} has no {missing}. Its words go in: {names}. "
+                           "Use those names in variables and try again.")
 
 
 # ---- one animation, made and rendered ------------------------------------------
@@ -531,6 +602,7 @@ def make(spec: dict, *, size: tuple[int, int], fps: float, out_dir: Path, llm_fa
         project = new_project(work, size, root=root)
         if spec.get("block"):
             info = add_block(project, spec["block"], spec.get("variables") or None, root=root)
+            check_variables(spec["block"], spec.get("variables"), info["variables"])
             duration = duration or info["duration"]
             (project / "index.html").write_text(
                 block_root(spec["block"], info, size, duration, spec.get("variables")), encoding="utf-8")
@@ -555,8 +627,7 @@ def make(spec: dict, *, size: tuple[int, int], fps: float, out_dir: Path, llm_fa
                 retry = extract_html(_ask(llm, writing_prompt(spec["request"], size, duration, guide_text,
                                                              previous=html or "(no HTML)", errors=errors)))
                 if not retry:
-                    raise HyperFramesError("The AI model didn't write an animation HyperFrames could use. "
-                                           "Try a simpler request, a catalog block, or a stronger model.")
+                    raise HyperFramesError(WRITE_FAILED)
                 (project / "index.html").write_text(retry, encoding="utf-8")
             kind, label = "request", str(spec["request"])[:80]
             timings["write"] = time.monotonic() - t0
@@ -568,6 +639,11 @@ def make(spec: dict, *, size: tuple[int, int], fps: float, out_dir: Path, llm_fa
         errors = validate(project, root=root)
         timings["check"] = time.monotonic() - t1
         if errors:
+            if kind == "request":
+                # Written by the model and already retried once: their raw
+                # codes only send the model off inventing causes.
+                log.info("hyperframes: written animation still fails: %s", " | ".join(errors[:5]))
+                raise HyperFramesError(WRITE_FAILED)
             raise HyperFramesError("The animation didn't pass HyperFrames' checks: " + " | ".join(errors[:5]))
 
         out_dir = Path(out_dir)
