@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from '../lib/api'
+import { openAISetup } from '../lib/aiSetup'
+import { api, type AgentModelList } from '../lib/api'
 import { t } from '../lib/i18n'
 import { CHECKING, isChecking, pullPercent } from '../lib/modelPull'
 import type { PublishPlanItem } from '../lib/types'
 import { useEvents } from '../lib/useEvents'
+import AssistantModelPicker from './AssistantModelPicker'
 import { seedOptions } from './queue/AddVideos'
 
 interface Turn {
@@ -14,21 +16,28 @@ interface Turn {
 
 /** Ask Clips Kitty to do things in plain language.
  *
- *  A local model reads the request and calls the app's own tools: find a
- *  video, list its clips, plan uploads. It is the same tool list the MCP
- *  server gives an outside agent, so there is one set of descriptions to keep
- *  honest rather than two.
+ *  A model reads the request and calls the app's own tools: find a video,
+ *  list its clips, plan uploads. It is the same tool list the MCP server gives
+ *  an outside agent, so there is one set of descriptions to keep honest
+ *  rather than two.
  *
- *  It CAN publish, since 2026-09-22. It used to be withheld, which meant
- *  "process this video and publish them all" got the processing and silence
- *  about the rest — worse than either doing it or refusing. It still plans
- *  first, so a proposal with a button under it is the usual path, and a
- *  publish only happens when the request asked for one.
+ *  The model is the box's own, chosen in its picker (AssistantModelPicker):
+ *  Ollama, then OpenRouter, then any provider with the person's own key. It
+ *  never changes the model that picks clips.
+ *
+ *  It plans posts but never posts (server/agent.py HUMAN_ONLY): a plan comes
+ *  back as a card here, and only a click on that card posts or schedules.
  */
 export default function Assistant(): JSX.Element | null {
   const [ready, setReady] = useState<boolean | null>(null)
   const [model, setModel] = useState('')
   const [reason, setReason] = useState('')
+  // The provider whose key would fix it, for an "Add your key" button.
+  const [settingsFor, setSettingsFor] = useState('')
+  // The box's model list and what it is set to. Its own choice, kept by the
+  // engine (PUT /agent/model), never the app's model.
+  const [models, setModels] = useState<AgentModelList | null>(null)
+  const [loadingModels, setLoadingModels] = useState(true)
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -42,6 +51,8 @@ export default function Assistant(): JSX.Element | null {
     /** A daily budget. 0 means a flat every_hours gap instead. */
     per_day: number
     gap_hours: number
+    /** When the first post goes out, as the plan worked it out. Empty means now. */
+    start_at: string
     hashtags: string[]
   } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -58,21 +69,81 @@ export default function Assistant(): JSX.Element | null {
   // record goes missing has stopped; an 'asking' one may not have landed yet.
   const pullStage = useRef<'idle' | 'asking' | 'running'>('idle')
 
-  const checkStatus = useCallback((): void => {
+  const showStatus = useCallback(
+    (s: { ready: boolean; model: string; reason: string; settings?: string; install?: { model: string; size_gb: number } | null }): void => {
+      setReady(s.ready)
+      setModel(s.model)
+      setReason(s.reason)
+      setSettingsFor(s.settings ?? '')
+      setInstall(s.install ?? null)
+    },
+    []
+  )
+
+  // Counts picks in the list. An answer that set off before the latest pick
+  // is dropped, so a slow reload can't put the old model back.
+  const pickSeq = useRef(0)
+
+  const checkStatus = useCallback(
+    (spec = ''): void => {
+      const seq = pickSeq.current
+      api
+        .agentStatus(spec)
+        .then((s) => {
+          if (seq === pickSeq.current) showStatus(s)
+        })
+        .catch(() => setReady(false))
+    },
+    [showStatus]
+  )
+
+  // The list can take a few seconds (each provider with a key is asked), so
+  // the box checks its current model first and the list fills in after.
+  const loadModels = useCallback((): void => {
+    const seq = pickSeq.current
+    setLoadingModels(true)
     api
-      .agentStatus()
-      .then((s) => {
-        setReady(s.ready)
-        setModel(s.model)
-        setReason(s.reason)
-        setInstall(s.install ?? null)
+      .agentModels()
+      .then((list) => {
+        setModels(list)
+        // The first usable model, in order, when the remembered one is gone.
+        if (list.default && seq === pickSeq.current) checkStatus(list.default)
       })
-      .catch(() => setReady(false))
-  }, [])
+      .catch(() => {
+        /* engine not answering: the status line already says so */
+      })
+      .finally(() => setLoadingModels(false))
+  }, [checkStatus])
 
   useEffect(() => {
     checkStatus()
-  }, [checkStatus])
+    loadModels()
+  }, [checkStatus, loadModels])
+
+  const chooseModel = async (spec: string): Promise<void> => {
+    pickSeq.current += 1
+    const seq = pickSeq.current
+    setModel(spec)
+    try {
+      // Remembered for the box only. Its answer is the check for that model.
+      const status = await api.chooseAgentModel(spec)
+      if (seq === pickSeq.current) showStatus(status)
+    } catch (e) {
+      setReady(false)
+      setReason(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const picker = (
+    <AssistantModelPicker
+      groups={models?.groups ?? []}
+      value={model}
+      loading={loadingModels}
+      disabled={busy}
+      onChoose={(spec) => void chooseModel(spec)}
+      onOpen={loadModels}
+    />
+  )
 
   // One download's state, from an event or from the engine's record. Worded
   // as the Models page and setup word it (lib/modelPull): never 100% before
@@ -187,7 +258,7 @@ export default function Assistant(): JSX.Element | null {
       // captions came back burned in however often the box was unticked,
       // because that choice lives in this window and the model never
       // saw it.
-      const res = await api.agentChat(text, history, seedOptions())
+      const res = await api.agentChat(text, history, seedOptions(), model)
       setTurns((prior) => [
         ...prior,
         {
@@ -205,6 +276,7 @@ export default function Assistant(): JSX.Element | null {
           every_hours?: number
           per_day?: number
           gap_hours?: number
+          start_at?: string
           hashtags?: string[]
         }
         setSchedule(
@@ -214,6 +286,7 @@ export default function Assistant(): JSX.Element | null {
                 every_hours: p.every_hours || 0,
                 per_day: p.per_day || 0,
                 gap_hours: p.gap_hours || 1,
+                start_at: p.start_at || '',
                 hashtags: p.hashtags || []
               }
             : null
@@ -244,6 +317,9 @@ export default function Assistant(): JSX.Element | null {
           every_hours: schedule.every_hours,
           per_day: schedule.per_day || undefined,
           gap_hours: schedule.per_day ? schedule.gap_hours : undefined,
+          // The start the card's times were worked out from, so "tomorrow
+          // at 9" is not sent as "now".
+          start_at: schedule.start_at || undefined,
           hashtags: schedule.hashtags
         })
         const parts = [`${t('Scheduled')} ${res.started.length}.`]
@@ -270,7 +346,10 @@ export default function Assistant(): JSX.Element | null {
   if (ready === false) {
     return (
       <section className="card h-full overflow-y-auto" aria-label={t('Assistant')}>
-        <p className="font-semibold">{t('Ask Clips Kitty')}</p>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="font-semibold">{t('Ask Clips Kitty')}</p>
+          {picker}
+        </div>
         {install ? (
           /* Nothing installed can run the box. Say what it needs and offer it,
              rather than sending someone to another page to choose a build. */
@@ -281,7 +360,7 @@ export default function Assistant(): JSX.Element | null {
               {t('Install Gemma 4 to use this box.')}{' '}
               <span className="text-xs text-muted">
                 {t(
-                  'It runs on a Gemma 4 model, and none is installed. Your clips are still picked by the model you chose.'
+                  'It needs a model that can use tools, like Gemma 4, or choose OpenRouter or another provider in the list. Your clips are still picked by the model you chose.'
                 )}
               </span>
             </p>
@@ -315,7 +394,21 @@ export default function Assistant(): JSX.Element | null {
             )}
           </>
         ) : (
-          <p className="text-xs text-muted mt-1">{reason || t('No model available.')}</p>
+          <p className="text-xs text-muted mt-1">
+            {reason || t('No model available.')}
+            {settingsFor && (
+              <>
+                {' '}
+                <button
+                  className="text-accent hover:underline"
+                  title={t('Opens Settings → AI, where you add your key or sign in.')}
+                  onClick={() => openAISetup(settingsFor)}
+                >
+                  {t('Add your key in Settings')}
+                </button>
+              </>
+            )}
+          </p>
         )}
       </section>
     )
@@ -326,9 +419,9 @@ export default function Assistant(): JSX.Element | null {
       className="card flex flex-col h-full min-h-0 overflow-hidden"
       aria-label={t('Assistant')}
     >
-      <div className="flex items-baseline justify-between shrink-0">
+      <div className="flex items-baseline justify-between gap-2 shrink-0">
         <p className="font-semibold">{t('Ask Clips Kitty')}</p>
-        {model && <span className="text-[11px] text-muted tabular-nums">{model}</span>}
+        {picker}
       </div>
       <div ref={scrollRef} className="mt-3 flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
         {turns.length === 0 ? (

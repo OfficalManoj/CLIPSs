@@ -376,7 +376,7 @@ def _call(name: str, arguments: dict) -> dict:
 def test_the_new_tools_are_offered():
     names = {t["name"] for t in _send(_request(29, "tools/list"))["result"]["tools"]}
     assert {"start_queue", "clip_posts"} <= names
-    assert len(names) == len(mcp.TOOLS) == 21
+    assert len(names) == len(mcp.TOOLS) == 22
 
 
 def test_start_queue_presses_start_then_reads_the_queue(monkeypatch):
@@ -584,3 +584,54 @@ def test_clip_posts_quotes_a_mistyped_video_id(monkeypatch):
     text = _call("clip_posts", {"video_id": "my video"})["content"][0]["text"]
     assert calls == ["/videos/my%20video/clips"]
     assert text.startswith("No clips for my video.")
+
+
+# ---- set_clip_text ------------------------------------------------------------
+
+
+def test_set_clip_text_patches_only_what_was_passed(monkeypatch):
+    calls = []
+
+    def fake(method, path, body=None, *a, **k):
+        calls.append((method, path, body))
+        return {"id": 9, "title": "New hook", "description": "old", "hashtags": ["gaming"]}
+
+    monkeypatch.setattr(mcp, "_request", fake)
+    result = _call("set_clip_text", {"clip_id": 9, "title": "New hook"})
+    assert calls == [("PATCH", "/clips/9", {"title": "New hook"})]
+    assert result["isError"] is False
+    assert result["content"][0]["text"] == "Clip 9 updated.\nTitle: New hook"
+
+
+def test_set_clip_text_sends_hashtags_as_a_list(monkeypatch):
+    sent = {}
+    monkeypatch.setattr(mcp, "_request", lambda m, p, b=None, *a, **k: (
+        sent.update(b), {"hashtags": b["hashtags"], "description": b["description"]})[1])
+    text = _call("set_clip_text", {"clip_id": 3, "description": "A clutch win",
+                                   "hashtags": "gaming, gta6 #clips"})["content"][0]["text"]
+    assert sent == {"description": "A clutch win", "hashtags": ["gaming", "gta6", "#clips"]}
+    assert "Hashtags: #gaming #gta6 #clips" in text
+
+
+def test_set_clip_text_with_nothing_to_change_calls_nothing(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    assert _call("set_clip_text", {"clip_id": 3})["content"][0]["text"].startswith("Nothing changed")
+
+
+def test_set_clip_text_names_a_missing_clip(monkeypatch):
+    import urllib.error
+
+    def missing(*a, **k):
+        raise urllib.error.HTTPError("http://x/clips/404", 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(mcp, "_request", missing)
+    text = _call("set_clip_text", {"clip_id": 404, "title": "x"})["content"][0]["text"]
+    assert text == "There is no clip 404. list_clips shows the ids that exist."
+
+
+def test_set_clip_text_sends_only_fields_patch_clips_takes():
+    api = pytest.importorskip("server.api")
+    tool = next(t for t in mcp.TOOLS if t["name"] == "set_clip_text")
+    props = set(tool["inputSchema"]["properties"]) - {"clip_id"}
+    assert props <= set(api.ClipPatch.model_fields)
+    assert tool["inputSchema"]["required"] == ["clip_id"]

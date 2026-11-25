@@ -7,10 +7,13 @@ agents: one list, one set of descriptions, one place to fix a mistake.
 
 Three rules hold it together.
 
-**Uploading is not something the model can do.** `publish_plan_execute` is
-never offered here. The model may build a plan; turning that into uploads takes
-a person pressing a button. Thirty videos cannot be un-uploaded, so the
-confirmation is structural rather than a matter of the model behaving.
+**Posting is not something the model can do.** The tools that post or
+schedule (HUMAN_ONLY) are never offered here, and queue_video's
+publish_when_done is never taken from the model. The model may build a plan;
+the window shows it as a card, and posting takes a person pressing its button.
+Thirty posts cannot be taken back, so the confirmation is structural rather
+than a matter of the model behaving. (The MCP server, for outside agents,
+still offers all of them: this rule is the box's.)
 
 **It needs a model that can call tools.** Gemma 4 can; the app's default
 gemma3:4b cannot, and neither can gemma:7b. Ollama reports this per model, so
@@ -32,19 +35,30 @@ TOOL_OUTPUT_LIMIT = 4000
 # What the box says when a model answers with nothing at all.
 NO_ANSWER = "The model didn't answer that time. Try again, or ask for one thing at a time."
 
-# Never offered to the model.
+# Never offered to the model, and refused if it calls one anyway.
 #
-# Empty on purpose, and it is a deliberate reversal. Publishing used to sit
-# here because it posts publicly and cannot be taken back. In practice that
-# meant asking the assistant to "process this video and publish them all" got
-# you the processing and silence about the rest: the model could not do the
-# second half and said nothing, which is worse than either doing it or
-# refusing. Colin's call, 2026-09-22: "it should do what i told it to do."
-#
-# What stands in for the gate: the model calls publish_plan before it
-# executes, so there is a record of the intent, and a deferred publish only
-# runs when the request actually asked for one (see `then` in server/jobs.py).
-HUMAN_ONLY: set[str] = set()
+# This was empty from 2026-09-22 ("it should do what i told it to do"), so
+# "process this and publish them all" posted with no click. The plan Colin
+# approved on 2026-11-25 for the box puts posting behind the plan card again:
+# the model plans (publish_plan, schedule_clips_plan), the window shows the
+# card, and the person's click on it posts. The model is told so in plain
+# words, so the second half of a request is never dropped in silence.
+HUMAN_ONLY: set[str] = {"publish_plan_execute", "schedule_clips_execute", "uploadpost_publish"}
+
+# The planning tools whose structured result the window turns into a card.
+PLAN_TOOLS = ("publish_plan", "schedule_clips_plan")
+
+# queue_video's argument for "publish when processing finishes". Taken out of
+# what the model sees and out of what it sends: it would post with no click.
+DEFERRED_PUBLISH = "publish_when_done"
+
+# What the model is told when it reaches for posting.
+NEEDS_CLICK = (
+    "Not done: posting needs the person's click on the plan card in the app. "
+    "Call publish_plan (YouTube) or schedule_clips_plan (other platforms) so the "
+    "card shows, and tell them to press its button. If the clips are still being "
+    "made, tell them to ask again once they are done."
+)
 
 SYSTEM = (
     "You drive Clips Kitty, a local video clipping app, through its tools.\n"
@@ -60,12 +74,12 @@ SYSTEM = (
     "mentioning it in your reply: captions on or off and how they look, "
     "longer clips, a watermark by name, podcast footage, or a horizontal "
     "longform video. Ignoring one silently gives them the wrong render.\n"
-    "To publish, call publish_plan first and show what it returns, then "
-    "execute it. Do this only when they asked you to publish.\n"
+    "To publish or schedule, call publish_plan (YouTube) or schedule_clips_plan "
+    "(other platforms) and describe what it returns. You cannot post: the app "
+    "shows the plan as a card and the person presses its button. Say so.\n"
     "If they ask you to process a video AND publish it, the clips do not exist "
-    "yet when you queue the job, so you cannot publish them in this reply. "
-    "Pass publish_when_done to queue_video instead and say you have done so: "
-    "the app publishes them the moment processing finishes.\n"
+    "yet when you queue the job. Queue it, then say that once the clips are "
+    "made they can ask you to plan the posts.\n"
     "If they want particular hashtags on every clip, pass hashtags to "
     "queue_video. Adding them afterwards clip by clip is not the way.\n"
     "When they say what the clips should be about or include (a topic, a "
@@ -86,12 +100,44 @@ def tool_specs(tools: list[dict]) -> list[dict]:
             "function": {
                 "name": tool["name"],
                 "description": tool["description"],
-                "parameters": tool["inputSchema"],
+                "parameters": _without_deferred_publish(tool["inputSchema"]),
             },
         }
         for tool in tools
         if tool["name"] not in HUMAN_ONLY
     ]
+
+
+def _without_deferred_publish(schema: dict) -> dict:
+    """The schema with publish_when_done taken out, so the model never sees it.
+    A copy: the MCP server's own TOOLS keep it for outside agents."""
+    props = (schema or {}).get("properties") or {}
+    if DEFERRED_PUBLISH not in props:
+        return schema
+    return {**schema, "properties": {k: v for k, v in props.items() if k != DEFERRED_PUBLISH}}
+
+
+def with_defaults(arguments: dict, defaults: dict | None) -> dict:
+    """queue_video's arguments with the bar's defaults filled in where the
+    model said nothing (an explicit "no captions" still wins). Never
+    publish_when_done, even from the defaults: posting waits for a click."""
+    for key, value in (defaults or {}).items():
+        if key != DEFERRED_PUBLISH:
+            arguments.setdefault(key, value)
+    return arguments
+
+
+def guarded_call(name: str, args: dict, call_tool) -> tuple[str, dict | None]:
+    """One tool call from the model, with the posting rule applied: the
+    HUMAN_ONLY tools are refused with NEEDS_CLICK, and publish_when_done is
+    dropped (and the model told), so nothing posts without a click."""
+    if name in HUMAN_ONLY:
+        return NEEDS_CLICK, None
+    dropped = args.pop(DEFERRED_PUBLISH, None) if isinstance(args, dict) else None
+    text, structured = call_tool(name, args)
+    if dropped:
+        text = f"{text}\n{NEEDS_CLICK}"
+    return text, structured
 
 
 def can_call_tools(host: str, model: str) -> bool:
@@ -231,12 +277,9 @@ def run(
                     args = json.loads(args)
                 except ValueError:
                     args = {}
-            if name in HUMAN_ONLY:
-                text = "Not allowed from here. The person confirms uploads in the app."
-            else:
-                text, structured = call_tool(name, args)
-                if name == "publish_plan" and structured:
-                    plan = structured
+            text, structured = guarded_call(name, args, call_tool)
+            if name in PLAN_TOOLS and structured:
+                plan = structured
             steps.append({"tool": name, "arguments": args, "result": text[:400]})
             messages.append({"role": "tool", "content": text[:TOOL_OUTPUT_LIMIT]})
 
@@ -291,12 +334,9 @@ def run_cloud(message: str, history: list[dict], tools: list[dict], call_tool, b
 
         for call in turn.tool_calls:
             args = dict(call.arguments or {})
-            if call.name in HUMAN_ONLY:
-                text = "Not allowed from here. The person confirms uploads in the app."
-            else:
-                text, structured = call_tool(call.name, args)
-                if call.name == "publish_plan" and structured:
-                    plan = structured
+            text, structured = guarded_call(call.name, args, call_tool)
+            if call.name in PLAN_TOOLS and structured:
+                plan = structured
             steps.append({"tool": call.name, "arguments": args, "result": text[:400]})
             messages.append({"role": "tool", "tool_call_id": call.id, "name": call.name,
                              "content": text[:TOOL_OUTPUT_LIMIT]})

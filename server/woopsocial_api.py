@@ -355,6 +355,9 @@ def install(app, *, config, db, data_dir, publish_worker=None) -> None:
                 "every_hours": body.every_hours,
                 "per_day": body.per_day,
                 "gap_hours": body.gap_hours,
+                # Handed back so the confirm sends it: without it a plan made
+                # for "tomorrow at 9" was scheduled from now instead.
+                "start_at": body.start_at,
                 "hashtags": [h.lstrip("#").strip() for h in body.hashtags if h.strip()],
                 "items": items,
                 "warnings": warnings,

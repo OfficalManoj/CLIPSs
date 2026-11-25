@@ -591,6 +591,39 @@ def _clip_captions(args: dict) -> str:
     return "\n".join(f"{ln['start']:>6.2f}  {ln['text']}" for ln in lines)
 
 
+def _set_clip_text(args: dict) -> str:
+    """A clip's title, description and hashtags, through PATCH /clips/{id}:
+    the same call the clip editor's text boxes make. Only what was passed is
+    sent, so a new title leaves the description alone."""
+    clip_id = int(args["clip_id"])
+    body: dict = {}
+    for key in ("title", "description"):
+        if args.get(key) is not None:
+            body[key] = str(args[key])
+    if args.get("hashtags") is not None:
+        raw = args["hashtags"]
+        if isinstance(raw, str):
+            raw = raw.replace(",", " ").split()
+        body["hashtags"] = [str(h).strip() for h in raw if str(h).strip()]
+    if not body:
+        return "Nothing changed: pass a title, a description or hashtags."
+    try:
+        clip = _request("PATCH", f"/clips/{clip_id}", body)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return f"There is no clip {clip_id}. list_clips shows the ids that exist."
+        raise
+    tags = " ".join(f"#{str(h).lstrip('#')}" for h in clip.get("hashtags") or [])
+    lines = [f"Clip {clip_id} updated."]
+    if "title" in body:
+        lines.append(f"Title: {clip.get('title', '')}")
+    if "description" in body:
+        lines.append(f"Description: {clip.get('description', '')}")
+    if "hashtags" in body:
+        lines.append(f"Hashtags: {tags or '(none)'}")
+    return "\n".join(lines)
+
+
 def _export_clip(args: dict) -> str:
     out = _request(
         "POST", f"/clips/{int(args['clip_id'])}/export", {"folder": args["folder"]}
@@ -1374,6 +1407,31 @@ TOOLS: list[dict] = [
             "required": ["clip_id"],
         },
         "handler": _clip_captions,
+    },
+    {
+        "name": "set_clip_text",
+        "title": "Set a clip's title, description or hashtags",
+        "description": (
+            "Change the title, description or hashtags of one clip, as the clip "
+            "editor's text boxes do. Only what you pass changes. Titles are cut "
+            "at 100 characters. Hashtags replace the clip's current list. This "
+            "never posts anything."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "clip_id": {"type": "integer", "description": "One clip, from list_clips"},
+                "title": {"type": "string"},
+                "description": {"type": "string"},
+                "hashtags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "The clip's whole hashtag list, e.g. [\"gaming\", \"gta6\"]",
+                },
+            },
+            "required": ["clip_id"],
+        },
+        "handler": _set_clip_text,
     },
     {
         "name": "export_clip",

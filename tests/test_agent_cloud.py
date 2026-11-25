@@ -79,3 +79,45 @@ def test_an_empty_cloud_answer_says_so():
 
     out = run_cloud("clip this", [], [], lambda *_a: ("", None), Silent())
     assert "didn't answer" in out["reply"]
+
+
+def test_posting_needs_the_click_on_a_cloud_model_too():
+    """The same rule as run(): the posting tools never run from the box, and
+    the model is told it needs the person's click on the plan card."""
+    from server.agent import HUMAN_ONLY, NEEDS_CLICK
+
+    for name in sorted(HUMAN_ONLY):
+        backend = Scripted([
+            ChatTurn(tool_calls=[ToolCall(id="c1", name=name, arguments={"clip_ids": [1]})]),
+            ChatTurn(text="Press the button on the card."),
+        ])
+        ran = []
+        result = run_cloud("post them", [], TOOLS, lambda n, a, ran=ran: (ran.append(n), ("posted", None))[1], backend)
+        assert ran == [], name
+        assert result["steps"][0]["result"] == NEEDS_CLICK
+        assert backend.seen[1][0][-1]["content"] == NEEDS_CLICK
+
+
+def test_publish_when_done_is_dropped_on_a_cloud_model_too():
+    from server.agent import NEEDS_CLICK
+
+    backend = Scripted([
+        ChatTurn(tool_calls=[ToolCall(id="c1", name="queue_video",
+                                      arguments={"url": "https://youtu.be/x", "publish_when_done": ["tiktok"]})]),
+        ChatTurn(text="Queued."),
+    ])
+    seen = []
+    result = run_cloud("clip and post", [], TOOLS, lambda n, a: (seen.append(dict(a)), ("Queued", None))[1],
+                       backend)
+    assert seen == [{"url": "https://youtu.be/x"}]
+    assert NEEDS_CLICK in result["steps"][0]["result"]
+
+
+def test_a_schedule_plan_reaches_the_card_on_a_cloud_model():
+    backend = Scripted([
+        ChatTurn(tool_calls=[ToolCall(id="c1", name="schedule_clips_plan", arguments={})]),
+        ChatTurn(text="Here is the schedule."),
+    ])
+    card = {"provider": "woopsocial", "items": [{"clip_id": 2}]}
+    result = run_cloud("post them 5 a day", [], TOOLS, lambda n, a: ("planned", card), backend)
+    assert result["plan"] == card

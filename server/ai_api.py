@@ -173,6 +173,13 @@ def install(app, *, config, db, data_dir, settings_path) -> None:
         models_cache[(spec.id, kind)] = fresh
         return fresh
 
+    def _keyed_text_models(provider_id: str) -> list[dict]:
+        """A keyed provider's text models, from the same cache as this card.
+        The Ask Clips Kitty box's model picker reads it (server/agent_box.py)."""
+        return _models(*_keyed(_spec(provider_id)))[1]
+
+    app.state.ai_text_models = _keyed_text_models
+
     def _forget_models(provider_id: str) -> None:
         for kind in ("text", "stt"):
             models_cache.pop((provider_id, kind), None)

@@ -418,3 +418,52 @@ def test_a_bug_report_names_the_cloud_model_and_nothing_else(monkeypatch):
     monkeypatch.setattr(feedback.requests, "get", no_ollama)
     info = feedback._model_info({"llm": {"backend": "openrouter/meta/muse-spark-1.3"}})
     assert info == {"model": "meta/muse-spark-1.3", "backend": "openrouter", "local": False}
+
+
+# ---- the Ask Clips Kitty box on OpenRouter -------------------------------------
+
+
+def test_a_chat_with_tools_routes_only_to_providers_that_take_tools(fake, backend):
+    transport = fake({"/chat/completions": reply("ok")})
+    backend.chat([{"role": "user", "content": "list my videos"}],
+                 [{"type": "function", "function": {"name": "list_videos", "parameters": {}}}])
+    assert transport.calls[0]["json"]["provider"] == {"require_parameters": True}
+
+
+def test_a_chat_without_tools_is_routed_as_before(fake, backend):
+    transport = fake({"/chat/completions": reply("ok")})
+    backend.chat([{"role": "user", "content": "hi"}], [])
+    assert "provider" not in transport.calls[0]["json"]
+
+
+def test_no_endpoints_for_tool_use_is_said_plainly(fake, backend):
+    fake({"/chat/completions": Response(404, {"error": {
+        "code": 404, "message": "No endpoints found that support tool use. To learn more about provider "
+                                "routing, visit: https://openrouter.ai/docs/provider-routing"}})})
+    with pytest.raises(LLMError) as caught:
+        backend.chat([{"role": "user", "content": "hi"}],
+                     [{"type": "function", "function": {"name": "list_videos", "parameters": {}}}])
+    assert caught.value.kind == "model_unavailable"
+    assert "Uses tools" in caught.value.message
+    assert "endpoints" not in caught.value.message
+
+
+
+def test_no_endpoints_for_the_required_parameters_is_the_tools_case(fake, backend):
+    # With provider.require_parameters, OpenRouter words the same 404 this way.
+    fake({"/chat/completions": Response(404, {"error": {
+        "code": 404, "message": "No endpoints found that can handle the requested parameters. To learn more "
+                                "about provider routing, visit: https://openrouter.ai/docs/provider-routing"}})})
+    with pytest.raises(LLMError) as caught:
+        backend.chat([{"role": "user", "content": "hi"}],
+                     [{"type": "function", "function": {"name": "list_videos", "parameters": {}}}])
+    assert caught.value.kind == "model_unavailable"
+    assert "Uses tools" in caught.value.message
+
+
+def test_a_plain_404_still_says_the_model_is_not_offered(fake, backend):
+    fake({"/chat/completions": Response(404, {"error": {"message": "No such model"}})})
+    with pytest.raises(LLMError) as caught:
+        backend.chat([{"role": "user", "content": "hi"}], [])
+    assert caught.value.kind == "model_unavailable"
+    assert "Uses tools" not in caught.value.message
