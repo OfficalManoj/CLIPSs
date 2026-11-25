@@ -64,7 +64,7 @@ class OllamaBackend(LLMBackend):
         self.timeout = timeout
         self._capabilities_cache: list[str] | None = None
 
-    def generate(self, prompt: str, *, json_mode: bool = False) -> str:
+    def generate(self, prompt: str, *, json_mode: bool = False, max_tokens: int | None = None) -> str:
         payload = {
             "model": self.model,
             "prompt": prompt,
@@ -78,6 +78,10 @@ class OllamaBackend(LLMBackend):
         if json_mode:
             payload["format"] = "json"
         self._limit_reasoning(payload)
+        if max_tokens:
+            # A longer answer than clip picking needs (a whole HyperFrames
+            # composition, video/hyperframes.py). Never less than reasoning got.
+            payload["options"]["num_predict"] = max(payload["options"]["num_predict"], int(max_tokens))
         return self._answer(payload)
 
     def sees_images(self) -> bool:

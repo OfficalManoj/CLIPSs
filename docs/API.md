@@ -1569,13 +1569,35 @@ Installed builds ship the engine as `api.exe` in the app's `resources\backend` f
 the command there is `api.exe mcp`. `CLIPS_STUDIO_API` overrides the address if the engine
 is on another port.
 
-Twenty-two tools. Processing: `queue_video`, `queue_local_file`, `start_queue`,
+Twenty-six tools. Processing: `queue_video`, `queue_local_file`, `start_queue`,
 `job_status`, `queue_status`, `list_videos`, `list_clips`, `clip_captions`,
 `set_clip_text`, `export_clip`, `engine_status`. Scheduling through WoopSocial: `woopsocial_status`,
 `schedule_clips_plan`, `schedule_clips_execute`. Several platforms through Upload-Post:
 `uploadpost_status`, `uploadpost_publish`, `uploadpost_result`. YouTube: `youtube_status`,
 `publish_plan`, `publish_plan_execute`, `publish_status`. Where a clip went, any provider:
-`clip_posts`.
+`clip_posts`. Animations with HyperFrames: `hyperframes_catalog`, `hyperframes_guide`,
+`add_animation`, `remove_animations`.
+
+### Animations (HyperFrames)
+
+Clips Kitty uses [HyperFrames](https://github.com/heygen-com/hyperframes) (HeyGen,
+Apache-2.0) as published: their npm package, their composition format, their catalog
+blocks and their own `lint`, `check` and `render`. `python scripts/fetch_hyperframes.py`
+installs the pinned package and their pinned headless Chrome into `vendor/hyperframes/`;
+it needs Node 22 or newer. `GET /animations/status` says whether it is set up.
+
+`add_animation` takes exactly one of: a catalog `block` with its `variables`
+(`hyperframes_catalog` lists both), a whole composition as `html` (`hyperframes_guide` says
+how, from their docs), or a `request` in plain words, which the app's own AI writes (the
+model the "Ask Clips Kitty" box runs on, or the one chosen in Settings → AI: Ollama,
+OpenRouter or a direct provider, so OpenRouter requests carry the app's attribution
+headers). The engine makes a transparent ProRes 4444 MOV at the clip's size and frame rate
+(`POST /clips/{id}/animations`), then the tool re-renders the clip through
+`POST /clips/{id}/render` with `render_opts.overlays`. Each overlay is laid on after the
+image watermark from its `start`, alpha kept. The source video is never touched, and the
+clip gets a new id. `remove_animations` re-renders with no overlays;
+`GET /clips/{id}/animations` lists what a clip has. A clip without overlays renders exactly
+as before.
 
 Queueing only adds to the queue, which stays stopped until someone starts it, so
 `start_queue` is the Queue page's Start queue button (`POST /queue/resume`).

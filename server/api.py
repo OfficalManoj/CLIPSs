@@ -817,6 +817,12 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
 
     ai_api.install(app, config=config, db=db, data_dir=data_dir, settings_path=settings_path)
 
+    # Animations on clips with HyperFrames (video/hyperframes.py), for the MCP
+    # tools; laying one on a clip is the re-render (render_opts overlays).
+    from server import animations_api
+
+    animations_api.install(app, config=config, db=db, data_dir=data_dir)
+
     # Plugins: install, turn on and off, roll back and remove community
     # pipelines (plugins/api.py). Its own module, the same way; the routes
     # that change what is installed need the desktop app's session secret.
@@ -2916,6 +2922,8 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
         box_spec = checked["model"]
         cloud = not is_local(box_spec)
         model = "" if cloud else parse_spec(box_spec)[1]
+        # The model this exchange runs on, as a backend spec (add_animation).
+        box_model = box_spec
 
         # The plan tool's structured items go to the window, which turns them
         # into a Confirm button; the model only needs to describe the plan.
@@ -2928,6 +2936,11 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                 # in the sentence still beats the bar above it. A file on this
                 # PC follows the bar's switches just as a link does.
                 with_defaults(arguments, body.defaults)
+            if name == "add_animation":
+                # A request the engine writes is written by the model this box
+                # runs on, through the app's own providers (OpenRouter's
+                # attribution headers included), never a different one.
+                arguments["model"] = box_model
             try:
                 text = tool["handler"](arguments)
             except urllib.error.HTTPError as e:

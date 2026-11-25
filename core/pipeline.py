@@ -1816,6 +1816,14 @@ def _render_files(
     if wm_cfg and _wm.has_image(wm_cfg, wm_assets):
         _wm.apply_image(render_path, wm_cfg, canvas, wm_assets)
 
+    # Animations (HyperFrames, video/hyperframes.py): one more overlay pass,
+    # each laid from its start with its alpha, only when the clip has any.
+    if opts.get("overlays"):
+        from video import hyperframes as _hf
+
+        _hf.apply_overlays(render_path, opts["overlays"],
+                           _hf.animations_dir(Path(config["paths"]["data_dir"])))
+
     # Writes final_path complete, with the card. Never raises and never loses
     # the clip: if the card cannot be made it still writes final_path without
     # one, because every step here WRITES the destination rather than
