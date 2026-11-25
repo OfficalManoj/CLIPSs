@@ -132,6 +132,7 @@ def _captions(project: dict) -> list:
 
 
 def _change(data, manifest, row, body):
+    pytest.importorskip("numpy")  # prepare() reaches core.pipeline, which needs numpy
     relayout.prepare(data, manifest["id"], body, row=row, config=CONFIG)
     assert relayout.has_pending(data, manifest["id"])
     out = relayout.apply(data, manifest["id"], exe="editor.exe", open_session=FakeSession)
@@ -232,6 +233,7 @@ def test_the_links_survive_each_layout_change(made):
 def test_a_held_project_is_left_as_it_was(made):
     data, manifest, row, project_dir, _ = made
     before = (project_dir / "concat.json").read_bytes()
+    pytest.importorskip("numpy")  # prepare() reaches core.pipeline, which needs numpy
     relayout.prepare(data, manifest["id"], {"crop": "letterbox"}, row=row, config=CONFIG)
     (project_dir / "concat.lock").write_text("the window")
     with pytest.raises(relayout.Held):
@@ -242,6 +244,7 @@ def test_a_held_project_is_left_as_it_was(made):
 def test_a_failure_puts_the_file_back_and_keeps_the_pending_layout(made, monkeypatch):
     data, manifest, row, project_dir, _ = made
     before = (project_dir / "concat.json").read_bytes()
+    pytest.importorskip("numpy")  # prepare() reaches core.pipeline, which needs numpy
     relayout.prepare(data, manifest["id"], {"crop": "center"}, row=row, config=CONFIG)
 
     def broken(*a, **k):
