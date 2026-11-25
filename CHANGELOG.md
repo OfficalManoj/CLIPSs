@@ -18,6 +18,16 @@ were often broken in a way that only showed up on somebody else's machine.
   live preview. A clip's captions look the same burned in as they do when you open it in the
   editor. The old caption fonts, colours, all caps, word highlight and animations are gone; a
   style you saved before becomes the nearest preset.
+- **Gaming clips open in the editor as layers, and captions stay on one line.** A gaming
+  clip opens in Clips Kitty Editor with its gameplay, webcam and game UI as their own layers,
+  placed as the clip had them, so you can move or resize each one. Layout… at the top of the
+  Editor page switches between the 11 gaming layouts and keeps your cuts and captions; it can
+  remember the layout for that creator's next videos. Other clips get Automatic, Letterbox and
+  Center there. The layers of a gaming clip are tied together: cut, delete, trim, split or
+  speed up one and the others do the same. Captions now fit on one line: up to 3 words (your
+  words per caption), fewer when they don't fit, so a caption no longer shows two words with
+  one below. In the editor, stretching, moving or resizing one caption changes them all, and
+  each keeps its own words.
 - **One editor, and "Clip Editor" is now "Clips".** Clips Kitty Editor is the only editor: the
   old small editor (Edit this clip) is gone, and every Edit opens the clip in Clips Kitty Editor.
   Subtitles and dubbing in 19 languages are under "Other languages…" at the top of the Editor
@@ -25,8 +35,7 @@ were often broken in a way that only showed up on somebody else's machine.
   YouTube upload and your published links are in the Publish window. Publish and Publish all
   are always on the Clips page; with no account connected, the window says how to connect one.
   The Clips page's "Make clips again…" button is gone. A few of the old editor's
-  tools come back in later updates: gaming layouts, framing (Automatic, Letterbox and Center),
-  the word tools, Swap speakers, plugin suggestions, the free music picker with Duck under voice
+  tools come back in later updates: the word tools, Swap speakers, plugin suggestions, the free music picker with Duck under voice
   and the AI edit chat. Sharpen is in the editor as the Sharpen effect. For now the Publish window sends a clip with its own title and
   description to every platform, without a first comment.
 - **A full editor, inside Clips Kitty (when the editor is installed).** The new Editor page

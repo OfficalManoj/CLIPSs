@@ -142,6 +142,28 @@ def prepare(data_dir, project_id: str, body: dict, *, row, config: dict, progres
     return {"layout": choice}
 
 
+def _forget_dropped(project: dict, old_video, video: Path, media_folder: Path, keep: set) -> None:
+    """Take the old layout's video out of the project's bin when the server
+    deletes that file after the change (a video in the project's own media
+    folder, kitty_editor_api _drop_old_video), so the editor does not ask
+    for a missing file on the next open. An item a piece still uses stays."""
+    if not old_video or registry.same_path(old_video, video):
+        return
+    old = Path(str(old_video))
+    try:
+        if old.parent.resolve() != media_folder.resolve():
+            return
+    except OSError:
+        return
+    gone = set(sections.media_ids_for(project, old)) - keep
+    if not gone:
+        return
+    used = {str(clip.get("mediaId")) for timeline in project.get("timelines") or () if isinstance(timeline, dict)
+            for clip in timeline.get("clips") or () if isinstance(clip, dict)}
+    project["media"] = [item for item in project.get("media") or ()
+                        if not (isinstance(item, dict) and str(item.get("id")) in gone - used)]
+
+
 def _clock(manifest: dict) -> str:
     """Whether the project's pieces count the source's time ("source", made
     from the source in step KG) or the base video's ("base")."""
@@ -212,9 +234,10 @@ def apply(data_dir, project_id: str, *, exe: str, open_session=None) -> dict:
                         and str(clip.get("mediaId")) in ours):
                     clip["sourceStart"] = round(max(0.0, float(clip.get("sourceStart") or 0.0) + shift), 6)
                     clip["mediaId"] = new_ids[0]
-        sections.place(project, pending["lanes"], set(new_ids), mint)
-        _write_json(path, project)
+        sections.place(project, pending["lanes"], set(new_ids), mint, captions=manifest.get("captions"))
         old_video = manifest.get("video_file")
+        _forget_dropped(project, old_video, video, home / "media", set(new_ids))
+        _write_json(path, project)
 
         def note(m: dict) -> None:
             m.update(layout=pending["layout"], video_file=str(video), clock=after)

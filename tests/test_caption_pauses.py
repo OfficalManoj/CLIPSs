@@ -490,5 +490,8 @@ def test_the_burned_captions_follow_the_new_lines(tmp_path):
     plain = [(a, b, re.sub(r"\{[^}]*\}", "", text)) for a, b, text in _events(path)]
 
     # "honestly" ends its caption at the cap, not after the 3 s it is written
-    # as lasting, and the quiet part has no caption.
-    assert plain == [("0:00:00.00", "0:00:01.50", "well honestly"), ("0:00:03.30", "0:00:04.50", "it was fine")]
+    # as lasting, and the quiet part has no caption. ("well honestly" is
+    # wider than one line at the default caption size: two captions, so
+    # neither wraps.)
+    assert plain == [("0:00:00.00", "0:00:00.30", "well"), ("0:00:00.30", "0:00:01.50", "honestly"),
+                     ("0:00:03.30", "0:00:04.50", "it was fine")]

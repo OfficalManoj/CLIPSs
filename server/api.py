@@ -1949,6 +1949,16 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
         finally:
             d.close()
 
+    def _clip_language(row) -> str:
+        """The language a clip's captions are burned in (the rerender's
+        detected_language); English when it cannot be told."""
+        try:
+            from transcription.transcriber import detected_language
+
+            return detected_language(row["video_id"], data_dir / "transcripts")
+        except Exception:
+            return "en"
+
     def _clip_captions(row, as_burned: bool = False) -> list[dict]:
         """Current caption lines for a clip: the user-corrected override when
         one exists, otherwise regenerated from the transcript.
@@ -1963,7 +1973,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
             return opts["caption_lines"]
 
         from core.models import ClipCandidate, Segment
-        from video.captions import DEFAULT_STYLE, build_caption_lines
+        from video.captions import DEFAULT_STYLE, build_caption_lines, line_fit
 
         transcript_path = data_dir / "transcripts" / f"{row['video_id']}.json"
         if not transcript_path.exists():
@@ -1974,6 +1984,10 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
         words = opts.get("caption_style", {}).get(
             "words_per_caption", DEFAULT_STYLE["words_per_caption"]
         )
+        # One line per caption, in the box the burn and the editor's titles
+        # draw it in (the render's style, canvas and language).
+        fit = line_fit(opts.get("caption_style") or (config.get("clips") or {}).get("caption_style"),
+                       (1920, 1080) if opts.get("profile") else (1080, 1920), _clip_language(row))
         if as_burned:
             from core.pipeline import _wants_second_speaker
             from video.captions import paint_turns
@@ -1983,9 +1997,9 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                 # Who says a line is worked out afresh at every render.
                 return [
                     {k: v for k, v in line.items() if k != "speaker"}
-                    for line in build_caption_lines(segments, candidate, words, said)
+                    for line in build_caption_lines(segments, candidate, words, said, fit=fit)
                 ]
-        return build_caption_lines(segments, candidate, words)
+        return build_caption_lines(segments, candidate, words, fit=fit)
 
     @app.get("/clips/{clip_id}/captions")
     def get_captions(clip_id: int):

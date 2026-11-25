@@ -180,6 +180,53 @@ def test_each_layout_change_keeps_the_cuts_and_captions(made):
     assert {c["mediaId"] for c in main} == {source_id}
     assert _cuts(project) == cuts and _captions(project) == words
     assert registry.load(data, manifest["id"])["clock"] == "source"
+    # The base the server deletes after this change is out of the bin too:
+    # no "can't find these files" box on the next open.
+    assert [m["path"] for m in project["media"]] == [m["path"] for m in project["media"] if m["id"] == source_id]
+
+
+def test_a_video_kept_on_disk_or_still_used_stays_in_the_bin(made):
+    data, manifest, row, project_dir, bases = made
+    project = _read(project_dir)
+    outside = {"id": "m9", "path": "D:/elsewhere/clip.mp4", "kind": "video"}
+    relayout._forget_dropped({**project, "media": [*project["media"], outside]}, outside["path"], Path("x.mp4"),
+                             registry.folder(data, manifest["id"]) / "media", {"m1"})
+    media = registry.folder(data, manifest["id"]) / "media"
+    media.mkdir(parents=True, exist_ok=True)
+    used = {"id": "m8", "path": str(media / "base.mp4").replace("\\", "/"), "kind": "video"}
+    doc = {**project, "media": [*project["media"], used]}
+    doc["timelines"][0]["clips"][0]["mediaId"] = "m8"
+    relayout._forget_dropped(doc, str(media / "base.mp4"), Path("x.mp4"), media, {"m1"})
+    assert used in doc["media"]
+    doc["timelines"][0]["clips"][0]["mediaId"] = "m1"
+    relayout._forget_dropped(doc, str(media / "base.mp4"), Path("x.mp4"), media, {"m1"})
+    assert used not in doc["media"] and doc["media"][0]["id"] == "m1"
+
+
+def test_the_links_survive_each_layout_change(made):
+    data, manifest, row, project_dir, bases = made
+    record = {"follow": {"lines": [{"start": 0.0, "end": 2.0, "text": "hello"},
+                                   {"start": 2.0, "end": 4.0, "text": "there"}]}}
+    registry.update(data, manifest["id"], lambda m: m.update(captions=record))
+
+    def links(project):
+        tl = project["timelines"][0]
+        columns: dict = {}
+        for c in tl["clips"]:
+            if c["kind"] == "video":
+                columns.setdefault(c.get(sections.TIME_LINK), set()).add(c["trackId"])
+        looks = [c.get(sections.LOOK_LINK) for c in tl["clips"] if c["kind"] == "text"]
+        return columns, looks
+
+    for body in ({"gaming": {**GAMING, "preset": "circle_cam"}}, {"crop": "letterbox"}, {"crop": "track"},
+                 {"gaming": GAMING}):
+        _change(data, manifest, row, body)
+        project = _read(project_dir)
+        columns, looks = links(project)
+        lanes = [t for t in project["timelines"][0]["tracks"] if t.get("kittyRole")]
+        assert sorted(columns) == ["c2", "c3"], body
+        assert all(len(v) == len(lanes) for v in columns.values()), body
+        assert looks == ["captions", "captions"], body
 
 
 def test_a_held_project_is_left_as_it_was(made):

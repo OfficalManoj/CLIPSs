@@ -366,3 +366,28 @@ def widest_word(text: str, family: str, size: float, bold: bool) -> float | None
         glyphs = m.glyphs(word)
         best = max(best, _span(glyphs, 0, len(glyphs) - 1))
     return best * slack
+
+
+def one_line(text: str, family: str, size: float, bold: bool, room: float, spacing: float = 0.0) -> bool | None:
+    """Whether `text` (words with one ordinary space between them) stays on
+    one line inside `room` (the frame's width less the margins), as libass
+    measures a line at 100%. A close call (_UNSURE_PX) counts as not
+    fitting, so a caption drops a word rather than risk a second line.
+    `spacing` is the style's letter spacing in script pixels, added after
+    every character but the last. None when the font cannot be measured or
+    the text has a character this model does not follow (as lines())."""
+    face = font(family)
+    if face is None:
+        return None
+    m = Measure(face, size, bold)
+    for ch in text:
+        if ch == " ":
+            continue
+        if not _plain(ch) or ord(ch) not in m.cmap:
+            return None
+    glyphs = m.glyphs(text)
+    n = len(glyphs)
+    if not n:
+        return True
+    width = _span(glyphs, 0, n - 1) + spacing * (n - 1)
+    return width <= room - _UNSURE_PX

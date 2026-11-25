@@ -835,7 +835,7 @@ class Worker(threading.Thread):
             import json as _json
 
             from core.models import ClipCandidate, Segment
-            from video.captions import DEFAULT_STYLE, build_caption_lines
+            from video.captions import DEFAULT_STYLE, build_caption_lines, line_fit
 
             tpath = data_dir / "transcripts" / f"{clip['video_id']}.json"
             if not tpath.exists():
@@ -847,7 +847,11 @@ class Worker(threading.Thread):
             cand = ClipCandidate(
                 start=clip["start_s"], end=clip["end_s"], score=clip["score"] or 0
             )
-            return build_caption_lines(segments, cand, wpc)
+            # One line per caption, in the box the burn draws it in.
+            style = opts.get("caption_style") or (self.config.get("clips") or {}).get("caption_style")
+            canvas = (1920, 1080) if opts.get("profile") else (1080, 1920)
+            fit = line_fit(style, canvas, self._source_language(clip["video_id"], data_dir))
+            return build_caption_lines(segments, cand, wpc, fit=fit)
         except Exception as e:
             print(f"      (could not rebuild captions: {e})")
             return []
@@ -1108,12 +1112,15 @@ class Worker(threading.Thread):
         if render_opts.get("caption_lines"):
             # Saved caption text is timed for the clip as it was saved: carried
             # to the clip as it is now, and the seconds it gained captioned (#120).
-            from video.captions import DEFAULT_STYLE, refit_caption_lines
+            from transcription.transcriber import detected_language
+            from video.captions import DEFAULT_STYLE, line_fit, refit_caption_lines
 
             style = render_opts.get("caption_style") or (self.config.get("clips") or {}).get("caption_style")
+            canvas = (1920, 1080) if render_opts.get("profile") else (1080, 1920)
             render_opts["caption_lines"] = refit_caption_lines(
                 render_opts["caption_lines"], segments, float(clip["start_s"]), start, end,
                 {**DEFAULT_STYLE, **(style or {})}["words_per_caption"],
+                fit=line_fit(style, canvas, detected_language(video_id, data_dir / "transcripts")),
             )
         if render_opts.get("speaker_edits"):
             # Who a person said is talking where (the editor's Fix speakers) is

@@ -1582,7 +1582,14 @@ def _render_files(
     if captions_on(config, opts):
         lines = opts.get("caption_lines")  # user-corrected caption text, if any
         if _wants_second_speaker(config, opts):
-            from video.captions import DEFAULT_STYLE, build_caption_lines, paint_turns, tag_lines, words_of
+            from video.captions import (
+                DEFAULT_STYLE,
+                build_caption_lines,
+                line_fit,
+                paint_turns,
+                tag_lines,
+                words_of,
+            )
 
             turns = _speaker_turns(source, candidate, segments, config, opts)
             # What was heard, with what a person said in the editor laid over
@@ -1597,16 +1604,18 @@ def _render_files(
                 lines = tag_lines(lines, said, words_of(segments, candidate))
             elif said:
                 wpc = {**DEFAULT_STYLE, **(caption_style or {})}["words_per_caption"]
-                lines = build_caption_lines(segments, candidate, wpc, said)
+                lines = build_caption_lines(segments, candidate, wpc, said,
+                                            fit=line_fit(caption_style, canvas, content_language))
         if edit is not None and (edit.keep is not None or abs(edit.speed - 1) >= 0.01):
             # Sections were cut out and/or the clip was sped up: every
             # surviving caption shifts to its new time on the edited timeline.
-            from video.captions import DEFAULT_STYLE, build_caption_lines
+            from video.captions import DEFAULT_STYLE, build_caption_lines, line_fit
             from video_editor.captions import remap_lines
 
             if lines is None:
                 wpc = {**DEFAULT_STYLE, **(caption_style or {})}["words_per_caption"]
-                lines = build_caption_lines(segments, candidate, wpc)
+                lines = build_caption_lines(segments, candidate, wpc,
+                                            fit=line_fit(caption_style, canvas, content_language))
             lines = remap_lines(lines, edit)
         ass_path = build_captions(
             segments, candidate, clip_dir / f"{stem}.ass",

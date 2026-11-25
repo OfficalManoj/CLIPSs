@@ -144,6 +144,22 @@ def test_the_layout_keys_are_the_gaming_renders():
     assert sections.LAYOUT_KEYS == run.LAYOUT_KEYS
 
 
+def test_a_layout_the_app_picked_opens_as_it_was_drawn():
+    # No preset stored (the app chose Half itself): the render drew the game
+    # whole with the webcam on top (gaming.layout.resolve), so the editor does too.
+    auto = sections.gaming_of({"gaming": {"cam": [0.1, 0.1, 0.2, 0.2], "used_preset": "half"}})
+    assert auto["preset"] == "half" and auto["game_fit"] == "fit" and auto["order"] == "cam_top"
+    below = sections.gaming_of({"gaming": {"cam": [0.1, 0.1, 0.2, 0.2], "cam_position": "bottom",
+                                           "game_fit": "fill", "used_preset": "half"}})
+    assert below["order"] == "game_top" and below["game_fit"] == "fill"
+    chosen = sections.gaming_of({"gaming": {"cam": [0.1, 0.1, 0.2, 0.2], "preset": "half", "used_preset": "half"}})
+    assert "game_fit" not in chosen and "order" not in chosen
+    layout = pytest.importorskip("gaming.layout", exc_type=ImportError)
+    g = {"cam": [0.1, 0.1, 0.2, 0.2]}
+    drawn = layout.resolve(g)
+    assert {k: drawn[k] for k in ("preset", "game_fit", "order")} == {k: auto[k] for k in ("preset", "game_fit", "order")}
+
+
 def test_heads_come_from_the_render_or_the_cache_else_they_are_looked_for():
     g = {"cam": [0.1, 0.1, 0.2, 0.2], "used_cam": [0.1, 0.1, 0.2, 0.2], "heads_norm": {"cam": [0.2, 0.15, 0.25]}}
     settings = sections.gaming_of({"gaming": g})
@@ -240,6 +256,91 @@ def test_placing_again_takes_the_earlier_sections_off_first():
     json.dumps(project)
 
 
+# ---- KG-link: a column's pieces share a time link, the captions a look link ---------------------
+
+def _columns(timeline: dict) -> dict:
+    """Every video piece by its time link."""
+    out: dict = {}
+    for c in timeline["clips"]:
+        if c["kind"] == "video":
+            out.setdefault(c.get(sections.TIME_LINK), []).append(c)
+    return out
+
+
+def _record(*lines) -> dict:
+    return {"follow": {"lines": [{"start": a, "end": b, "text": t} for a, b, t in lines]}}
+
+
+def test_each_columns_pieces_share_one_time_link_the_main_pieces_id():
+    project = _project()
+    mint, _ = _mint_for(project)
+    lanes = sections.gaming_specs(_settings("game_ui"), 1920, 1080, _heads(1920, 1080))
+    sections.place(project, lanes, ["m1"], mint)
+    for timeline in project["timelines"]:
+        main = next(t["id"] for t in timeline["tracks"] if t.get("kittyRole") == "game")
+        columns = _columns(timeline)
+        mains = [c for c in timeline["clips"] if c["kind"] == "video" and c["trackId"] == main]
+        assert sorted(columns) == sorted(c["id"] for c in mains)
+        for piece in mains:
+            column = columns[piece["id"]]
+            assert len(column) == len(lanes) and len({c["trackId"] for c in column}) == len(lanes)
+            assert {(c["start"], c["duration"]) for c in column} == {(piece["start"], piece["duration"])}
+        assert all(sections.LOOK_LINK not in c for c in timeline["clips"])     # no record: no look link
+    json.dumps(project)
+
+
+def test_a_layout_change_keeps_the_links_and_an_existing_link_is_kept():
+    project = _project()
+    mint, _ = _mint_for(project)
+    sections.place(project, sections.gaming_specs(_settings("duo_split"), 1920, 1080), ["m1"], mint)
+    first = {c["id"]: c[sections.TIME_LINK] for c in project["timelines"][0]["clips"]
+             if c["kind"] == "video" and c.get("kittyRole") == "game"}
+    # A piece split in the editor: its tail keeps the column it was given there.
+    project["timelines"][0]["clips"].append(
+        _video("a40", "aT4", 6.4, 1.0, 120.0, **{sections.TIME_LINK: "a41"}))
+    sections.place(project, sections.gaming_specs(_settings("game_ui"), 1920, 1080, _heads(1920, 1080)), ["m1"], mint)
+    timeline = project["timelines"][0]
+    columns = _columns(timeline)
+    assert first == {"a2": "a2", "a3": "a3"}
+    assert sorted(columns) == ["a2", "a3", "a41"]
+    assert all(len(v) == len(sections.gaming_specs(_settings("game_ui"), 1920, 1080, _heads(1920, 1080)))
+               for v in columns.values())
+    sections.place(project, sections.framing_specs("letterbox", 1920, 1080), ["m1"], mint)
+    columns = _columns(project["timelines"][0])
+    assert sorted(columns) == ["a2", "a3", "a41"] and all(len(v) == 1 for v in columns.values())
+
+
+def test_with_a_caption_record_every_caption_title_shares_the_look_link():
+    project = _project()
+    for timeline in project["timelines"]:     # a hook and a watermark: titles on lanes of their own
+        p = "a" if timeline["id"] == "TL1" else "b"
+        timeline["tracks"] += [{"id": f"{p}t7", "muted": False, "visible": True},
+                               {"id": f"{p}t8", "muted": False, "visible": True}]
+        timeline["clips"] += [_text(f"{p}12", f"{p}t7", 0.0, 3.0, "WATCH THIS"),
+                              _text(f"{p}13", f"{p}t8", 0.0, 6.4, "@me")]
+    mint, _ = _mint_for(project)
+    sections.place(project, sections.framing_specs("center", 1920, 1080), ["m1"], mint,
+                   captions=_record((0.0, 2.0, "hello"), (2.0, 4.0, "there")))
+    for timeline in project["timelines"]:
+        looks = {c["text"]["content"]: c.get(sections.LOOK_LINK) for c in timeline["clips"] if c["kind"] == "text"}
+        assert looks == {"hello": "captions", "there": "captions", "WATCH THIS": None, "@me": None}
+    assert project["clips"] is project["timelines"][0]["clips"]
+
+
+def test_link_captions_file_links_every_tab_and_keeps_the_rest(tmp_path):
+    project = _project()
+    (tmp_path / "concat.json").write_text(json.dumps(project), encoding="utf-8")
+    sections.link_captions_file(tmp_path, None)                     # no captions: the file is left alone
+    assert json.loads((tmp_path / "concat.json").read_text(encoding="utf-8")) == project
+    sections.link_captions_file(tmp_path, {"follow": None})         # no record: the lane with the most titles
+    saved = json.loads((tmp_path / "concat.json").read_text(encoding="utf-8"))
+    for timeline in saved["timelines"]:
+        assert [c.get(sections.LOOK_LINK) for c in timeline["clips"] if c["kind"] == "text"] == ["captions"] * 2
+        assert all(sections.LOOK_LINK not in c for c in timeline["clips"] if c["kind"] != "text")
+    assert saved["clips"] == saved["timelines"][0]["clips"]
+    assert not (tmp_path / "concat.json.tmp").exists()
+
+
 # ---- A6: the real editor draws the lanes where the auto render does ------------------------------
 
 @pytest.mark.skipif(not __import__("os").environ.get("CLIPS_KITTY_EDITOR_DIR"),
@@ -330,6 +431,6 @@ def test_the_real_editor_draws_each_section_where_the_auto_render_does(tmp_path,
 def test_the_sound_gain_never_takes_a_peak_past_the_target(monkeypatch, input_i, input_tp, expected):
     import subprocess
 
-    stats = '{\n "input_i" : "%s",\n "input_tp" : "%s",\n "input_lra" : "5.0"\n}' % (input_i, input_tp)
+    stats = f'{{\n "input_i" : "{input_i}",\n "input_tp" : "{input_tp}",\n "input_lra" : "5.0"\n}}'
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "", stats))
     assert sections.loudness_gain("clip.mp4", 0.0, 10.0) == pytest.approx(expected, abs=1e-3)

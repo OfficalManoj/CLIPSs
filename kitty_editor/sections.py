@@ -16,6 +16,13 @@ only Auto (the tracker's moving crop) still needs a framed base video
 - place(): puts them on a saved project, in the project file itself, once
            the editor has let go of it (as languages.apply does).
 
+Links (step KG-link, the editor fork's links.rs): every piece of a column
+(the main lane's piece and its copies on the section lanes) carries one
+time link, so cutting, deleting, trimming, speeding or moving one does it to
+all of them; every caption title carries one look link, so stretching,
+moving or restyling one caption does it to every caption. Both are plain
+keys on the clip in concat.json, which older editors keep and ignore.
+
 The placement rule, the editor's own (concat stage.rs footprint): the crop
 is applied first, what is left is contain-fitted to the canvas, then scaled
 about its centre (stretched per axis) and moved by offsets that are
@@ -44,6 +51,12 @@ LAYOUT_KEYS = ("cam", "cam_position", "game_align", "game_box", "game_fit", "pre
                "safe", "ui_box", "cam2", "panels", "places")
 # Transform numbers a placement sets: a person's keys on them would fight it.
 _PLACED_KEYS = ("scale", "offsetX", "offsetY", "stretchX", "stretchY")
+# The editor fork's link keys (concat-project links.rs). A time link's value
+# is the main lane piece's own clip id (ids are unique, so it never collides);
+# the caption titles share CAPTION_LOOK.
+TIME_LINK = "kittyTimeLink"
+LOOK_LINK = "kittyLookLink"
+CAPTION_LOOK = "captions"
 
 
 # ---- which way a clip's project is made ------------------------------------------------------
@@ -70,6 +83,13 @@ def gaming_of(opts: dict) -> dict | None:
     settings = {k: g[k] for k in LAYOUT_KEYS if k in g}
     if "used_cam" in g:
         settings["cam"] = g["used_cam"]
+    if g.get("used_preset") and g.get("preset") is None:
+        # A layout the app picked by itself stores no preset: the render
+        # (gaming.layout.resolve) drew it with the game whole and the webcam
+        # on top unless told otherwise. Keep that look when the preset it
+        # used is written in, or the plan would zoom the game to fill.
+        settings.setdefault("order", "game_top" if g.get("cam_position") == "bottom" else "cam_top")
+        settings.setdefault("game_fit", settings.get("game_fit") or "fit")
     if g.get("used_preset"):
         settings["preset"] = g["used_preset"]
     return settings
@@ -406,7 +426,7 @@ def _set_numbers(clip: dict, spec: dict) -> None:
         clip["name"] = spec["name"]
 
 
-def place(project: dict, lanes: list[dict], media_ids, mint) -> dict:
+def place(project: dict, lanes: list[dict], media_ids, mint, captions=None) -> dict:
     """The lanes of `lanes` (specs(): the main lane first) on every timeline
     of a saved project, in place, and the project returned.
 
@@ -416,7 +436,13 @@ def place(project: dict, lanes: list[dict], media_ids, mint) -> dict:
     piece (a new id from `mint("c")`), muted. Lanes an earlier placement
     added are taken off first. Captions, titles, music and the rest are not
     touched. `media_ids`: the clip video's media items (the main lane is
-    found by them when it is not tagged)."""
+    found by them when it is not tagged).
+
+    Each main lane piece and its copies share one time link (TIME_LINK):
+    the piece's own id, or the link it already has (a piece split in the
+    editor keeps its own column through a Layout change). With `captions`
+    (the project's caption record), the caption titles get the look link
+    too (link_captions)."""
     for timeline in _timelines(project):
         lane = main_lane(timeline, media_ids)
         if lane is None:
@@ -429,6 +455,7 @@ def place(project: dict, lanes: list[dict], media_ids, mint) -> dict:
                           key=lambda c: float(c.get("start") or 0.0))
         for clip in template:
             _set_numbers(clip, lanes[0])
+            clip[TIME_LINK] = str(clip.get(TIME_LINK) or clip["id"])
         at = next(i for i, t in enumerate(tracks) if isinstance(t, dict) and str(t.get("id")) == str(lane))
         tracks[at][ROLE] = lanes[0]["role"]
         for n, spec in enumerate(lanes[1:], start=1):
@@ -449,11 +476,50 @@ def place(project: dict, lanes: list[dict], media_ids, mint) -> dict:
                 made["muted"] = True
                 clips.append(made)
         timeline["tracks"], timeline["clips"] = tracks, clips
+        if captions:
+            link_captions(timeline, captions)
+    _mirror(project)
+    return project
+
+
+def _mirror(project: dict) -> None:
     active = next((t for t in _timelines(project) if t.get("id") == project.get("activeTimelineId")), None)
     if active is not None:
         # The flat mirror of the active tab every save writes (doc.rs).
         project["tracks"], project["clips"] = active.get("tracks"), active.get("clips")
-    return project
+
+
+def link_captions(timeline: dict, captions) -> int:
+    """One look link on every caption title of a tab (languages.caption_items:
+    the titles matching the caption record, or the lane holding the most
+    titles), so the editor stretches, moves and restyles them together. The
+    hook and the watermark are titles on lanes of their own and are left
+    alone. How many titles were linked."""
+    from kitty_editor import languages
+
+    items = languages.caption_items(timeline, {"captions": captions})
+    for item in items:
+        item[LOOK_LINK] = CAPTION_LOOK
+    return len(items)
+
+
+def link_captions_file(project_dir, captions) -> None:
+    """link_captions on every tab of a project the editor has just saved and
+    closed (a fresh build: nothing else holds it)."""
+    import json
+    import os
+    from pathlib import Path
+
+    if not captions:
+        return
+    path = Path(project_dir) / "concat.json"
+    project = json.loads(path.read_text(encoding="utf-8"))
+    for timeline in _timelines(project):
+        link_captions(timeline, captions)
+    _mirror(project)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(json.dumps(project, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(temp, path)
 
 
 def media_ids_for(project: dict, path) -> list[str]:
@@ -470,7 +536,7 @@ def media_ids_for(project: dict, path) -> list[str]:
     return out
 
 
-def place_file(project_dir, lanes: list[dict], video) -> None:
+def place_file(project_dir, lanes: list[dict], video, captions=None) -> None:
     """place() on a project the editor has just saved and closed (a fresh
     build: nothing else holds it)."""
     import json
@@ -487,7 +553,7 @@ def place_file(project_dir, lanes: list[dict], video) -> None:
         counter[0] += 1
         return f"{prefix}{counter[0]}"
 
-    place(project, lanes, media_ids_for(project, video), mint)
+    place(project, lanes, media_ids_for(project, video), mint, captions=captions)
     temp = path.with_name(path.name + ".tmp")
     temp.write_text(json.dumps(project, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(temp, path)

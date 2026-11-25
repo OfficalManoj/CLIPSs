@@ -404,6 +404,8 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
         with build.open_session(exe, home, [base.parent]) as editor_session:
             progress(0.9, force=True)
             project_dir = build.apply_clip_plan(editor_session, home, manifest["name"], canvas, base, plan)
+        # The captions share one look in the editor (the fork's look link).
+        sections.link_captions_file(project_dir, captions)
         print(f"  Editor project {manifest['id']}: the editor's project made in {time.monotonic() - planned:.1f} s")
         _drop_old_video(manifest, base)
         try:        # the clip's own tab, told from language tabs added later (KF)
@@ -482,7 +484,7 @@ def install(app, *, db, data_dir: Path, session_secret: str, broadcaster, config
             project_dir = build.apply_clip_plan(editor_session, home, manifest["name"], canvas, source, plan,
                                                 window=(start, length), frame=False)
         progress(0.9, force=True)
-        sections.place_file(project_dir, lanes, source)
+        sections.place_file(project_dir, lanes, source, captions)
         print(f"  Editor project {manifest['id']}: the editor's project made in {time.monotonic() - began:.1f} s")
         _drop_old_video(manifest, source)
         try:        # the clip's own tab, told from language tabs added later (KF)

@@ -77,6 +77,7 @@ def build_caption_lines(
     candidate: ClipCandidate,
     words_per_caption: int = 3,
     turns: list | None = None,
+    fit=None,
 ) -> list[dict]:
     """The caption lines for one clip as editable data:
     [{"start", "end", "text"}] with times relative to the clip start.
@@ -85,16 +86,21 @@ def build_caption_lines(
     `turns` (analysis/voice_turns.py) is where someone other than the main
     speaker talks, [[start, end, speaker], ...] in clip seconds. With it a
     line ends where the speaker changes, so no caption mixes two people's
-    words, and the other speaker's lines carry "speaker"."""
+    words, and the other speaker's lines carry "speaker".
+
+    `fit` (line_fit) says whether a caption's text stays on one line. With
+    it, a caption that would wrap shows fewer words (down to one) and the
+    rest start the next one; words_per_caption stays the most. None groups
+    by the word count alone."""
     words = _words_in_window(segments, candidate.start, candidate.end)
     size = max(1, int(words_per_caption))
     lines = []
     heard = bool(_turns(turns))
     captions: list[tuple[int, list[dict]]] = []
     for speaker, run in _by_speaker(words, turns, candidate.start, candidate.end):
-        groups = _grouped(run, size, candidate.start, candidate.end)
+        groups = _grouped(run, size, candidate.start, candidate.end, fit)
         if heard:
-            groups = _standing(groups, size, candidate.start, candidate.end)
+            groups = _standing(groups, size, candidate.start, candidate.end, fit)
         captions.extend((speaker, group) for group in groups)
     said: list[dict] = []       # the clip's words as the editor is given them, when they are needed
     for i, (speaker, group) in enumerate(captions):
@@ -352,7 +358,7 @@ def _stands(word: dict, start: float, end: float) -> bool:
     return said_to - said_from > _TINY
 
 
-def _standing(groups: list[list[dict]], size: int, start: float, end: float) -> list[list[dict]]:
+def _standing(groups: list[list[dict]], size: int, start: float, end: float, fit=None) -> list[list[dict]]:
     """What one person says, in captions that hold a word long enough to
     stand alone. A group of nothing but shorter words goes in the caption
     before it (the first of them in the one after): alone it would be on
@@ -365,7 +371,10 @@ def _standing(groups: list[list[dict]], size: int, start: float, end: float) -> 
 
     Never across a pause, which would keep the caption up through it: each
     stretch between two pauses is done by itself, and short words alone in
-    one are a caption together (_alone has it on screen in the silence)."""
+    one are a caption together (_alone has it on screen in the silence).
+
+    With `fit` (line_fit), words are put together only when the caption
+    still stays on one line."""
     stretches = [groups[:1]]
     for before, group in zip(groups, groups[1:]):
         if _quiet(before, group, start, end):
@@ -373,18 +382,27 @@ def _standing(groups: list[list[dict]], size: int, start: float, end: float) -> 
         else:
             stretches[-1].append(group)
     if len(stretches) < 2:
-        return _stood(groups, size, start, end)
+        return _stood(groups, size, start, end, fit)
     out: list[list[dict]] = []
     for stretch in stretches:
         if any(_stands(w, start, end) for group in stretch for w in group):
-            out.extend(_stood(stretch, size, start, end))
+            out.extend(_stood(stretch, size, start, end, fit))
         else:
             short = [w for group in stretch for w in group]
-            out.extend(short[i:i + size + 3] for i in range(0, len(short), size + 3))
+            if fit is None:
+                out.extend(short[i:i + size + 3] for i in range(0, len(short), size + 3))
+            else:
+                chunks: list[list[dict]] = []
+                for w in short:
+                    if chunks and len(chunks[-1]) < size + 3 and _fits(fit, chunks[-1] + [w]):
+                        chunks[-1].append(w)
+                    else:
+                        chunks.append([w])
+                out.extend(chunks)
     return out
 
 
-def _stood(groups: list[list[dict]], size: int, start: float, end: float) -> list[list[dict]]:
+def _stood(groups: list[list[dict]], size: int, start: float, end: float, fit=None) -> list[list[dict]]:
     """_standing for words with no pause between them."""
     limit = size + 3
     out: list[list[dict]] = []
@@ -393,7 +411,8 @@ def _stood(groups: list[list[dict]], size: int, start: float, end: float) -> lis
     for group in groups:
         if any(_stands(w, start, end) for w in group):
             taken: list[dict] = []
-            while waiting and len(waiting[-1]) + len(taken) + len(group) <= limit:
+            while (waiting and len(waiting[-1]) + len(taken) + len(group) <= limit
+                   and _fits(fit, waiting[-1] + taken + group)):
                 taken = waiting.pop() + taken
             out.extend(waiting)
             out.append(taken + group)
@@ -401,7 +420,7 @@ def _stood(groups: list[list[dict]], size: int, start: float, end: float) -> lis
             seen = room = True
         elif not seen:
             waiting.append(group)
-        elif room and len(out[-1]) + len(group) <= limit:
+        elif room and len(out[-1]) + len(group) <= limit and _fits(fit, out[-1] + group):
             out[-1] = out[-1] + group
         else:
             out.append(group)
@@ -476,6 +495,7 @@ def refit_caption_lines(
     new_start: float,
     new_end: float,
     words_per_caption: int = 3,
+    fit=None,
 ) -> list[dict]:
     """Saved caption lines carried to a clip whose start or end has moved.
 
@@ -485,7 +505,9 @@ def refit_caption_lines(
     start put all of them out of sync (#120). So the lines shift with the
     start, the ones the clip no longer holds are dropped, and the stretch
     before the first and after the last is captioned from the transcript. A
-    line the user blanked still covers its time, and stays blank."""
+    line the user blanked still covers its time, and stays blank. The
+    captions added are grouped with `fit` (build_caption_lines); the saved
+    lines keep their own grouping."""
     duration = new_end - new_start
     shift = old_start - new_start
     kept = []
@@ -499,7 +521,7 @@ def refit_caption_lines(
             kept.append({**line, "start": round(start, 2), "end": round(end, 2)})
     if not kept:
         return build_caption_lines(
-            segments, ClipCandidate(start=new_start, end=new_end, score=0), words_per_caption
+            segments, ClipCandidate(start=new_start, end=new_end, score=0), words_per_caption, fit=fit
         )
     kept.sort(key=lambda l: l["start"])
 
@@ -514,7 +536,7 @@ def refit_caption_lines(
     tail = [w for w in words if w["start"] >= last - _EDGE]
     size = max(1, int(words_per_caption))
     added = []
-    made = [_grouped(head, size, new_start, new_end), _grouped(tail, size, new_start, new_end)]
+    made = [_grouped(head, size, new_start, new_end, fit), _grouped(tail, size, new_start, new_end, fit)]
     for groups in made:
         for i, group in enumerate(groups):
             start = max(0.0, group[0]["start"] - new_start)
@@ -548,14 +570,15 @@ def build_captions(
     there is nothing to caption."""
     opts = presets.normalize(style)
     look = presets.resolve(opts, canvas, language)
-    if bundled.is_bundled(look["fontname"]) and not bundled.usable(look["fontname"]):
+    if _font_missing(look):
         # Never a failed render over a font: Arial, and a line in the job log.
         missing = " (the app's own caption fonts are missing)" if bundled.folder() is None else ""
         print(f"      The caption font {look['fontname']} is missing or damaged in this copy of the app, "
               f"so the captions use Arial{missing}")
-        look = {**look, "fontname": "Arial", "fontsize": max(1, round(look["em"] * 1.117)), "bold": True}
+        look = _arial(look)
     if lines is None:
-        lines = build_caption_lines(segments, candidate, opts["words_per_caption"])
+        lines = build_caption_lines(segments, candidate, opts["words_per_caption"],
+                                    fit=_fit_for(look, canvas))
 
     # The other speaker's lines (build_caption_lines, tag_lines) in their own
     # colour. Only with the option on: a "speaker" left on a saved line by an
@@ -596,6 +619,48 @@ def build_captions(
 
 
 _EVENT_TEXT = "Default,,0,0,0,,"
+
+
+def _font_missing(look: dict) -> bool:
+    return bundled.is_bundled(look["fontname"]) and not bundled.usable(look["fontname"])
+
+
+def _arial(look: dict) -> dict:
+    """The look with Arial in place of an app font that is missing (build_captions)."""
+    return {**look, "fontname": "Arial", "fontsize": max(1, round(look["em"] * 1.117)), "bold": True}
+
+
+def line_fit(style: dict | None, canvas: tuple[int, int] = (1080, 1920), language: str = "en"):
+    """Whether a caption's text stays on one line in its caption box, as a
+    function of the text: the style's font at its size, inside the width
+    between the margins (caption_presets.look's maxWidth, the wrap width the
+    burn and the editor's titles both get). For grouping words into
+    captions (build_caption_lines' `fit`), so a caption is one line rather
+    than two words over one. Text this cannot measure (a script caption_fit
+    does not follow, an emoji, a Windows font this machine lacks) counts as
+    fitting: those captions keep the word count alone."""
+    look = presets.resolve(presets.normalize(style), canvas, language)
+    if _font_missing(look):
+        look = _arial(look)
+    return _fit_for(look, canvas)
+
+
+def _fit_for(look: dict, canvas: tuple[int, int]):
+    room = canvas[0] - 2 * look["margin"] - 1
+    # The editor's text engine wraps a line a few pixels sooner than this
+    # measure (captions within about 7 px of the box broke in two there),
+    # so a caption keeps a small gap to the edge: one line in both.
+    room -= max(8, round(0.02 * room))
+
+    def fits(text: str) -> bool:
+        return caption_fit.one_line(_spaced(text), look["fontname"], look["fontsize"], look["bold"],
+                                    room, look["spacing"]) is not False
+    return fits
+
+
+def _fits(fit, words: list[dict]) -> bool:
+    """Whether `words` make a caption that stays on one line (always, with no `fit`)."""
+    return fit is None or fit(" ".join(str(w["word"]) for w in words))
 
 # Characters with no width and no ink that are not spaces to Python either:
 # zero-width space, word joiner, byte-order mark, Mongolian vowel separator.
@@ -715,18 +780,22 @@ def _spread_evenly(seg: Segment, start: float, end: float) -> list[dict]:
     ]
 
 
-def _grouped(words: list[dict], size: int, start: float, end: float) -> list[list[dict]]:
+def _grouped(words: list[dict], size: int, start: float, end: float, fit=None) -> list[list[dict]]:
     """Words in captions of `size`, a new one after every pause: when the
     words so far have been said (_said) and the next starts more than
     PAUSE_SECONDS later. `start` and `end` are the clip's, in the words' own
     time. A word of no length before a pause is left alone by it too: its
-    caption is on screen in the silence after it (_alone)."""
+    caption is on screen in the silence after it (_alone).
+
+    With `fit` (line_fit), a word that would take the caption onto a second
+    line starts the next caption instead; one word always stands alone,
+    however wide."""
     groups: list[list[dict]] = []
     until = 0.0                 # how far the caption being filled has been said
     for w in words:
         said_from, said_to = _said(w, start, end)
         paused = round(said_from - until, 2) > PAUSE_SECONDS
-        if groups and len(groups[-1]) < size and not paused:
+        if groups and len(groups[-1]) < size and not paused and _fits(fit, groups[-1] + [w]):
             groups[-1].append(w)
             until = max(until, said_to)
         else:
