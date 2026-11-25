@@ -282,9 +282,10 @@ class Box:
         if cloud is None or not model:
             out["reason"] = "Choose a model in the list."
             return out
-        if not keys.has_key(self.data_dir, provider):
+        # The catalog's own id, never the text that came in with the request.
+        if not keys.has_key(self.data_dir, cloud.id):
             out["reason"] = f"Add your {cloud.key_label} in Settings → AI to use {cloud.label} here."
-            out["settings"] = provider
+            out["settings"] = cloud.id
             return out
         # Whether the provider says this model can call tools. A slow or failed
         # list doesn't stop the run: the provider's own answer will say why.
