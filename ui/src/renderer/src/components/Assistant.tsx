@@ -129,11 +129,16 @@ export default function Assistant({
     pickSeq.current += 1
     const seq = pickSeq.current
     setModel(spec)
+    // "Checking..." until the engine has checked the new model: the box must
+    // not look ready for a model it may not be able to run.
+    setReady(null)
+    setReason('')
     try {
       // Remembered for the box only. Its answer is the check for that model.
       const status = await api.chooseAgentModel(spec)
       if (seq === pickSeq.current) showStatus(status)
     } catch (e) {
+      if (seq !== pickSeq.current) return
       setReady(false)
       setReason(e instanceof Error ? e.message : String(e))
     }

@@ -2902,7 +2902,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
     def agent_chat(body: AgentIn):
         """One exchange with the assistant."""
         from llm.spec import is_local, parse_spec
-        from server.agent import run, run_cloud, with_defaults
+        from server.agent import refusal_text, run, run_cloud, with_defaults
         from server.mcp import TOOLS
 
         if not body.message.strip():
@@ -2923,9 +2923,10 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
             tool = next((x for x in TOOLS if x["name"] == name), None)
             if tool is None:
                 return f"There is no tool called {name}.", None
-            if name == "queue_video":
+            if name in ("queue_video", "queue_local_file"):
                 # Only where the model said nothing: an explicit "no captions"
-                # in the sentence still beats the bar above it.
+                # in the sentence still beats the bar above it. A file on this
+                # PC follows the bar's switches just as a link does.
                 with_defaults(arguments, body.defaults)
             try:
                 text = tool["handler"](arguments)
@@ -2936,7 +2937,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                     detail = json.loads(e.read() or b"{}").get("detail", "")
                 except Exception:
                     detail = ""
-                return f"That was refused: {detail or e.reason}", None
+                return refusal_text(detail or e.reason), None
             except Exception:  # a tool failing is news, not a crash
                 # Unlike the refusal above, this is an unexpected internal
                 # failure rather than our own API saying no. Its text can
@@ -2997,7 +2998,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                                  create_backend(agent_box.backend_config(box_spec)),
                                  context=body.context)
             return run(
-                body.message, body.history, TOOLS, call_tool, ollama_host, model,
+                body.message, body.history, TOOLS, call_tool, agent_box.ollama_host, model,
                 # Never below 16K: the tool list alone fills most of Ollama's 4K default.
                 num_ctx=max(16384, int(config["llm"].get("num_ctx") or 0)),
                 context=body.context,

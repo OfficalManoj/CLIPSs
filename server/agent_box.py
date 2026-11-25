@@ -42,6 +42,25 @@ OLLAMA_NOT_ANSWERING = ("Ollama isn't answering right now, so this PC's models c
                         "your own key in the list.")
 
 
+def loopback(host: str) -> str:
+    """The Ollama address with "localhost" spelled 127.0.0.1, for the box's
+    own calls. On Windows "localhost" can try IPv6 first and wait about two
+    seconds per call before falling back, which made choosing a model look
+    ready for seconds before its check answered. The pipeline's own setting
+    is left as it is."""
+    import urllib.parse
+
+    host = host.rstrip("/")
+    try:
+        parts = urllib.parse.urlsplit(host)
+        if (parts.hostname or "").lower() != "localhost":
+            return host
+        netloc = "127.0.0.1" + (f":{parts.port}" if parts.port else "")
+        return urllib.parse.urlunsplit(parts._replace(netloc=netloc))
+    except ValueError:
+        return host
+
+
 def full_spec(spec: str) -> str:
     """"gemma:7b" and "ollama/gemma:7b" are the same model: one spelling."""
     provider, model = parse_spec(spec)
@@ -56,7 +75,7 @@ class Box:
         self.config = config
         self.db = db
         self.data_dir = data_dir
-        self.ollama_host = ollama_host.rstrip("/")
+        self.ollama_host = loopback(ollama_host)
         self.list_models = list_models
         self.vram_gb = vram_gb
         # (name, modified_at) -> can call tools. A model re-pulled under the
@@ -102,6 +121,20 @@ class Box:
         answer = can_call_tools(self.ollama_host, name)
         with self._lock:
             self._tools_seen[key] = answer
+        return answer
+
+    def _tools_known(self, name: str) -> bool:
+        """Whether `name` can call tools, from what the list already asked
+        when it can (the picker has just shown it), else asked now and kept."""
+        from server.agent import can_call_tools
+
+        with self._lock:
+            seen = [answer for (seen_name, _), answer in self._tools_seen.items() if seen_name == name]
+        if seen:
+            return seen[-1]
+        answer = can_call_tools(self.ollama_host, name)
+        with self._lock:
+            self._tools_seen[(name, "")] = answer
         return answer
 
     def _ollama_group(self) -> dict:
@@ -237,7 +270,7 @@ class Box:
         from llm.providers import keys
         from llm.providers.catalog import get
         from llm.signin import catalog as signin
-        from server.agent import can_call_tools, install_offer, usable_model
+        from server.agent import install_offer, usable_model
 
         explicit = bool(spec) or bool(self.chosen())
         spec = full_spec(spec) if spec else self.current()
@@ -252,7 +285,7 @@ class Box:
                 found = usable_model(self.ollama_host, model)
                 if found:
                     return {**out, "ready": True, "model": f"{LOCAL}/{found}"}
-            elif model and can_call_tools(self.ollama_host, model):
+            elif model and self._tools_known(model):
                 return {**out, "ready": True}
             if not self._ollama_answers():
                 out["reason"] = OLLAMA_NOT_ANSWERING
