@@ -376,7 +376,9 @@ def _call(name: str, arguments: dict) -> dict:
 def test_the_new_tools_are_offered():
     names = {t["name"] for t in _send(_request(29, "tools/list"))["result"]["tools"]}
     assert {"start_queue", "clip_posts"} <= names
-    assert len(names) == len(mcp.TOOLS) == 22
+    assert {"set_clip_text", "hyperframes_catalog", "hyperframes_guide", "add_animation",
+            "remove_animations"} <= names
+    assert len(names) == len(mcp.TOOLS) == 26
 
 
 def test_start_queue_presses_start_then_reads_the_queue(monkeypatch):
@@ -635,3 +637,116 @@ def test_set_clip_text_sends_only_fields_patch_clips_takes():
     props = set(tool["inputSchema"]["properties"]) - {"clip_id"}
     assert props <= set(api.ClipPatch.model_fields)
     assert tool["inputSchema"]["required"] == ["clip_id"]
+
+
+# ---- animations (HyperFrames) ------------------------------------------------
+
+
+class _Engine:
+    """Answers by (method, path) prefix, records what was sent."""
+
+    def __init__(self, answers):
+        self.answers = answers
+        self.sent = []
+
+    def __call__(self, method, path, body=None, *a, **k):
+        self.sent.append((method, path, body))
+        for (m, prefix), answer in self.answers.items():
+            if m == method and path.startswith(prefix):
+                return answer(body) if callable(answer) else answer
+        raise AssertionError(f"unexpected {method} {path}")
+
+
+MADE = {"overlay": {"file": "anim-1.mov", "start": 2, "duration": 4.8, "kind": "block", "label": "lt-neon-border"},
+        "overlays": [{"file": "old.mov", "start": 0}, {"file": "anim-1.mov", "start": 2}],
+        "video_id": "v1", "start_s": 10.0, "end_s": 40.0}
+
+
+def test_add_animation_renders_then_re_renders_and_gives_the_new_id(monkeypatch):
+    engine = _Engine({
+        ("POST", "/clips/5/animations"): MADE,
+        ("POST", "/clips/5/render"): {"job_id": 9},
+        ("GET", "/jobs/9"): {"status": "done"},
+        ("GET", "/videos/v1/clips"): [{"id": 3, "start_s": 0, "end_s": 9}, {"id": 12, "start_s": 10.0, "end_s": 40.0}],
+    })
+    monkeypatch.setattr(mcp, "_request", engine)
+    result = _call("add_animation", {"clip_id": 5, "block": "lt-neon-border", "variables": {"name": "C"}, "start": 2})
+    text = result["content"][0]["text"]
+    assert result["isError"] is False and "new id is 12" in text
+    made_body = engine.sent[0][2]
+    assert made_body == {"block": "lt-neon-border", "variables": {"name": "C"}, "start": 2}
+    # Laid on through the existing re-render, with the clip's earlier ones kept.
+    assert engine.sent[1] == ("POST", "/clips/5/render", {"render_opts": {"overlays": MADE["overlays"]}})
+
+
+def test_add_animation_takes_exactly_one_kind(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", _Engine({}))
+    for args in ({"clip_id": 5}, {"clip_id": 5, "block": "x", "request": "y"}):
+        result = _call("add_animation", args)
+        assert result["isError"] is True and "exactly one" in result["content"][0]["text"]
+
+
+def test_a_stopped_queue_is_said_instead_of_waiting(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", _Engine({
+        ("POST", "/clips/5/animations"): MADE,
+        ("POST", "/clips/5/render"): {"job_id": 9},
+        ("GET", "/jobs/9"): {"status": "queued"},
+        ("GET", "/queue"): {"paused": True},
+    }))
+    text = _call("add_animation", {"clip_id": 5, "request": "a subscribe pop"})["content"][0]["text"]
+    assert "start_queue" in text and "job 9" in text
+
+
+def test_a_long_render_answers_with_the_job(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", _Engine({
+        ("POST", "/clips/5/animations"): MADE,
+        ("POST", "/clips/5/render"): {"job_id": 9},
+        ("GET", "/jobs/9"): {"status": "running"},
+    }))
+    monkeypatch.setattr(mcp, "_sleep", lambda s: None)
+    text = _call("add_animation", {"clip_id": 5, "html": "<html></html>"})["content"][0]["text"]
+    assert "Still rendering as job 9" in text and "job_status" in text
+
+
+def test_remove_animations_re_renders_with_none(monkeypatch):
+    engine = _Engine({
+        ("GET", "/clips/5/animations"): {"overlays": [{"file": "a.mov"}], "video_id": "v1",
+                                         "start_s": 10.0, "end_s": 40.0},
+        ("POST", "/clips/5/render"): {"job_id": 4},
+        ("GET", "/jobs/4"): {"status": "done"},
+        ("GET", "/videos/v1/clips"): [{"id": 13, "start_s": 10.0, "end_s": 40.0}],
+    })
+    monkeypatch.setattr(mcp, "_request", engine)
+    text = _call("remove_animations", {"clip_id": 5})["content"][0]["text"]
+    assert "Removed 1" in text and "13" in text
+    assert ("POST", "/clips/5/render", {"render_opts": {"overlays": []}}) in engine.sent
+
+
+def test_remove_animations_on_a_clip_without_any(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", _Engine({("GET", "/clips/5/animations"): {"overlays": []}}))
+    assert "no animations" in _call("remove_animations", {"clip_id": 5})["content"][0]["text"]
+
+
+def test_the_catalog_lists_blocks_and_one_blocks_variables(monkeypatch):
+    monkeypatch.setattr(mcp, "_request", _Engine({
+        ("GET", "/animations/catalog?block="): {"variables": [
+            {"id": "movement", "type": "enum", "label": "Movement", "default": "step",
+             "options": [{"value": "step"}, {"value": "glide"}]}]},
+        ("GET", "/animations/catalog"): {"blocks": [
+            {"name": "lt-neon-border", "title": "Neon", "dimensions": {"width": 1920, "height": 1080},
+             "duration": 4.8, "description": "A lower third"}]},
+    }))
+    listed = _call("hyperframes_catalog", {})["content"][0]["text"]
+    assert "lt-neon-border: Neon (1920x1080, 4.8s)" in listed
+    one = _call("hyperframes_catalog", {"block": "lt-neon-border"})["content"][0]["text"]
+    assert "movement (enum one of step, glide)" in one
+
+
+def test_an_engine_refusal_reaches_the_agent_in_words(monkeypatch):
+    def refuse(method, path, body=None, *a, **k):
+        raise urllib.error.HTTPError(path, 400, "Bad Request", {},
+                                     io.BytesIO(b'{"detail": "Animations need Node 22 or newer"}'))
+
+    monkeypatch.setattr(mcp, "_request", refuse)
+    result = _call("add_animation", {"clip_id": 5, "block": "x"})
+    assert result["isError"] is True and "Node 22" in result["content"][0]["text"]

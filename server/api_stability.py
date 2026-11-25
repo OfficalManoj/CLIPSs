@@ -93,6 +93,12 @@ ROUTES: dict[tuple[str, str], tuple[str, str, str]] = {
     ("GET", "/videos/{video_id}/clips"): (STABLE, "results", "A video's clips with titles, scores and paths."),
     ("GET", "/media/{clip_id}"): (STABLE, "results", "A clip's video file."),
     ("GET", "/clips/{clip_id}/captions"): (STABLE, "results", "A clip's caption lines, clip-relative."),
+    # Animations on clips (HyperFrames); a re-render lays them on the clip.
+    ("GET", "/animations/status"): (EXPERIMENTAL, "results", "Whether HyperFrames is set up: Node 22+ and the package."),
+    ("GET", "/animations/catalog"): (EXPERIMENTAL, "results", "HyperFrames catalog blocks, or one block's variables."),
+    ("GET", "/animations/guide"): (EXPERIMENTAL, "results", "A short how-to from HyperFrames' own docs."),
+    ("GET", "/clips/{clip_id}/animations"): (EXPERIMENTAL, "results", "The animations a clip has now."),
+    ("POST", "/clips/{clip_id}/animations"): (EXPERIMENTAL, "results", "Make one animation for a clip as a transparent MOV."),
     # Models and where the AI runs
     ("GET", "/models"): (STABLE, "models", "Local models through Ollama, and which one is active."),
     ("POST", "/models/activate"): (STABLE, "models", "Choose the local model."),

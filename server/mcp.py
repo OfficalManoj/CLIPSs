@@ -30,6 +30,7 @@ import io
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -917,6 +918,101 @@ def _publish_status(args: dict) -> str:
     )
 
 
+# ---- animations (HyperFrames, video/hyperframes.py) ----------------------------
+
+# How long add_animation and remove_animations wait for the re-render, which
+# runs in the engine's queue, before answering with the job id instead.
+RENDER_WAIT_SECONDS = 240
+RENDER_POLL_SECONDS = 3
+_sleep = time.sleep  # replaced in tests
+
+
+def _hyperframes_catalog(args: dict) -> str:
+    block = str(args.get("block") or "").strip()
+    if block:
+        out = _request("GET", "/animations/catalog?" + urllib.parse.urlencode({"block": block}), timeout=300)
+        variables = out.get("variables") or []
+        if not variables:
+            return (f"{block} has no variables: it plays as designed. Use add_animation with "
+                    f"block {block!r}.")
+        lines = [f"{block} variables (pass them as add_animation's variables):"]
+        for v in variables:
+            extra = ""
+            if v.get("options"):
+                extra = " one of " + ", ".join(str(o.get("value")) for o in v["options"] if isinstance(o, dict))
+            lines.append(f"  {v.get('id')} ({v.get('type', 'string')}{extra}): {v.get('label') or ''}, "
+                         f"default {v.get('default')!r}")
+        return "\n".join(lines)
+    query = str(args.get("query") or "").strip()
+    path = "/animations/catalog" + ("?" + urllib.parse.urlencode({"query": query}) if query else "")
+    blocks = _request("GET", path, timeout=120).get("blocks") or []
+    if not blocks:
+        return "No blocks match that. Try other words, or write the animation with add_animation's request."
+    lines = []
+    for b in blocks[:40]:
+        size = b.get("dimensions") or {}
+        lines.append(f"{b.get('name')}: {b.get('title')} ({size.get('width')}x{size.get('height')}, "
+                     f"{b.get('duration')}s) {str(b.get('description') or '')[:110]}")
+    if len(blocks) > 40:
+        lines.append(f"...and {len(blocks) - 40} more: search with query.")
+    lines.append("Give block to see one block's variables.")
+    return "\n".join(lines)
+
+
+def _hyperframes_guide(_args: dict) -> str:
+    return _request("GET", "/animations/guide", timeout=60).get("guide") or ""
+
+
+def _after_render(job_id: int, made: dict, done_words: str) -> str:
+    """Wait a while for the re-render, then say where the clip is now. A
+    re-rendered clip gets a new id; the old one is gone."""
+    waited = 0.0
+    while waited < RENDER_WAIT_SECONDS:
+        job = _request("GET", f"/jobs/{job_id}", timeout=30)
+        status = job.get("status")
+        if status == "done":
+            clips = _request("GET", f"/videos/{made['video_id']}/clips", timeout=30) or []
+            new = next((c for c in clips if abs(float(c.get("start_s", -1)) - float(made["start_s"])) < 0.01
+                        and abs(float(c.get("end_s", -1)) - float(made["end_s"])) < 0.01), None)
+            if new:
+                return f"{done_words} The clip's new id is {new['id']} (the old id is gone)."
+            return f"{done_words} list_clips on video {made['video_id']} shows its new id."
+        if status in ("failed", "cancelled"):
+            raise ToolError(f"The re-render (job {job_id}) {status}: {job.get('error') or 'no reason given'}")
+        if status == "queued" and _request("GET", "/queue", timeout=30).get("paused"):
+            return (f"Queued as job {job_id}, but the queue is stopped: start it with start_queue. "
+                    f"The clip gets a new id when the job is done (list_clips on video {made['video_id']}).")
+        _sleep(RENDER_POLL_SECONDS)
+        waited += RENDER_POLL_SECONDS
+    return (f"Still rendering as job {job_id}. Follow it with job_status; the clip gets a new id when "
+            f"it is done (list_clips on video {made['video_id']}).")
+
+
+def _add_animation(args: dict) -> str:
+    clip_id = int(args["clip_id"])
+    body = {k: args[k] for k in ("html", "block", "variables", "request", "start", "duration", "model")
+            if args.get(k) not in (None, "", {})}
+    given = [k for k in ("html", "block", "request") if k in body]
+    if len(given) != 1:
+        raise ToolError("Give exactly one of: html (a HyperFrames composition), block (from "
+                        "hyperframes_catalog), or request (what the animation should be).")
+    made = _request("POST", f"/clips/{clip_id}/animations", body, timeout=1800)
+    job = _request("POST", f"/clips/{clip_id}/render", {"render_opts": {"overlays": made["overlays"]}})
+    overlay = made.get("overlay") or {}
+    words = (f"Added the animation ({overlay.get('label')}) at {overlay.get('start', 0):g}s for "
+             f"{overlay.get('duration', 0):g}s.")
+    return _after_render(int(job["job_id"]), made, words)
+
+
+def _remove_animations(args: dict) -> str:
+    clip_id = int(args["clip_id"])
+    now = _request("GET", f"/clips/{clip_id}/animations", timeout=30)
+    if not now.get("overlays"):
+        return f"Clip {clip_id} has no animations."
+    job = _request("POST", f"/clips/{clip_id}/render", {"render_opts": {"overlays": []}})
+    return _after_render(int(job["job_id"]), now, f"Removed {len(now['overlays'])} animation(s).")
+
+
 TOOLS: list[dict] = [
     {
         "name": "youtube_status",
@@ -1453,6 +1549,75 @@ TOOLS: list[dict] = [
         "description": "Whether the engine is up, and which version it is.",
         "inputSchema": {"type": "object", "properties": {}},
         "handler": _engine_status,
+    },
+    {
+        "name": "hyperframes_catalog",
+        "title": "Animation blocks",
+        "description": (
+            "HyperFrames' catalog of ready-made animation blocks (lower thirds, follow and "
+            "subscribe cards, titles, social posts). With no arguments: the blocks made to sit "
+            "over a video. query searches the whole catalog. block gives one block's variables, "
+            "the text and colours add_animation can set. Blocks without variables play as designed."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search words, e.g. 'subscribe' or 'lower third'."},
+                "block": {"type": "string", "description": "One block's name, for its variables."},
+            },
+        },
+        "handler": _hyperframes_catalog,
+    },
+    {
+        "name": "hyperframes_guide",
+        "title": "How to write an animation",
+        "description": (
+            "A short guide, from HyperFrames' own docs, to writing an animation as HTML in "
+            "their format: the root, a transparent background, one paused GSAP timeline. "
+            "Read it before passing html to add_animation."
+        ),
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": _hyperframes_guide,
+    },
+    {
+        "name": "add_animation",
+        "title": "Add an animation to a clip",
+        "description": (
+            "Put an animation on a clip with HyperFrames, then re-render the clip with it; the "
+            "source video is never touched. Give exactly ONE of: block plus variables (from "
+            "hyperframes_catalog), html (a full HyperFrames composition, see hyperframes_guide), "
+            "or request in plain words ('a subscribe button pop at the end'), which Clips Kitty's "
+            "AI writes. start is seconds into the clip. Rendering takes a minute or more. The "
+            "clip gets a NEW id when it is done: use that one afterwards."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "clip_id": {"type": "integer", "description": "From list_clips"},
+                "block": {"type": "string", "description": "A block name from hyperframes_catalog"},
+                "variables": {"type": "object", "description": "The block's variables, e.g. {\"name\": \"Colin\"}"},
+                "html": {"type": "string", "description": "A complete HyperFrames index.html"},
+                "request": {"type": "string", "description": "What the animation should be, in plain words"},
+                "start": {"type": "number", "description": "Seconds into the clip. Default 0."},
+                "duration": {"type": "number", "description": "Seconds, for a block or a request."},
+            },
+            "required": ["clip_id"],
+        },
+        "handler": _add_animation,
+    },
+    {
+        "name": "remove_animations",
+        "title": "Remove a clip's animations",
+        "description": (
+            "Take every animation off a clip by re-rendering it without them. The clip gets a NEW "
+            "id when it is done."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"clip_id": {"type": "integer", "description": "From list_clips"}},
+            "required": ["clip_id"],
+        },
+        "handler": _remove_animations,
     },
 ]
 

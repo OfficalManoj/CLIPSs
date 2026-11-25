@@ -4,7 +4,7 @@
 
 API version **1** (`GET /health` → `api_version`). The engine listens on `http://127.0.0.1:8765`. How to call it, with examples and the gotchas, is in [`docs/API.md`](../API.md); what the labels promise is in [API](api.md).
 
-260 routes: **60 stable**, **47 experimental**, 153 internal.
+265 routes: **60 stable**, **52 experimental**, 153 internal.
 
 | Label | Promise |
 |---|---|
@@ -64,6 +64,11 @@ Details: [`docs/API.md` › Results](../API.md#results).
 
 | Route | Label | What it is for |
 |---|---|---|
+| `GET /animations/catalog` | experimental | HyperFrames catalog blocks, or one block's variables. |
+| `GET /animations/guide` | experimental | A short how-to from HyperFrames' own docs. |
+| `GET /animations/status` | experimental | Whether HyperFrames is set up: Node 22+ and the package. |
+| `GET /clips/{clip_id}/animations` | experimental | The animations a clip has now. |
+| `POST /clips/{clip_id}/animations` | experimental | Make one animation for a clip as a transparent MOV. |
 | `GET /clips/{clip_id}/captions` | stable | A clip's caption lines, clip-relative. |
 | `GET /clips/{clip_id}/words` | experimental | A clip's words with their times. |
 | `GET /media/{clip_id}` | stable | A clip's video file. |
